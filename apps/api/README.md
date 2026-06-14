@@ -95,6 +95,28 @@ l'autorise) → **dédoublonnage** par DOI / identifiant externe → **persistan
 Propriétés : **idempotent** (rejouer ne crée pas de doublon), **incrémental**
 (curseur de reprise), conforme (User-Agent + `mailto`).
 
+## Comptes & gouvernance
+
+Rôles (hiérarchie dans `security.yaml`) : `ROLE_ADMIN` > `ROLE_MODERATEUR` /
+`ROLE_COMITE` > `ROLE_REDACTEUR` > `ROLE_USER`. Identité **vérifiée** requise pour
+rédiger (nom réel ou pseudo, mais traçable — cf. spec §4/§8.6). Le **comité** est
+rattaché à des nœuds (périmètre de validation, `DomainExpertise`).
+
+```bash
+# Créer/mettre à jour des comptes
+bin/console app:user:create admin@scienceswiki.org --role=ROLE_ADMIN --verified
+bin/console app:user:create dr.curie@labo.fr --role=ROLE_COMITE --type=scientifique \
+  --real-name="Pr. Curie" --orcid=0000-0002-1234-5678 --verified
+
+# Donner à un membre du comité la compétence de validation sur un domaine
+bin/console app:user:grant-domain dr.curie@labo.fr physical-sciences
+```
+
+Règle d'autorisation (`AnswerVoter`) : valider une réponse exige `ROLE_COMITE`
+**et** la compétence sur le domaine du nœud (ou `ROLE_ADMIN`) ; l'édition exige
+`ROLE_REDACTEUR`. (Les endpoints d'authentification — login/JWT — seront branchés
+sur ce socle.)
+
 ## Rédaction RAG (brouillons de Q/R)
 
 Génère un brouillon de réponse **vulgarisée et sourcée** pour une question
