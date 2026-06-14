@@ -39,6 +39,7 @@ final class DiscoverCommand extends Command
         $this
             ->addArgument('source', InputArgument::REQUIRED, 'Code de la source (ex. openalex)')
             ->addOption('since', null, InputOption::VALUE_REQUIRED, 'Ne récupérer que les travaux mis à jour depuis cette date (YYYY-MM-DD)')
+            ->addOption('set', null, InputOption::VALUE_REQUIRED, 'Sous-ensemble OAI-PMH (ex. arXiv « cs » ou « cs.AI »)')
             ->addOption('max', null, InputOption::VALUE_REQUIRED, 'Nombre maximal de travaux à traiter')
             ->addOption('resume', null, InputOption::VALUE_NONE, 'Reprendre depuis le dernier curseur enregistré pour cette source')
             ->addOption('async', null, InputOption::VALUE_NONE, 'Publier chaque travail comme message (traitement asynchrone)');
@@ -71,6 +72,10 @@ final class DiscoverCommand extends Command
                 return Command::FAILURE;
             }
             $cursor->since = $since;
+        }
+
+        if (null !== $input->getOption('set')) {
+            $cursor->set = (string) $input->getOption('set');
         }
 
         if (null !== $input->getOption('max')) {

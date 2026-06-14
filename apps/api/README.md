@@ -51,6 +51,16 @@ qui affine le portier de licence (full-text stockable ou non).
 php bin/console harvester:resolve-oa --limit=500
 ```
 
+## Moissonner arXiv (Lot 3 — OAI-PMH)
+
+arXiv est moissonné via OAI-PMH (full-text STEM), avec moisson incrémentale
+(`--since` → `from`), sous-ensembles OAI (`--set`, ex. `cs`, `math`) et un
+rate-limit strict (≤ 1 requête / 3 s, respect du 503/Retry-After).
+
+```bash
+php bin/console harvester:discover arxiv --set=cs --since=2025-06-01 --max=500
+```
+
 ## Ce que fait la moissonneuse (Lot 1)
 
 Pipeline (cf. Phase 1 §4) : **découverte** (OpenAlex, cursor paging, polite pool)
@@ -91,5 +101,5 @@ src/
 
 - ~~**Lot 1** : socle + connecteur OpenAlex.~~ ✅
 - ~~**Lot 2** : résolveur Unpaywall + résolution OA légale.~~ ✅
-- **Lot 3** : connecteur arXiv (OAI-PMH incrémental).
+- ~~**Lot 3** : connecteur arXiv (OAI-PMH incrémental).~~ ✅
 - **Lot 4** : enrichissement IA (embeddings + suggestion de placement).
