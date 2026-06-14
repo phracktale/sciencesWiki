@@ -95,6 +95,23 @@ l'autorise) → **dédoublonnage** par DOI / identifiant externe → **persistan
 Propriétés : **idempotent** (rejouer ne crée pas de doublon), **incrémental**
 (curseur de reprise), conforme (User-Agent + `mailto`).
 
+## Rédaction RAG (brouillons de Q/R)
+
+Génère un brouillon de réponse **vulgarisée et sourcée** pour une question
+rattachée à un nœud : récupération pgvector → prompt sourcé → LLM → `Answer` +
+révision IA + notes de bas de page (DOI). Le brouillon **n'est pas publié** : il
+part en relecture comité (cf. spec §8.2).
+
+```bash
+bin/console wiki:draft-answer --node=computer-science \
+  --question="Qu'est-ce que l'apprentissage automatique ?" -k 5
+```
+
+Le LLM est choisi par `LLM_DRIVER` (`openai`/Ollama sur la machine IA, ou `stub`
+pour le dev). Le parseur tolère une sortie non structurée (fallback) ; avec le
+vrai LLM, la sortie JSON sépare bloc académique / vulgarisation et cite les
+sources sélectionnées.
+
 ## API de lecture (Phase 2/3 — API Platform)
 
 API REST (JSON et JSON-LD/Hydra) exposant la connaissance moissonnée. Doc

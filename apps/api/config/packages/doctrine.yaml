@@ -11,6 +11,10 @@ doctrine:
         # Embeddings (pgvector) — cf. Lot 4.
         types:
             vector: Pgvector\Doctrine\VectorType
+        # Permet à l'introspection du schéma (migrations:diff) de reconnaître le
+        # type SQL « vector » des colonnes existantes.
+        mapping_types:
+            vector: vector
     orm:
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore
