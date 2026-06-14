@@ -198,6 +198,10 @@ Sources OA ──▶ Moissonneuse ──▶ File d'ingestion ──▶ Normalisa
 
 ## 6. La moissonneuse (priorité n°1)
 
+> 📄 **Spécifications détaillées :** voir [`docs/phase-1-moissonneuse.md`](phase-1-moissonneuse.md)
+> (connecteurs, pipeline Messenger, modèle de données, portier de licence,
+> enrichissement IA, critères d'acceptation).
+
 ### 6.1 Responsabilités
 
 1. Interroger périodiquement les **API des sources retenues** (§3.1).
