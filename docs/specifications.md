@@ -1,6 +1,6 @@
 # Spécifications — Plateforme « SciencesWiki »
 
-> **Statut :** brouillon v0.1 — document vivant, soumis à vos réponses.
+> **Statut :** brouillon v0.2 — document vivant, soumis à vos réponses.
 > **Date :** 2026-06-14
 > **Devise du projet :** *éducation populaire, savoir libre, sources ouvertes.*
 
@@ -50,18 +50,25 @@ Le projet se compose de :
 
 ### 3.1 Sources retenues (libre accès légal)
 
-| Source | Type | Accès | Rôle dans le pipeline |
+> **Stratégie d'implémentation (décidée) :** **toutes** les sources ci-dessous
+> sont *référencées* dans le registre de sources dès la conception (modèle de
+> données + configuration), mais seules les **3 premières** (OpenAlex, Unpaywall,
+> arXiv) sont **développées** en Phase 1. Les connecteurs suivants se branchent
+> ensuite sans changer l'architecture (interface `SourceConnector` commune).
+
+| Source | Type | Accès | Rôle dans le pipeline | Phase |
+|---|---|---|---|---|
 |---|---|---|---|
-| **OpenAlex** | Index méta (250M+ travaux) | API gratuite | Socle de découverte, métadonnées, graphe de citations, lien OA |
-| **Unpaywall** | Résolveur OA légal | API gratuite | Trouve la version **légalement** déposée d'un DOI |
-| **arXiv** | Préprints STEM | Full-text libre, API | Moisson full-text (physique, maths, info, bio…) |
-| **Europe PMC / PMC** | Biomédical | Full-text OA, API | Moisson full-text biomédical |
-| **HAL** | Archive ouverte FR | Full-text OA, API | Forte couverture francophone |
-| **DOAJ** | Annuaire de revues OA | API | Filtrage revues 100 % OA |
-| **CORE** | Agrégateur OA mondial | API | Complément de couverture |
-| **OpenAIRE** (EU Open Research) | Agrégateur européen | API | Projets/financements européens |
-| **Persée** | SHS francophone | OA | Sciences humaines et sociales |
-| **Diamond OA** (revues sans frais) | Revues | OA | Cible prioritaire (ni paywall, ni APC) |
+| **OpenAlex** | Index méta (250M+ travaux) | API gratuite | Socle de découverte, métadonnées, graphe de citations, lien OA | **1 (codé)** |
+| **Unpaywall** | Résolveur OA légal | API gratuite | Trouve la version **légalement** déposée d'un DOI | **1 (codé)** |
+| **arXiv** | Préprints STEM | Full-text libre, API | Moisson full-text (physique, maths, info, bio…) | **1 (codé)** |
+| **Europe PMC / PMC** | Biomédical | Full-text OA, API | Moisson full-text biomédical | 2 (référencé) |
+| **HAL** | Archive ouverte FR | Full-text OA, API | Forte couverture francophone | 2 (référencé) |
+| **DOAJ** | Annuaire de revues OA | API | Filtrage revues 100 % OA | 2 (référencé) |
+| **CORE** | Agrégateur OA mondial | API | Complément de couverture | 2 (référencé) |
+| **OpenAIRE** (EU Open Research) | Agrégateur européen | API | Projets/financements européens | 3 (référencé) |
+| **Persée** | SHS francophone | OA | Sciences humaines et sociales | 3 (référencé) |
+| **Diamond OA** (revues sans frais) | Revues | OA | Cible prioritaire (ni paywall, ni APC) | 3 (référencé) |
 
 > *Nature, Google Scholar et autres : voir §3.3.*
 
@@ -80,13 +87,24 @@ que **métadonnées + lien + citation**.
 
 | Source | Décision | Motif |
 |---|---|---|
-| **Sci-Hub** | **Exclue** | Redistribution d'articles **en violation du droit d'auteur**. L'intégrer organiserait une infraction de masse, ruinerait la crédibilité auprès du comité scientifique et des chercheurs, et exposerait juridiquement le projet. Contredit frontalement l'argument « démarche libre et légale ». |
+| **Sci-Hub** | **Exclue (recommandé) — en discussion** | Redistribution d'articles **en violation du droit d'auteur**. L'intégrer organiserait une infraction de masse, ruinerait la crédibilité auprès du comité scientifique et des chercheurs, et exposerait juridiquement le projet. Contredit frontalement l'argument « démarche libre et légale ». *Aucun connecteur Sci-Hub ne sera développé.* Voir l'encart « Maximiser la couverture légalement » ci-dessous. |
 | **Google Scholar** | **Exclue comme moissonneuse** | N'est pas une source OA mais un index ; son scraping est **interdit par ses CGU** et bloqué techniquement. Le même besoin de découverte est couvert **légalement** par OpenAlex + Unpaywall. |
 | **Nature** (contenu paywall) | **Métadonnées seulement** | Seuls les articles Nature explicitement OA seront full-text ; le reste = métadonnées + lien éditeur. |
 
 > Cette frontière n'est pas un détail technique : c'est **l'argument commercial
 > et éthique** auprès des chercheurs. « Nous ne diffusons que ce qui est
 > légalement libre » est précisément ce qui les rassure pour déposer.
+
+**Maximiser la couverture légalement (réponse au besoin couvert par Sci-Hub) :**
+au lieu de pirater les articles sous paywall, on couvre le même besoin par des
+moyens légaux et on en fait un **levier d'éducation populaire** :
+
+1. **Unpaywall + OpenAlex** récupèrent la version Green OA **légalement
+   auto-archivée par l'auteur** (forte couverture, 0 € de risque).
+2. **Open Access Button / CORE** complètent la recherche de copies légales.
+3. Pour un article **sans aucune version OA légale** : on ne stocke que
+   **métadonnées + lien éditeur**, et l'absence devient une **invitation au
+   dépôt** adressée à l'auteur — c'est la mission même du projet en action.
 
 ---
 
@@ -114,9 +132,9 @@ Monorepo proposé :
 ```
 sciencesWiki/
 ├── apps/
-│   ├── api/            # Symfony 8 — API REST/JSON + GraphQL optionnel
-│   ├── web/            # Front public (Symfony + Twig/Stimulus, ou SPA)
-│   └── mobile/         # Flutter (iOS + Android, code partagé)
+│   ├── api/            # Symfony 8 + API Platform — API durcie (sécurité forte)
+│   ├── web/            # Front public Symfony/Twig — consomme l'API
+│   └── mobile/         # Flutter (iOS + Android) — consomme l'API
 ├── services/
 │   └── harvester/      # Moissonneuse (worker autonome)
 ├── ml/                 # Modèles IA auto-hébergés (embeddings, classif.)
@@ -135,13 +153,19 @@ Sources OA ──▶ Moissonneuse ──▶ File d'ingestion ──▶ Normalisa
                           Suggestion de placement dans l'arbre
                                                       │
                                                       ▼
-                        Base (PostgreSQL) ◀──▶ API Symfony 8
-                                                      │
+              Base (PostgreSQL) ◀──▶ API Symfony 8 + API Platform (durcie)
+                                                      ▲
+                          tous les clients passent par l'API (HTTPS, auth)
                         ┌─────────────────────────────┼─────────────┐
-                        ▼                             ▼             ▼
-                    Web public                   App Flutter   Back-office
-                                                              (révision/modération)
+                        │                             │             │
+                  Front Web Symfony/Twig        App Flutter    Back-office
+                   (SSR, SEO, lecture)         (iOS/Android)  (révision/modération)
 ```
+
+> **Décision d'architecture :** l'**API Symfony 8 + API Platform** est l'unique
+> source de vérité, **durcie** (voir §10.1 sécurité). Le **front web Symfony/Twig**
+> (rendu serveur pour le SEO, essentiel à une encyclopédie) et les **apps Flutter**
+> sont des **clients** de cette API. Aucun client n'accède directement à la base.
 
 ---
 
@@ -203,8 +227,18 @@ sources, **journalisation** complète de la provenance (audit/transparence).
 - Besoin probable d'un **graphe** plutôt qu'un arbre strict (une notion peut
   relever de plusieurs parents : ex. « théorie de l'information » ↔ maths/info/
   physique). → modèle **DAG** (arbre + liens transverses) à valider §13.
-- Base taxonomique de départ : à choisir (ex. classifications existantes type
-  OpenAlex *concepts*, UNESCO, Dewey scientifique…) **à confirmer §13**.
+- **Base taxonomique de départ (décidée) :** **amorçage** depuis les *concepts
+  OpenAlex* (déjà alignés sur les publications, donc le placement IA fonctionne
+  immédiatement), **puis taxonomie éditable** : le **comité scientifique** ou le
+  **référent scientifique du domaine** peut **discuter, renommer, fusionner,
+  scinder, déplacer** les nœuds. L'arbre OpenAlex n'est qu'une *graine*, pas une
+  cassure figée.
+- **Gouvernance de la taxonomie :** toute modification structurelle d'un nœud
+  (création/fusion/déplacement) passe par un **workflow de validation** assuré
+  par le référent/comité du domaine concerné, avec **historique versionné** (au
+  même titre que les articles). Un mapping `concept OpenAlex → nœud local` est
+  conservé pour que la moissonneuse continue de proposer des placements même
+  après réorganisation manuelle.
 
 ---
 
@@ -265,17 +299,36 @@ Brouillon → Proposition → Révision communautaire → Relecture experte
 
 ## 10. Stack technique (proposition)
 
-| Brique | Choix proposé | À confirmer |
+| Brique | Choix proposé | Statut |
 |---|---|---|
-| API & back | **Symfony 8** (PHP 8.3+), API Platform, Messenger | ✓ imposé |
-| Base de données | **PostgreSQL** (+ `pgvector` pour embeddings) | §13 |
+| API & back | **Symfony 8** (PHP 8.3+), **API Platform**, Messenger | ✓ décidé |
+| Base de données | **PostgreSQL** (+ `pgvector` pour embeddings) | proposé §13 |
 | Recherche | OpenSearch/Elasticsearch ou pg full-text | §13 |
 | File / workers | Symfony Messenger (+ RabbitMQ/Redis) | §13 |
-| Front web | Twig + Stimulus/Turbo, ou SPA (à décider) | §13 |
-| Mobile | **Flutter** (iOS + Android) | ✓ imposé |
-| IA | Modèles open source auto-hébergés (embeddings + LLM léger) | ✓ choisi |
+| Front web | **Symfony/Twig** (SSR, SEO) consommant l'API | ✓ décidé |
+| Mobile | **Flutter** (iOS + Android) consommant l'API | ✓ décidé |
+| IA | Modèles open source auto-hébergés (embeddings + LLM léger) | ✓ décidé |
 | Conteneurisation | Docker / Docker Compose, CI/CD | §13 |
 | Auth | JWT/OAuth2 pour API ; comptes wiki | §13 |
+
+### 10.1 Sécurité de l'API (exigence : « hyper sécurisée »)
+
+L'API étant l'unique porte d'entrée (web, Flutter, back-office), elle est durcie :
+
+- **Authentification** : JWT courts + *refresh tokens* rotatifs ; OAuth2 pour les
+  intégrations ; option **2FA** pour rôles sensibles (comité, modérateurs, admin).
+- **Autorisation** : contrôle d'accès **par rôle et par domaine** (Voters Symfony)
+  — un relecteur n'agit que sur ses nœuds.
+- **Surface & transport** : HTTPS/HSTS obligatoire, CORS strict, en-têtes de
+  sécurité (CSP, etc.), **rate-limiting** et anti-bruteforce.
+- **Entrées** : validation/sérialisation API Platform, protection injection/XSS,
+  *upload* contrôlé, anti-CSRF côté formulaires Twig.
+- **Audit** : journalisation des actions sensibles (édition, validation,
+  modération) ; traçabilité de la provenance des données moissonnées.
+- **Secrets & dépendances** : *Symfony Secrets*/vault, scans de vulnérabilités
+  (SCA) en CI, mises à jour suivies.
+- **Données** : RGPD (minimisation, droit à l'effacement), chiffrement au repos
+  des données sensibles.
 
 ---
 
@@ -309,25 +362,30 @@ Brouillon → Proposition → Révision communautaire → Relecture experte
 
 ---
 
-## 13. Questions ouvertes (prochain tour)
+## 13. Décisions prises & questions ouvertes
 
-1. **Taxonomie de départ de l'arbre** : repartir des *concepts OpenAlex* (déjà
-   alignés sur les publications) ? d'une classification UNESCO/Dewey ? ou bâtir
-   une taxonomie maison validée par les comités ?
+### Décidé
+- **Sources** : toutes référencées dans le registre ; **3 codées en Phase 1**
+  (OpenAlex, Unpaywall, arXiv).
+- **Taxonomie** : amorcée sur les *concepts OpenAlex*, puis **éditable par le
+  comité/référent scientifique** (versionnée).
+- **Front** : **API Symfony + API Platform durcie** + **front Symfony/Twig** ;
+  les **apps Flutter** consomment l'API.
+- **Licence contenu** : CC BY-SA 4.0. **Langue** : francophone d'abord.
+  **IA** : modèles open source auto-hébergés.
+
+### À trancher au prochain tour
+1. **Sci-Hub** : confirmer l'exclusion définitive (recommandé) — décision laissée
+   ouverte à votre demande (cf. §3.3).
 2. **Arbre strict vs graphe (DAG)** : autorise-t-on un nœud à avoir plusieurs
    parents (notions transverses) ?
-3. **Front web** : rendu serveur Symfony/Twig (SEO, simplicité) **ou** SPA
-   (réactivité) ? Le SEO est crucial pour une encyclopédie.
-4. **Système de réputation** : modèle Wikipedia (droits par ancienneté/édits) ou
-   StackExchange (points/badges) ? Comment recrute-t-on les comités ?
-5. **Périmètre du MVP moissonneuse** : combien de sources au départ ? (je propose
-   OpenAlex + Unpaywall + arXiv pour démarrer simple et légal.)
-6. **Stockage du full-text** : copie locale (si licence CC le permet) ou
+3. **Système de réputation** : modèle Wikipedia (droits par ancienneté/édits) ou
+   StackExchange (points/badges) ? Comment recrute-t-on les comités/référents ?
+4. **Stockage du full-text** : copie locale (si licence CC le permet) ou
    lien + extraction à la volée ?
-7. **Hébergement & budget** : auto-hébergement (souveraineté, coût infra IA) ?
+5. **Hébergement & budget** : auto-hébergement (souveraineté, coût infra IA) ?
    cloud ? association/fondation porteuse du projet ?
-8. **Modération à grande échelle** : outils anti-vandalisme, validation des
-   nouvelles sources externes de vulgarisation (qui décide qu'une vidéo est
-   « sûre » ?).
-9. **Nom & marque** : « SciencesWiki » est-il le nom retenu ?
+6. **Modération à grande échelle** : outils anti-vandalisme ; qui décide qu'une
+   ressource de vulgarisation externe (vidéo, blog) est « sûre » ?
+7. **Nom & marque** : « SciencesWiki » est-il le nom retenu ?
 ```
