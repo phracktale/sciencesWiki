@@ -21,11 +21,11 @@ class TreeEdge
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(targetEntity: TreeNode::class)]
+    #[ORM\ManyToOne(targetEntity: TreeNode::class, inversedBy: 'childEdges')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private TreeNode $parent;
 
-    #[ORM\ManyToOne(targetEntity: TreeNode::class)]
+    #[ORM\ManyToOne(targetEntity: TreeNode::class, inversedBy: 'parentEdges')]
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private TreeNode $child;
 

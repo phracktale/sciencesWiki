@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiFilter;
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use App\Enum\OaStatus;
 use App\Enum\ProcessingStatus;
 use App\Repository\PublicationRepository;
@@ -12,6 +17,7 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
 use Pgvector\Vector;
+use Symfony\Component\Serializer\Attribute\Groups;
 
 /**
  * Un travail scientifique moissonné. Clé de dédoublonnage : le DOI normalisé
@@ -20,6 +26,12 @@ use Pgvector\Vector;
 #[ORM\Entity(repositoryClass: PublicationRepository::class)]
 #[ORM\Table(name: 'publication')]
 #[ORM\Index(name: 'idx_publication_status', columns: ['processing_status'])]
+#[ApiResource(
+    operations: [new GetCollection(), new Get()],
+    normalizationContext: ['groups' => ['publication:read']],
+    paginationItemsPerPage: 30,
+)]
+#[ApiFilter(OrderFilter::class, properties: ['publicationDate', 'id'])]
 class Publication
 {
     #[ORM\Id]
@@ -29,40 +41,52 @@ class Publication
 
     /** DOI normalisé (minuscule, sans préfixe URL) ; absent pour certains préprints. */
     #[ORM\Column(length: 255, nullable: true, unique: true)]
+    #[Groups(['publication:read'])]
     private ?string $doi = null;
 
     /** @var array<string,string> */
     #[ORM\Column(type: Types::JSON)]
+    #[Groups(['publication:read'])]
     private array $externalIds = [];
 
     #[ORM\Column(type: Types::TEXT)]
+    #[Groups(['publication:read'])]
     private string $title;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['publication:read'])]
     private ?string $abstract = null;
 
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
+    #[Groups(['publication:read'])]
     private ?\DateTimeImmutable $publicationDate = null;
 
     #[ORM\Column(length: 16, nullable: true)]
+    #[Groups(['publication:read'])]
     private ?string $language = null;
 
     #[ORM\Column(length: 512, nullable: true)]
+    #[Groups(['publication:read'])]
     private ?string $venue = null;
 
     #[ORM\Column(length: 64, nullable: true)]
+    #[Groups(['publication:read'])]
     private ?string $type = null;
 
     #[ORM\Column(length: 128, nullable: true)]
+    #[Groups(['publication:read'])]
     private ?string $license = null;
 
     #[ORM\Column(length: 16, enumType: OaStatus::class)]
+    #[Groups(['publication:read'])]
     private OaStatus $oaStatus = OaStatus::Unknown;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['publication:read'])]
     private ?string $oaUrl = null;
 
     #[ORM\Column]
+    #[Groups(['publication:read'])]
     private bool $fulltextAvailable = false;
 
     /** Full-text effectivement conservé (vrai seulement si la licence l'autorise). */
@@ -326,6 +350,27 @@ class Publication
         $this->updatedAt = new \DateTimeImmutable();
 
         return $this;
+    }
+
+    /**
+     * Auteurs (forme légère pour l'API), ordonnés par rang.
+     *
+     * @return list<array{name:string,orcid:?string,position:int}>
+     */
+    #[Groups(['publication:read'])]
+    public function getAuthors(): array
+    {
+        $authors = [];
+        foreach ($this->authorships as $authorship) {
+            $author = $authorship->getAuthor();
+            $authors[] = [
+                'name' => $author->getName(),
+                'orcid' => $author->getOrcid(),
+                'position' => $authorship->getPosition(),
+            ];
+        }
+
+        return $authors;
     }
 
     /** @return Collection<int,Authorship> */

@@ -9,6 +9,7 @@ use App\Enum\ProcessingStatus;
 use App\Harvester\Pipeline\PublicationLookup;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
+use Pgvector\Vector;
 
 /**
  * @extends ServiceEntityRepository<Publication>
@@ -70,6 +71,58 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             ->setParameter('status', ProcessingStatus::Normalized->value)
             ->orderBy('p.id', 'ASC')
             ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Recherche sémantique : publications les plus proches d'un embedding
+     * (distance cosinus pgvector).
+     *
+     * @param list<float> $embedding
+     *
+     * @return list<array{publication:Publication,distance:float}>
+     */
+    public function nearestTo(array $embedding, int $k): array
+    {
+        $literal = (string) new Vector($embedding);
+        $k = max(1, $k);
+
+        $rows = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                'SELECT id, embedding <=> CAST(:vec AS vector) AS distance
+                 FROM publication
+                 WHERE embedding IS NOT NULL
+                 ORDER BY distance ASC
+                 LIMIT %d',
+                $k,
+            ),
+            ['vec' => $literal],
+        )->fetchAllAssociative();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $publication = $this->find((int) $row['id']);
+            if (null !== $publication) {
+                $result[] = ['publication' => $publication, 'distance' => (float) $row['distance']];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Recherche plein-texte simple (titre + résumé).
+     *
+     * @return list<Publication>
+     */
+    public function textSearch(string $query, int $limit): array
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('LOWER(p.title) LIKE :q OR LOWER(p.abstract) LIKE :q')
+            ->setParameter('q', '%'.mb_strtolower($query).'%')
+            ->orderBy('p.publicationDate', 'DESC')
+            ->setMaxResults(max(1, $limit))
             ->getQuery()
             ->getResult();
     }

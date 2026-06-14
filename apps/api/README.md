@@ -95,6 +95,27 @@ l'autorise) → **dédoublonnage** par DOI / identifiant externe → **persistan
 Propriétés : **idempotent** (rejouer ne crée pas de doublon), **incrémental**
 (curseur de reprise), conforme (User-Agent + `mailto`).
 
+## API de lecture (Phase 2/3 — API Platform)
+
+API REST (JSON et JSON-LD/Hydra) exposant la connaissance moissonnée. Doc
+interactive : `GET /api/docs`.
+
+```
+GET /api/tree_nodes?level=0&order[label]=asc   # arbre : domaines (filtres level, domain, label)
+GET /api/tree_nodes/{slug}                      # nœud + enfants + parents (fil d'Ariane DAG)
+GET /api/publications?order[publicationDate]=desc
+GET /api/publications/{id}
+
+# Recherche
+GET /api/search?q=...&type=publications&mode=semantic   # kNN pgvector (embedding de la requête)
+GET /api/search?q=...&type=publications&mode=text       # plein-texte (titre/résumé)
+GET /api/search?q=...&type=nodes                         # nœuds les plus proches
+```
+
+> La recherche sémantique embede la requête via `EMBEDDING_DRIVER` (service `ml/`
+> en prod, ou embedder local en dev). Pour une consommation cross-origin (apps
+> Flutter), ajouter `nelmio/cors-bundle`.
+
 ## Tests
 
 ```bash

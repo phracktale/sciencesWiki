@@ -1,0 +1,15 @@
+api_platform:
+    title: SciencesWiki API
+    version: 0.1.0
+    # JSON simple (front/Flutter) + JSON-LD/Hydra (hypermédia).
+    formats:
+        json: ['application/json']
+        jsonld: ['application/ld+json']
+    docs_formats:
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+        html: ['text/html']
+    defaults:
+        stateless: true
+        cache_headers:
+            vary: ['Content-Type', 'Authorization', 'Origin']
