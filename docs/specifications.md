@@ -1,6 +1,6 @@
 # Spécifications — Plateforme « SciencesWiki »
 
-> **Statut :** brouillon v0.5 — document vivant, soumis à vos réponses.
+> **Statut :** brouillon v0.6 — document vivant, soumis à vos réponses.
 > **Date :** 2026-06-14
 > **Devise du projet :** *éducation populaire, savoir libre, sources ouvertes.*
 
@@ -577,6 +577,18 @@ côté contenu.
     (approuvé/rejeté/demande_modif), `commentaire`, `cree_le`.
 - **Report** — signalement de modération (`cible`, `motif`, `statut`, traitement).
 
+### 9.5 Domaine « Invitation au dépôt » (planifié — cf. §11.1)
+
+- **AuthorContact** — coordonnée d'un auteur, avec audit de provenance.
+  - `author_id`, `email`, `source` (crossref/orcid/institution), `source_url`,
+    `verifie` (bool), `cree_le`. *(Données personnelles — minimisation, RGPD.)*
+- **OptOut** — registre de désinscription respecté à vie.
+  - `email` (ou hash), `motif`, `date`. Toute campagne le consulte avant envoi.
+- **DepositInvitation** — invitation au dépôt liée à une publication/auteur.
+  - `publication_id`, `author_id`, `statut` (candidate/contacté/répondu/déposé/
+    refusé/opté-out), `canal` (email/orcid), `campagne_id`, `envoye_le`,
+    `relu_par` (humain), `version_oa_deposee_id` (si dépôt réalisé).
+
 ---
 
 ## 10. Stack technique (proposition)
@@ -633,6 +645,48 @@ L'API étant l'unique porte d'entrée (web, Flutter, back-office), elle est durc
 - **Métriques d'impact** : nombre de Q/R s'appuyant sur leurs travaux, vues,
   portée pédagogique.
 
+### 11.1 Invitation au dépôt des auteurs (études sous paywall) — *planifié*
+
+**Idée :** pour une étude **évaluée par les pairs mais sous paywall** (statut OA
+`closed`), on conserve **métadonnées + résumé + lien** (déjà fait, légalement, via
+OpenAlex — jamais le PDF), on identifie les auteurs, et on leur **propose de
+déposer gratuitement** leur version sur SciencesWiki. C'est la mission §3.4 en
+action : transformer une absence d'OA en **invitation au dépôt**.
+
+**Pipeline (conceptuel) :**
+
+```
+Étude closed + peer-reviewed  →  marquée « candidate à invitation »
+        → résolution du contact auteur (sources ci-dessous)
+        → constitution d'une campagne d'invitation (brouillon)
+        → RELECTURE HUMAINE (relations chercheurs)   ← obligatoire
+        → envoi (⏸ activation différée — cf. décision)
+        → suivi des réponses ; si dépôt → rattachement de la version OA déposée
+```
+
+**Sources de contact (décidé) :**
+1. Email de l'**auteur correspondant** présent dans les **métadonnées OA**
+   (Crossref/OpenAlex) ;
+2. Email **public** d'ORCID ;
+3. **Pages institutionnelles publiques** (annuaires de laboratoires) — récupération
+   **respectueuse** : `robots.txt`, rate-limit, et **traçabilité de la source**
+   de chaque email.
+
+**Garde-fous RGPD & anti-spam (non négociables) :**
+- **Base légale** : intérêt légitime (mission éducative non lucrative) +
+  **transparence** (chaque message indique d'où vient l'email).
+- **Désinscription en un clic** et **registre d'opt-out respecté à vie** ; un
+  auteur opté-out n'est plus jamais contacté.
+- **Source de l'email auditée** et conservée ; minimisation des données.
+- **Pas d'envoi de masse aveugle** : campagnes **relues par un humain**, limites
+  de débit, mesure de réputation.
+- **Activation différée (décidé)** : on **spécifie** le modèle et le workflow
+  maintenant ; l'**envoi réel n'est activé que dans une phase ultérieure**, après
+  cadrage juridique (DPO/CNIL) et mise en place de l'opt-out.
+
+> Disponible techniquement après la Phase 1 (les études `closed` sont déjà
+> identifiées par le pipeline OA), mais **encadré et activé plus tard**.
+
 ---
 
 ## 12. Feuille de route (phasage proposé)
@@ -646,6 +700,7 @@ L'API étant l'unique porte d'entrée (web, Flutter, back-office), elle est durc
 | **4. Wiki + rédaction RAG** | Édition + révision | Articles, blocs, versioning, workflow comité/modération, **brouillons IA sourcés (RAG)** |
 | **5. Mobile** | Lecture/navigation | App Flutter (lecture d'abord) |
 | **6. Communauté** | Réputation, incitation chercheurs | Gouvernance, page dépôt, comités |
+| **7. Relations chercheurs** | Invitation au dépôt (§11.1) | Résolution de contact, campagnes relues, opt-out/RGPD — *envoi activé après cadrage juridique* |
 
 > Vous avez indiqué vouloir **commencer par la moissonneuse** : Phase 1 est donc
 > le premier chantier de développement.
