@@ -242,7 +242,9 @@ sources, **journalisation** complète de la provenance (audit/transparence).
 - **Rédaction de vulgarisation** : un **LLM open source auto-hébergé** génère le
   **brouillon** de l'article de vulgarisation à partir des publications sourcées
   du nœud (avec citations DOI). Ce brouillon part **en draft au comité de
-  lecture** et n'est **jamais public** sans validation (cf. §8.2).
+  lecture** et n'est **jamais public** sans validation (cf. §8.2). La génération
+  est **ancrée par un serveur RAG** (récupération des passages réels + citations
+  obligatoires) — voir [`docs/rag-server.md`](rag-server.md).
 - **Pas de dépendance à une API propriétaire** ; abstraction permettant de
   changer de modèle.
 - Toute production IA est **non décisionnelle** : un humain (comité) valide le
@@ -497,8 +499,8 @@ L'API étant l'unique porte d'entrée (web, Flutter, back-office), elle est durc
 | **0. Cadrage** | Valider la spec | Ce document finalisé + ADR |
 | **1. Moissonneuse (MVP)** | Ingestion légale + normalisation | Worker harvester, 2-3 sources (OpenAlex+Unpaywall+arXiv), schéma BDD, dédoublonnage |
 | **2. IA de tri** | Placement assisté | Embeddings + classif. arbre auto-hébergés |
-| **3. Arbre + API** | Exposer la connaissance | TreeNode, API Symfony, recherche, **export bibliographique Zotero (nœud + descendants)** |
-| **4. Wiki** | Édition + révision | Articles, blocs, versioning, workflow comité/modération |
+| **3. Arbre + API + RAG** | Exposer la connaissance | TreeNode, API Symfony, **recherche sémantique (RAG)**, **export bibliographique Zotero (nœud + descendants)** |
+| **4. Wiki + rédaction RAG** | Édition + révision | Articles, blocs, versioning, workflow comité/modération, **brouillons IA sourcés (RAG)** |
 | **5. Mobile** | Lecture/navigation | App Flutter (lecture d'abord) |
 | **6. Communauté** | Réputation, incitation chercheurs | Gouvernance, page dépôt, comités |
 

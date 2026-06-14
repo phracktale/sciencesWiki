@@ -1,0 +1,126 @@
+# Serveur RAG (Retrieval-Augmented Generation) auto-hébergé
+
+> **Rattaché à :** `docs/specifications.md` (§6.3 IA, §8.2 rédaction).
+> **Statut :** brouillon v0.1.
+> **Principe :** auto-hébergé, open source, **sourcé par construction**.
+
+---
+
+## 1. Pourquoi un serveur RAG
+
+Une plateforme de vulgarisation **scientifique** ne peut pas se permettre une IA
+qui « invente ». Le RAG répond précisément à ça :
+
+- **Ancrage (grounding)** : la génération s'appuie sur des **passages réellement
+  récupérés** dans le corpus moissonné → **chaque affirmation porte ses sources
+  (DOI)**. C'est l'exigence même du *bloc académique* (cf. spec §8.1).
+- **Anti-hallucination** : le LLM reformule/explique des passages cités, il
+  n'invente pas de faits.
+- **Unification** : un seul service réunit ce qui était dispersé — embeddings
+  (déjà prévus en Phase 1), **recherche sémantique**, **aide au placement**, et
+  **rédaction des brouillons** de vulgarisation.
+- **Souveraineté** : 100 % **auto-hébergé**, modèles **open source** (cohérent
+  avec les décisions de la spec).
+
+---
+
+## 2. Ce que le serveur RAG dessert
+
+1. **Rédaction des brouillons de vulgarisation** (cf. spec §8.2) : pour un nœud,
+   il récupère les passages pertinents des publications rattachées et génère un
+   **brouillon sourcé** (avec citations) → part en draft au **comité**.
+2. **Recherche sémantique** pour les utilisateurs (web + Flutter via l'API).
+3. **Assistant Q&A sourcé** (optionnel) : « explique-moi X » → réponse **avec
+   citations**, jamais sans source.
+4. **Aide au placement** : réutilise la similarité vectorielle pour proposer le
+   nœud d'une nouvelle publication (déjà décrit en Phase 1).
+
+---
+
+## 3. Architecture & composants
+
+```
+              ┌────────────────────── Serveur RAG (ml/, auto-hébergé) ─────────────────────┐
+              │                                                                             │
+Publications  │  [1] Ingestion+Chunking → [2] Embeddings → [3] Vector store (pgvector)      │
+ (corpus)  ───┼────────────────────────────────────────────────┐                           │
+              │                                                  ▼                           │
+   Requête ───┼─▶ [4] Retrieval HYBRIDE (vecteur + texte/BM25) ─▶ [5] Rerank (opt.) ─┐       │
+              │                                                                      ▼       │
+              │                                       [6] Génération (LLM local) + [7] Contrainte de citation
+              └─────────────────────────────────────────────────────────────────────┼──────┘
+                                                                                      ▼
+                                          API Symfony  ◀── réponse + passages + DOIs sources
+```
+
+1. **Ingestion & chunking** — découpe le texte exploitable (full-text **si la
+   licence l'autorise**, sinon **résumé**) en *chunks* avec chevauchement ;
+   conserve le lien `chunk → publication (DOI)`.
+2. **Embeddings** — **réutilise le service `/embed` de la Phase 1**
+   (sentence-transformers multilingue). Pas de duplication.
+3. **Vector store** — **pgvector** (déjà dans la base) : pas d'infra
+   supplémentaire à introduire.
+4. **Retrieval hybride** — combine **similarité vectorielle** (pgvector) et
+   **recherche plein-texte** (PostgreSQL FTS ou OpenSearch) pour la précision
+   terminologique scientifique.
+5. **Rerank** (optionnel) — *cross-encoder* open source pour réordonner le top-k.
+6. **Génération** — **LLM open source auto-hébergé** (le même que pour la
+   rédaction) ; reçoit la question + les passages récupérés.
+7. **Contrainte de citation** — la sortie **doit** rattacher chaque affirmation
+   aux passages/DOIs récupérés ; sinon l'affirmation est écartée/signalée.
+
+---
+
+## 4. API (proposée)
+
+Service `ml/` exposant (consommé **uniquement** par l'API Symfony, jamais
+directement par les clients) :
+
+| Endpoint | Rôle |
+|---|---|
+| `POST /embed` | Vecteur d'un texte (déjà Phase 1) |
+| `POST /search` | Retrieval hybride → passages + scores + DOIs |
+| `POST /draft` | Brouillon de vulgarisation **sourcé** pour un nœud donné |
+| `POST /ask` | Réponse Q&A **avec citations** (jamais sans source) |
+
+Côté Symfony : interface `RagClient` **abstraite** (on peut changer de
+moteur/modèle), appels server-to-server authentifiés, réseau interne.
+
+---
+
+## 5. Modèle de données (ajouts)
+
+- **DocumentChunk** — `publication_id`, `ordre`, `texte`, `embedding`
+  (vector, pgvector), `source_span` (passage d'origine pour la citation),
+  `origine` (fulltext / resume).
+- (Réutilise `Publication`, `PlacementSuggestion` de la Phase 1 ; aucune base
+  externe : tout reste dans PostgreSQL + pgvector.)
+
+---
+
+## 6. Garde-fous (essentiels pour la crédibilité)
+
+- **Ne récupère/indexe que du contenu autorisé** : full-text seulement si la
+  licence le permet (cf. *LicenseGate*, Phase 1 §5) ; sinon **résumé** seul.
+- **Pas de publication automatique** : tout brouillon RAG passe par la
+  **validation du comité** avant accès public (workflow spec §8.2 **inchangé**).
+- **Citations obligatoires** : une réponse/brouillon sans source rattachée est
+  **rejeté** — c'est la règle d'or.
+- **Traçabilité** : on conserve, pour chaque génération, les **passages et DOIs**
+  utilisés (audit + affichage des sources).
+- **Auto-hébergé, open source, sans API propriétaire** ; `RagClient` abstrait.
+
+---
+
+## 7. Phasage
+
+| Quand | Capacité RAG activée |
+|---|---|
+| **Phase 1** | Embeddings + similarité (placement) — *déjà prévu* |
+| **Phase 2-3** | Chunking + **retrieval hybride** + **recherche sémantique** publique |
+| **Phase 4** | **Génération sourcée** : brouillons de vulgarisation + Q&A sourcé |
+
+> Conclusion : oui, un serveur RAG est pertinent — et il **n'ajoute quasiment pas
+> d'infrastructure** (il s'appuie sur le service d'embeddings et pgvector déjà
+> introduits en Phase 1). Il **devient indispensable** dès qu'on active la
+> rédaction IA des articles.
