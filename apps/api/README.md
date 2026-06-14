@@ -207,3 +207,9 @@ src/
 
 La Phase 1 (moissonneuse) est complète : ingestion légale 3 sources → résolution
 OA → embeddings → placement assisté dans l'arbre.
+
+## CORS (apps Flutter web / front cross-origin)
+
+`nelmio/cors-bundle` ajoute les en-têtes CORS. En production, restreindre les
+origines via `CORS_ALLOW_ORIGIN` (regex), ex. le domaine du front et de l'app web.
+Les apps Flutter **mobiles** (iOS/Android natives) ne sont pas soumises au CORS.
