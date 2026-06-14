@@ -26,13 +26,24 @@ qui « invente ». Le RAG répond précisément à ça :
 
 ## 2. Ce que le serveur RAG dessert
 
-1. **Rédaction des brouillons de vulgarisation** (cf. spec §8.2) : pour un nœud,
-   il récupère les passages pertinents des publications rattachées et génère un
-   **brouillon sourcé** (avec citations) → part en draft au **comité**.
-2. **Recherche sémantique** pour les utilisateurs (web + Flutter via l'API).
-3. **Assistant Q&A sourcé** (optionnel) : « explique-moi X » → réponse **avec
-   citations**, jamais sans source.
-4. **Aide au placement** : réutilise la similarité vectorielle pour proposer le
+> Modèle éditorial = **vulgarisation pilotée par les questions** (cf. spec §8).
+> L'unité produite est une **Q/R** rattachée à un nœud, pas un article par
+> publication.
+
+1. **Suggestion de questions** : pour un nœud, le RAG propose **quelques questions
+   évidentes** tirées du corpus du nœud (questions canoniques candidates).
+2. **Rédaction de réponses sourcées** : pour une question (suggérée ou libre), il
+   récupère les passages pertinents et génère une **réponse vulgarisée** avec
+   **notes de bas de page (DOI)**.
+   - question **suggérée** → brouillon **pré-rédigé** soumis au **comité** ;
+   - question **libre** → réponse **à la volée**, publique avec **bandeau « non
+     relu »** (cf. spec §8.4).
+3. **Garde-fou de domaine + réorientation** : détermine si la question relève du
+   nœud courant ; sinon **réoriente vers le bon nœud** et y rattache la Q/R.
+4. **Déduplication sémantique** : avant de générer, cherche une Q/R existante
+   proche → réutilise plutôt que dupliquer.
+5. **Recherche sémantique** pour les utilisateurs (web + Flutter via l'API).
+6. **Aide au placement** : réutilise la similarité vectorielle pour proposer le
    nœud d'une nouvelle publication (déjà décrit en Phase 1).
 
 ---
@@ -80,8 +91,13 @@ directement par les clients) :
 |---|---|
 | `POST /embed` | Vecteur d'un texte (déjà Phase 1) |
 | `POST /search` | Retrieval hybride → passages + scores + DOIs |
-| `POST /draft` | Brouillon de vulgarisation **sourcé** pour un nœud donné |
-| `POST /ask` | Réponse Q&A **avec citations** (jamais sans source) |
+| `POST /suggest-questions` | Pour un nœud → quelques questions évidentes (candidates canoniques) |
+| `POST /answer` | Pour une question (nœud + texte) → réponse **sourcée** (notes DOI) + `domaine_ok`/`noeud_suggere` (garde-fou/réorientation) + `doublon_de` (dédup) |
+| `POST /draft` | Brouillon canonique **pré-rédigé** d'une question suggérée (→ comité) |
+
+Le garde-fou de domaine, la réorientation et la déduplication sont portés par
+`/answer` (champs de réponse) ; l'API Symfony applique la décision (rattachement
+au bon nœud, réutilisation d'une Q/R existante, statut `non_relu` vs `canonique`).
 
 Côté Symfony : interface `RagClient` **abstraite** (on peut changer de
 moteur/modèle), appels server-to-server authentifiés, réseau interne.

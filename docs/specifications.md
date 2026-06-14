@@ -1,6 +1,6 @@
 # Spécifications — Plateforme « SciencesWiki »
 
-> **Statut :** brouillon v0.3 — document vivant, soumis à vos réponses.
+> **Statut :** brouillon v0.4 — document vivant, soumis à vos réponses.
 > **Date :** 2026-06-14
 > **Devise du projet :** *éducation populaire, savoir libre, sources ouvertes.*
 
@@ -239,12 +239,13 @@ sources, **journalisation** complète de la provenance (audit/transparence).
   multilingue) servi en local.
 - **Classification** : k-NN sur embeddings vers les nœuds de l'arbre + (option)
   petit LLM open source local pour justifier/affiner le placement.
-- **Rédaction de vulgarisation** : un **LLM open source auto-hébergé** génère le
-  **brouillon** de l'article de vulgarisation à partir des publications sourcées
-  du nœud (avec citations DOI). Ce brouillon part **en draft au comité de
-  lecture** et n'est **jamais public** sans validation (cf. §8.2). La génération
-  est **ancrée par un serveur RAG** (récupération des passages réels + citations
-  obligatoires) — voir [`docs/rag-server.md`](rag-server.md).
+- **Rédaction de vulgarisation (pilotée par les questions)** : un **LLM open
+  source auto-hébergé** génère des **réponses sourcées** (notes DOI) à des
+  **questions** rattachées à un nœud — questions **suggérées** (→ brouillon validé
+  par le comité, label ✅) ou **libres** (→ public immédiat avec bandeau ⚠️ « non
+  relu »). Voir §8 et le **serveur RAG**
+  ([`docs/rag-server.md`](rag-server.md)) qui **ancre** la génération (passages
+  réels + citations obligatoires).
 - **Pas de dépendance à une API propriétaire** ; abstraction permettant de
   changer de modèle.
 - Toute production IA est **non décisionnelle** : un humain (comité) valide le
@@ -314,60 +315,116 @@ sous forme de bibliographie importable dans **Zotero** (et autres gestionnaires)
 
 ---
 
-## 8. Le wiki
+## 8. Le wiki — vulgarisation pilotée par les questions
 
-### 8.1 Anatomie d'un article
+### 8.1 Principe (décidé)
+
+La vulgarisation **n'est pas** « un article par publication » (trop volumineux,
+inexploitable). **L'unité de contenu est la question concrète + sa réponse
+(Q/R)**, rattachée à un **nœud** de l'arbre. On répond à ce que les gens se
+demandent réellement.
+
+- **Questions suggérées** : sur le nœud où se trouve l'utilisateur, l'IA (via le
+  **RAG**, cf. [`docs/rag-server.md`](rag-server.md)) propose **quelques questions
+  évidentes** tirées du corpus du nœud.
+- **Clic → rédaction** : l'IA rédige la **réponse vulgarisée**, ancrée RAG, avec
+  les **sources en notes de bas de page** (DOI).
+- **Questions libres** : l'utilisateur pose les siennes, avec **garde-fous de
+  domaine**.
+- **Arbre des vulgarisations = projection simplifiée de l'arbre de référence** :
+  même structure de nœuds, mais chaque nœud ne porte qu'une **poignée de Q/R**,
+  pas les milliers de publications sous-jacentes.
+
+### 8.2 Deux types de questions
+
+| Type | Origine | Réponse |
+|---|---|---|
+| **Suggérée (canonique)** | L'IA propose les questions évidentes du nœud | L'IA **pré-rédige** un brouillon → **comité valide** → Q/R **canonique publique** (label *validé*) |
+| **Libre** | L'utilisateur saisit sa question | L'IA répond **à la volée** (RAG, sourcée) → **publique immédiatement avec bandeau** *« généré par IA, non relu par un comité »* → file de validation |
+
+**Garde-fou de domaine (décidé : réorientation) :** si une question libre relève
+d'un **autre nœud**, l'IA répond en **réorientant vers le bon nœud** et y
+**rattache la Q/R** — le savoir atterrit toujours au bon endroit de l'arbre.
+
+### 8.3 Anatomie d'une réponse (Q/R)
 
 ```
-┌────────────────────────────────────────────┐
-│  Titre de la notion + position dans l'arbre │
-├────────────────────────────────────────────┤
-│  🔵 BLOC ACADÉMIQUE (sourcé)                 │
-│     Faits établis, chacun lié à un DOI       │
-│     Statut : validé par comité du domaine    │
-├────────────────────────────────────────────┤
-│  🟡 BLOC VULGARISATION (non académique)      │
-│     Travail pédagogique communautaire        │
-│     Mention explicite « non académique »     │
-├────────────────────────────────────────────┤
-│  📚 Sources primaires (publications OA)      │
-│  🔗 Ressources de vulgarisation « sûres »    │
-│      (vidéos, articles), bloc identifié      │
-└────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────┐
+│  ❓ QUESTION  (+ nœud de rattachement dans l'arbre)  │
+├────────────────────────────────────────────────────┤
+│  STATUT :  ✅ Validé par le comité                   │
+│        ou  ⚠️ Généré par IA — non relu (bandeau)     │
+├────────────────────────────────────────────────────┤
+│  🔵 BLOC ACADÉMIQUE (sourcé)                         │
+│     Faits établis, chacun lié à un DOI               │
+├────────────────────────────────────────────────────┤
+│  🟡 BLOC VULGARISATION (pédagogique, non académique) │
+├────────────────────────────────────────────────────┤
+│  ¹ ² ³  Notes de bas de page → publications (DOI)    │
+│  🔗 Ressources de vulgarisation « sûres » (bloc id.) │
+└────────────────────────────────────────────────────┘
 ```
 
-### 8.2 Cycle de vie éditorial
+### 8.4 Cycle de vie & statuts
 
-**Principe (décidé) : rédaction IA → validation par le comité de lecture AVANT
-toute mise en ligne publique.** Aucun article n'est public tant qu'il n'est pas
-validé.
+Deux statuts **publics** coexistent (assouplissement assumé : réactivité +
+liberté de questionnement, encadrées par le **label** et le **sourcing**) :
 
 ```
-[1] L'IA (auto-hébergée) rédige un BROUILLON de vulgarisation à partir des
-    publications sourcées rattachées au nœud.
-        │
-[2] DRAFT privé : visible uniquement du COMITÉ DE LECTURE du domaine.
-        │   ↳ discussion, annotations, corrections (itérations)
-        │   ↳ vérification : exactitude, sourcing (DOI), neutralité,
-        │     séparation bloc académique / bloc vulgarisation
-        ▼
-[3] VALIDÉ par le comité de lecture.
-        │
-[4] PUBLIC : l'accès public devient possible.
-        ↺ (historique des versions, diff, restauration, page de discussion)
+A) Q/R CANONIQUE (suggérée)
+   IA propose la question + pré-rédige la réponse (RAG, sourcée)
+        → DRAFT relu par le COMITÉ (annote, corrige, itère)
+        → VALIDÉ  → public, label ✅ « validé par le comité »
+
+B) Q/R LIBRE (utilisateur)
+   IA répond à la volée (RAG, sourcée, garde-fous + réorientation)
+        → PUBLIC immédiat, bandeau ⚠️ « non relu »  + file de validation
+        → le comité peut : VALIDER (→ devient canonique ✅),
+                            CORRIGER, ou RETIRER
 ```
 
-- **Auteur initial = l'IA** ; le comité **annote et corrige** dans le draft
-  jusqu'à validation. Chaque itération est une **révision** (traçabilité).
-- **Mur de publication** : l'état `public` est inaccessible sans validation
-  comité enregistrée (contrôle applicatif, pas seulement UI).
-- **Versioning** complet (chaque édition = révision, diff, auteur, date) ;
-  l'auteur d'une révision peut être l'IA, un membre du comité ou un contributeur.
-- **Page de discussion / annotations** attachées au draft et conservées.
-- **Après publication** : corrections communautaires possibles (modèle wiki),
-  soumises à modération ; toute modification du **bloc académique** repasse par
-  l'aval du comité du domaine.
-- **Signalement / modération** (vandalisme, source douteuse, hors-sujet).
+- **Mur de publication ciblé** : le **label ✅ « validé »** et toute écriture du
+  **bloc académique** exigent une `Review` comité enregistrée (contrôle
+  applicatif). Le statut ⚠️ « non relu » est, lui, **autorisé en public** mais
+  **toujours** marqué et sourcé.
+- **Déduplication des questions** : avant de générer, on cherche une Q/R existante
+  **sémantiquement proche** (RAG) sur le nœud → on réutilise/renvoie plutôt que de
+  dupliquer. Les questions libres fréquentes **remontent** comme candidates
+  canoniques.
+- **Auteur initial = l'IA** ; comité et contributeurs produisent des **révisions**
+  (traçabilité complète : qui, quand, diff, restauration).
+- **Discussion / annotations** attachées au draft et conservées.
+- **Après publication** : corrections communautaires (modèle wiki) sous
+  modération ; toute modification du **bloc académique** repasse par l'aval comité.
+- **Signalement / modération** (réponse douteuse, source faible, hors-sujet,
+  vandalisme).
+
+### 8.5 Arbre des vulgarisations (projection simplifiée)
+
+L'arbre des Q/R **réutilise les mêmes nœuds** que la base de référence, mais
+n'expose que les Q/R (canoniques ✅ d'abord, ⚠️ ensuite). C'est une **vue
+allégée** de la connaissance : navigable par notion, peuplée par les questions,
+adossée — en profondeur — aux publications sourcées.
+
+---
+
+## 9. Modèle de données (entités principales)
+
+### 9.1 Domaine « Moisson » (Phase 1)
+
+- **Source** — un connecteur OA.
+  - `code` (openalex, unpaywall, arxiv…), `nom`, `type_api`, `licence_defaut`,
+    `actif`, `phase`, `config` (endpoints, quotas).
+- **Publication** — un travail scientifique (clé de dédoublonnage : `doi`).
+  - `doi` (unique), `ids_externes` (openalex_id, arxiv_id, pmcid…), `titre`,
+    `resume`, `date_publication`, `langue`, `revue`, `type` (article, préprint…),
+    `licence`, `statut_oa` (diamond/gold/green/closed), `url_oa_legale`,
+    `fulltext_disponible` (bool), `fulltext_stocke` (bool, ssi licence OK),
+    `embedding` (vecteur, pgvector), `statut_traitement` (à_traiter/enrichi/
+    en_validation/placé/rejeté), `horodatages`.
+- **Author** — auteur d'une publication.
+  - `nom`, `orcid`, `affiliation` ; relation N-N `Publication`↔`Author` (ordre).
+- **PublicationProvenance** — quelle Source a fourni quelle Publication.
 
 ---
 
@@ -407,26 +464,34 @@ validé.
 - **TreeNodeRevision** — versionnage des modifications structurelles/éditoriales
   du nœud (qui, quand, diff, validé par référent/comité).
 
-### 9.3 Domaine « Wiki »
+### 9.3 Domaine « Wiki » (vulgarisation par questions)
 
-- **Article** — rattaché à un `TreeNode`.
-  - `tree_node_id`, `titre`, `langue`, `bloc_academique_valide` (bool),
-    `statut` : `brouillon_ia` → `en_relecture_comite` → `valide` → `public`
-    (état `public` **interdit** sans `Review` comité approuvée enregistrée),
-    `genere_par_ia` (bool), `valide_par_comite_le`.
-- **ArticleRevision** — une version d'article (immuable).
-  - `article_id`, `contenu_academique`, `contenu_vulgarisation`,
+- **Question** — une question rattachée à un `TreeNode`.
+  - `tree_node_id`, `texte`, `embedding` (vector, pour la déduplication
+    sémantique), `origine` (`suggeree_ia` / `libre_utilisateur`), `auteur_id`
+    (null si IA), `nb_demandes` (popularité → candidate canonique), `cree_le`.
+- **Answer** (Q/R) — la réponse vulgarisée à une `Question`.
+  - `question_id`, `tree_node_id`, `langue`,
+    `statut_validation` : `non_relu` (⚠️ public avec bandeau) /
+    `en_relecture_comite` / `valide` (✅), `type` (`canonique` / `libre`),
+    `genere_par_ia` (bool), `bloc_academique_valide` (bool),
+    `valide_par_comite_le`. *(Le label ✅ `valide` exige une `Review` comité ;
+    `non_relu` est public mais toujours marqué — cf. §8.4.)*
+- **AnswerRevision** — une version d'une réponse (immuable).
+  - `answer_id`, `contenu_academique`, `contenu_vulgarisation`,
     `auteur_type` (ia/comite/contributeur), `auteur_id` (null si IA), `cree_le`,
     `resume_modif`, `parent_revision_id` (diff/restauration).
+- **Footnote / Citation** — note de bas de page liant une affirmation du bloc
+  académique à une `Publication`.
+  - `answer_revision_id`, `publication_id`, `marqueur` (¹²³), `ancre` (passage),
+    `doi`, `passages_rag` (traçabilité des extraits utilisés par le RAG).
 - **Annotation** — annotation/correction du comité sur une révision en draft.
-  - `article_revision_id`, `auteur_id`, `ancre`, `commentaire`, `statut`
+  - `answer_revision_id`, `auteur_id`, `ancre`, `commentaire`, `statut`
     (ouverte/résolue), `cree_le`.
-- **Citation** — lie une affirmation du bloc académique à une `Publication`.
-  - `article_revision_id`, `publication_id`, `ancre` (passage concerné), `doi`.
 - **ExternalResource** — ressource de vulgarisation « sûre » (bloc identifié).
   - `url`, `type` (vidéo, article, podcast…), `editeur`, `niveau_fiabilite`,
-    `statut_validation`, `valide_par`, relation N-N avec `Article`.
-- **Discussion / Comment** — page de discussion par article.
+    `statut_validation`, `valide_par`, relation N-N avec `Answer`.
+- **Discussion / Comment** — page de discussion par `Question`/`Answer`.
 
 ### 9.4 Domaine « Communauté & gouvernance »
 
