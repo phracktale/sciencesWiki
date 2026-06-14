@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}SciencesWiki{% endblock %}</title>
+    <style>
+        :root { --accent:#1a5; --aca:#2563eb; --vul:#b45309; }
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 1.5rem; color:#1f2937; line-height:1.55; }
+        header a { color: var(--accent); text-decoration: none; font-weight: 700; }
+        h1 { margin: .2rem 0; }
+        a { color: var(--aca); }
+        .muted { color:#6b7280; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.6rem; }
+        .card { display:block; border:1px solid #e5e7eb; border-radius:10px; padding:.8rem; text-decoration:none; color:#111827; }
+        .card:hover { border-color: var(--accent); }
+        .crumbs { font-size:.9rem; }
+        .qa { border:1px solid #e5e7eb; border-radius:12px; padding:1rem; margin:1rem 0; }
+        .badge { display:inline-block; font-size:.78rem; padding:.1rem .5rem; border-radius:999px; }
+        .badge.ok { background:#dcfce7; color:#166534; }
+        .badge.warn { background:#fef3c7; color:#92400e; }
+        .block-aca { border-left:3px solid var(--aca); padding-left:.8rem; }
+        .block-vul { border-left:3px solid var(--vul); padding-left:.8rem; }
+        .sources { font-size:.85rem; }
+        footer { margin-top:3rem; font-size:.8rem; color:#9ca3af; }
+    </style>
+</head>
+<body>
+    <header><a href="{{ path('home') }}">SciencesWiki</a> <span class="muted">— le savoir scientifique, libre et vulgarisé</span></header>
+    <main>{% block body %}{% endblock %}</main>
+    <footer>Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique.</footer>
+</body>
+</html>

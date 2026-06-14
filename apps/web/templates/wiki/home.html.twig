@@ -1,0 +1,19 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}SciencesWiki — l'arbre des connaissances{% endblock %}
+
+{% block body %}
+    <h1>L'arbre des connaissances</h1>
+    <p class="muted">Explorez les grands domaines scientifiques. Chaque notion est vulgarisée à partir de publications de recherche en libre accès.</p>
+
+    <div class="grid">
+        {% for domain in domains %}
+            <a class="card" href="{{ path('node', { slug: domain.slug }) }}">
+                <strong>{{ domain.label }}</strong><br>
+                <span class="muted">{{ domain.childrenCount }} champ(s)</span>
+            </a>
+        {% else %}
+            <p class="muted">Arbre non encore amorcé.</p>
+        {% endfor %}
+    </div>
+{% endblock %}

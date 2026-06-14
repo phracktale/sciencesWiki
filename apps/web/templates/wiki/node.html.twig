@@ -1,0 +1,57 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ node.label }} — SciencesWiki{% endblock %}
+
+{% block body %}
+    {% if node.parents is not empty %}
+        <p class="crumbs muted">
+            {% for parent in node.parents %}
+                <a href="{{ path('node', { slug: parent.slug }) }}">{{ parent.label }}</a>{% if not loop.last %} · {% endif %}
+            {% endfor %}
+        </p>
+    {% endif %}
+
+    <h1>{{ node.label }}</h1>
+    {% if node.description %}<p class="muted">{{ node.description }}</p>{% endif %}
+
+    {% if node.children is not empty %}
+        <h2>Sous-domaines</h2>
+        <div class="grid">
+            {% for child in node.children %}
+                <a class="card" href="{{ path('node', { slug: child.slug }) }}">{{ child.label }}</a>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <h2>Questions &amp; réponses</h2>
+    {% for answer in answers %}
+        <article class="qa">
+            <h3>{{ answer.questionText }}</h3>
+            {% if answer.validationStatus == 'valide' %}
+                <span class="badge ok">✅ Validé par le comité scientifique</span>
+            {% else %}
+                <span class="badge warn">⚠️ Réponse générée par IA — non encore relue par un comité</span>
+            {% endif %}
+
+            {% if answer.vulgarizationContent %}
+                <div class="block-vul"><h4>Vulgarisation</h4><p>{{ answer.vulgarizationContent|nl2br }}</p></div>
+            {% endif %}
+            {% if answer.academicContent %}
+                <div class="block-aca"><h4>Faits établis (sourcés)</h4><p>{{ answer.academicContent|nl2br }}</p></div>
+            {% endif %}
+
+            {% if answer.sources is not empty %}
+                <div class="sources">
+                    <strong>Sources :</strong>
+                    <ol>
+                        {% for source in answer.sources %}
+                            <li>{{ source.title }}{% if source.doi %} — <a href="https://doi.org/{{ source.doi }}" rel="noopener" target="_blank">doi:{{ source.doi }}</a>{% endif %}</li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            {% endif %}
+        </article>
+    {% else %}
+        <p class="muted">Aucune question publiée pour cette notion pour l'instant.</p>
+    {% endfor %}
+{% endblock %}
