@@ -36,6 +36,11 @@ class AnswerRevision
     #[ORM\Column(length: 16, enumType: RevisionAuthorType::class)]
     private RevisionAuthorType $authorType;
 
+    /** Auteur humain de la révision ; null si rédigée par l'IA (cf. spec §8.6). */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $author = null;
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $changeSummary = null;
 
@@ -102,6 +107,18 @@ class AnswerRevision
     public function getAuthorType(): RevisionAuthorType
     {
         return $this->authorType;
+    }
+
+    public function getAuthor(): ?User
+    {
+        return $this->author;
+    }
+
+    public function setAuthor(?User $author): self
+    {
+        $this->author = $author;
+
+        return $this;
     }
 
     public function getChangeSummary(): ?string

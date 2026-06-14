@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rag;
 
 use App\Entity\Answer;
+use App\Entity\User;
 use App\Enum\AnswerValidationStatus;
 
 /**
@@ -16,11 +17,11 @@ use App\Enum\AnswerValidationStatus;
  */
 final class AnswerValidator
 {
-    public function validate(Answer $answer): void
+    public function validate(Answer $answer, ?User $reviewer = null): void
     {
         $answer
             ->setValidationStatus(AnswerValidationStatus::Validated)
-            ->markValidatedByCommittee();
+            ->markValidatedByCommittee($reviewer);
     }
 
     public function sendBackToReview(Answer $answer): void

@@ -72,6 +72,11 @@ class Answer
     #[Groups(['answer:read'])]
     private ?\DateTimeImmutable $validatedByCommitteeAt = null;
 
+    /** Membre du comité ayant validé (cf. spec §8.4). */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $validatedBy = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -177,12 +182,30 @@ class Answer
         return $this;
     }
 
-    public function markValidatedByCommittee(): self
+    public function markValidatedByCommittee(?User $reviewer = null): self
     {
         $this->academicBlockValidated = true;
         $this->validatedByCommitteeAt = new \DateTimeImmutable();
+        $this->validatedBy = $reviewer;
 
         return $this;
+    }
+
+    public function getValidatedBy(): ?User
+    {
+        return $this->validatedBy;
+    }
+
+    /**
+     * Signataire de la réponse (cf. spec §8.6) : l'auteur humain de la version
+     * courante s'il existe, sinon le modèle IA.
+     */
+    #[Groups(['answer:read'])]
+    public function getSignature(): string
+    {
+        $author = $this->getLatestRevision()?->getAuthor();
+
+        return null !== $author ? $author->getDisplayName() : 'Modèle IA — SciencesWiki';
     }
 
     public function getType(): AnswerType

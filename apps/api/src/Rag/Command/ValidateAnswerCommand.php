@@ -6,6 +6,7 @@ namespace App\Rag\Command;
 
 use App\Rag\AnswerValidator;
 use App\Repository\AnswerRepository;
+use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
@@ -24,6 +25,7 @@ final class ValidateAnswerCommand extends Command
 {
     public function __construct(
         private readonly AnswerRepository $answers,
+        private readonly UserRepository $users,
         private readonly AnswerValidator $validator,
         private readonly EntityManagerInterface $em,
     ) {
@@ -34,6 +36,7 @@ final class ValidateAnswerCommand extends Command
     {
         $this
             ->addOption('answer', null, InputOption::VALUE_REQUIRED, 'ID de la réponse')
+            ->addOption('by', null, InputOption::VALUE_REQUIRED, 'E-mail du membre du comité validant')
             ->addOption('reject', null, InputOption::VALUE_NONE, 'Renvoyer en relecture au lieu de valider');
     }
 
@@ -52,7 +55,10 @@ final class ValidateAnswerCommand extends Command
             $this->validator->sendBackToReview($answer);
             $message = 'Réponse renvoyée en relecture.';
         } else {
-            $this->validator->validate($answer);
+            $reviewer = null !== $input->getOption('by')
+                ? $this->users->findOneByEmail((string) $input->getOption('by'))
+                : null;
+            $this->validator->validate($answer, $reviewer);
             $message = 'Réponse validée par le comité (publiable, label « validé »).';
         }
         $this->em->flush();
