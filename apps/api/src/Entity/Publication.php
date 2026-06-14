@@ -71,6 +71,10 @@ class Publication
     #[ORM\Column(length: 16, enumType: ProcessingStatus::class)]
     private ProcessingStatus $processingStatus = ProcessingStatus::ToProcess;
 
+    /** Date de la dernière résolution OA (Unpaywall) ; null si jamais résolue. */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $oaResolvedAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -273,6 +277,18 @@ class Publication
     public function setProcessingStatus(ProcessingStatus $processingStatus): self
     {
         $this->processingStatus = $processingStatus;
+
+        return $this;
+    }
+
+    public function getOaResolvedAt(): ?\DateTimeImmutable
+    {
+        return $this->oaResolvedAt;
+    }
+
+    public function markOaResolved(): self
+    {
+        $this->oaResolvedAt = new \DateTimeImmutable();
 
         return $this;
     }

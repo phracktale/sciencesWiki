@@ -40,6 +40,17 @@ php bin/console harvester:discover openalex --max=50 --async
 php bin/console messenger:consume harvester -vv
 ```
 
+## Résoudre l'accès ouvert légal (Lot 2 — Unpaywall)
+
+Unpaywall n'est pas une source de découverte mais un **résolveur** : pour chaque
+DOI, il fournit la meilleure version *légalement* accessible et sa licence, ce
+qui affine le portier de licence (full-text stockable ou non).
+
+```bash
+# Résout les publications ayant un DOI mais pas encore résolues OA
+php bin/console harvester:resolve-oa --limit=500
+```
+
 ## Ce que fait la moissonneuse (Lot 1)
 
 Pipeline (cf. Phase 1 §4) : **découverte** (OpenAlex, cursor paging, polite pool)
@@ -78,6 +89,7 @@ src/
 
 ## Prochains lots (cf. Phase 1 §12)
 
-- **Lot 2** : connecteur Unpaywall + résolution OA légale.
+- ~~**Lot 1** : socle + connecteur OpenAlex.~~ ✅
+- ~~**Lot 2** : résolveur Unpaywall + résolution OA légale.~~ ✅
 - **Lot 3** : connecteur arXiv (OAI-PMH incrémental).
 - **Lot 4** : enrichissement IA (embeddings + suggestion de placement).

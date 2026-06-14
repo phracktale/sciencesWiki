@@ -25,6 +25,22 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Publications ayant un DOI mais pas encore résolues OA (Unpaywall).
+     *
+     * @return list<Publication>
+     */
+    public function findNeedingOaResolution(int $limit): array
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.doi IS NOT NULL')
+            ->andWhere('p.oaResolvedAt IS NULL')
+            ->orderBy('p.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
      * Recherche par identifiant externe (ex. openalex/arxiv) stocké dans le JSON
      * `external_ids`. Utilise l'opérateur JSON de PostgreSQL.
      */
