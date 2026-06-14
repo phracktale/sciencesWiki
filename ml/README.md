@@ -3,6 +3,11 @@
 Service d'inférence **auto-hébergé** et **open source** qui produit les embeddings
 consommés par l'API Symfony et le futur serveur RAG (cf. `../docs/rag-server.md`).
 
+> **Déploiement (homelab) :** ce service — et plus tard le RAG/LLM — tourne sur
+> une **machine IA dédiée (GPU)** sur le réseau privé. L'API le joint via
+> `ML_EMBED_URL` (ex. `http://ia.homelab.lan:8001/embed`). N'exposez pas ce
+> service publiquement (cf. spec §5.1).
+
 - Modèle par défaut : `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2`
   (multilingue, **dimension 384**).
 - La dimension **doit** rester alignée avec la colonne pgvector `vector(384)` et

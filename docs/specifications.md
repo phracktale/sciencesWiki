@@ -203,6 +203,29 @@ Sources OA ──▶ Moissonneuse ──▶ File d'ingestion ──▶ Normalisa
 > (rendu serveur pour le SEO, essentiel à une encyclopédie) et les **apps Flutter**
 > sont des **clients** de cette API. Aucun client n'accède directement à la base.
 
+### 5.1 Topologie de déploiement (homelab — décidé)
+
+Tout ce qui relève de l'**IA tourne sur une machine dédiée** (GPU) : le service
+d'embeddings `ml/`, et plus tard le **RAG/LLM** (rédaction, recherche sémantique).
+
+- L'API ne contient **aucune dépendance IA** : elle appelle ces services **par
+  le réseau** via une URL configurable (ex. `ML_EMBED_URL`, future `RAG_URL`).
+  Bascule possible entre embedder local (dev) et machine dédiée (prod) **sans
+  changer le code** (cf. `EMBEDDING_DRIVER`).
+- **Réseau privé** du homelab entre l'API et le nœud IA ; recommandé : **jeton
+  d'authentification** service-à-service + restriction réseau (le nœud IA n'est
+  pas exposé publiquement).
+- Le nœud IA héberge aussi les **modèles open source** et leurs poids ; il est
+  dimensionné GPU. Les autres services (API, PostgreSQL+pgvector, front, workers)
+  vivent sur le(s) nœud(s) applicatif(s).
+
+```
+[ Nœud applicatif ]                         [ Nœud IA dédié (GPU) ]
+  API Symfony + PostgreSQL/pgvector  ──────▶  ml/ (embeddings)
+  front Twig, workers moisson         réseau   RAG / LLM (à venir)
+                                       privé
+```
+
 ---
 
 ## 6. La moissonneuse (priorité n°1)
