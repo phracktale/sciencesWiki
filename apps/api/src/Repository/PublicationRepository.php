@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Repository;
 
 use App\Entity\Publication;
+use App\Enum\ProcessingStatus;
 use App\Harvester\Pipeline\PublicationLookup;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
@@ -34,6 +35,39 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         return $this->createQueryBuilder('p')
             ->andWhere('p.doi IS NOT NULL')
             ->andWhere('p.oaResolvedAt IS NULL')
+            ->orderBy('p.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Publications sans embedding (à enrichir).
+     *
+     * @return list<Publication>
+     */
+    public function findNeedingEmbedding(int $limit): array
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.embedding IS NULL')
+            ->andWhere("p.title <> ''")
+            ->orderBy('p.id', 'ASC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Publications avec embedding mais pas encore placées dans l'arbre.
+     *
+     * @return list<Publication>
+     */
+    public function findNeedingPlacement(int $limit): array
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.embedding IS NOT NULL')
+            ->andWhere('p.processingStatus = :status')
+            ->setParameter('status', ProcessingStatus::Normalized->value)
             ->orderBy('p.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()

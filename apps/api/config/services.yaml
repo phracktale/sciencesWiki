@@ -24,5 +24,9 @@ services:
     App\:
         resource: '../src/'
 
+    # L'implémentation d'embedding est choisie par EMBEDDING_DRIVER (cf. fabrique).
+    App\Harvester\Ai\EmbeddingClient:
+        factory: ['@App\Harvester\Ai\EmbeddingClientFactory', 'create']
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

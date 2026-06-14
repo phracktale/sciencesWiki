@@ -7,12 +7,20 @@ doctrine:
         #server_version: '16'
 
         profiling_collect_backtrace: '%kernel.debug%'
+
+        # Embeddings (pgvector) — cf. Lot 4.
+        types:
+            vector: Pgvector\Doctrine\VectorType
     orm:
         validate_xml_mapping: true
         naming_strategy: doctrine.orm.naming_strategy.underscore
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         auto_mapping: true
+        dql:
+            numeric_functions:
+                cosine_distance: Pgvector\Doctrine\CosineDistance
+                l2_distance: Pgvector\Doctrine\L2Distance
         mappings:
             App:
                 type: attribute

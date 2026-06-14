@@ -61,6 +61,30 @@ rate-limit strict (≤ 1 requête / 3 s, respect du 503/Retry-After).
 php bin/console harvester:discover arxiv --set=cs --since=2025-06-01 --max=500
 ```
 
+## Enrichissement IA (Lot 4 — embeddings + placement)
+
+Embeddings auto-hébergés (pgvector) et suggestion de placement dans l'arbre par
+similarité (kNN cosinus, **non décisionnelle** — un humain valide).
+
+```bash
+# Amorce l'arbre des connaissances depuis la taxonomie OpenAlex (domaines/champs/sous-champs)
+php bin/console harvester:seed-tree --max-level=2
+
+# Calcule les embeddings des publications (titre + résumé)
+php bin/console harvester:embed --limit=500
+
+# Propose le placement dans l'arbre (k plus proches nœuds)
+php bin/console harvester:suggest-placement -k 3
+```
+
+Le moteur d'embedding est choisi par `EMBEDDING_DRIVER` :
+
+- `http` (défaut) : service `ml/` auto-hébergé (sentence-transformers) — cf. `../../ml/`.
+- `hashing` : embedder déterministe local, sans modèle, pour le dev/les tests
+  (signal lexical, même dimension 384 ; vérifie le pipeline pgvector/kNN).
+
+Prérequis : extension PostgreSQL **pgvector** (créée par la migration).
+
 ## Ce que fait la moissonneuse (Lot 1)
 
 Pipeline (cf. Phase 1 §4) : **découverte** (OpenAlex, cursor paging, polite pool)
@@ -102,4 +126,7 @@ src/
 - ~~**Lot 1** : socle + connecteur OpenAlex.~~ ✅
 - ~~**Lot 2** : résolveur Unpaywall + résolution OA légale.~~ ✅
 - ~~**Lot 3** : connecteur arXiv (OAI-PMH incrémental).~~ ✅
-- **Lot 4** : enrichissement IA (embeddings + suggestion de placement).
+- ~~**Lot 4** : enrichissement IA (embeddings pgvector + suggestion de placement).~~ ✅
+
+La Phase 1 (moissonneuse) est complète : ingestion légale 3 sources → résolution
+OA → embeddings → placement assisté dans l'arbre.

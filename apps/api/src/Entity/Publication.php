@@ -11,6 +11,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Pgvector\Vector;
 
 /**
  * Un travail scientifique moissonné. Clé de dédoublonnage : le DOI normalisé
@@ -74,6 +75,10 @@ class Publication
     /** Date de la dernière résolution OA (Unpaywall) ; null si jamais résolue. */
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $oaResolvedAt = null;
+
+    /** Embedding du contenu (titre + résumé) pour la suggestion de placement. */
+    #[ORM\Column(type: 'vector', length: 384, nullable: true)]
+    private ?Vector $embedding = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
@@ -284,6 +289,19 @@ class Publication
     public function getOaResolvedAt(): ?\DateTimeImmutable
     {
         return $this->oaResolvedAt;
+    }
+
+    public function getEmbedding(): ?Vector
+    {
+        return $this->embedding;
+    }
+
+    /** @param list<float>|Vector|null $embedding */
+    public function setEmbedding(array|Vector|null $embedding): self
+    {
+        $this->embedding = \is_array($embedding) ? new Vector($embedding) : $embedding;
+
+        return $this;
     }
 
     public function markOaResolved(): self
