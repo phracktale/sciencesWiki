@@ -102,6 +102,16 @@ au bon nœud, réutilisation d'une Q/R existante, statut `non_relu` vs `canoniqu
 Côté Symfony : interface `RagClient` **abstraite** (on peut changer de
 moteur/modèle), appels server-to-server authentifiés, réseau interne.
 
+### 4.1 Branchement du LLM (implémenté)
+
+La couche de **génération** est déjà branchable : l'API expose une abstraction
+`App\Ai\Llm\LlmClient` avec une implémentation **compatible OpenAI/Ollama**
+(`OpenAiCompatibleLlmClient`) et un **stub** déterministe pour le dev/les tests.
+Le moteur est choisi par `LLM_DRIVER` (`openai` | `stub`) ; la cible est
+configurée par `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_TOKEN` et pointe vers la
+**machine IA dédiée** (cf. spec §5.1). Le pipeline RAG (récupération → assemblage
+du prompt → génération sourcée) viendra s'appuyer sur ce client.
+
 ---
 
 ## 5. Modèle de données (ajouts)

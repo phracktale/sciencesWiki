@@ -28,5 +28,9 @@ services:
     App\Harvester\Ai\EmbeddingClient:
         factory: ['@App\Harvester\Ai\EmbeddingClientFactory', 'create']
 
+    # Le LLM de rédaction est choisi par LLM_DRIVER (openai/ollama ou stub).
+    App\Ai\Llm\LlmClient:
+        factory: ['@App\Ai\Llm\LlmClientFactory', 'create']
+
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones
