@@ -1,6 +1,6 @@
 # Spécifications — Plateforme « SciencesWiki »
 
-> **Statut :** brouillon v0.4 — document vivant, soumis à vos réponses.
+> **Statut :** brouillon v0.5 — document vivant, soumis à vos réponses.
 > **Date :** 2026-06-14
 > **Devise du projet :** *éducation populaire, savoir libre, sources ouvertes.*
 
@@ -139,8 +139,8 @@ Conséquences de conception :
 
 | Rôle | Droits | Notes |
 |---|---|---|
-| **Visiteur** | Lecture, recherche, navigation dans l'arbre | Anonyme |
-| **Contributeur** (compte) | Proposer/éditer des articles, suggérer sources, signaler | Modèle wiki |
+| **Visiteur** | Lecture, recherche, navigation, **poser une question** | Anonyme autorisé (lecture + question) |
+| **Contributeur** (compte) | Rédiger/éditer des réponses, suggérer sources, signaler | **Identité vérifiée obligatoire** (nom réel **ou** pseudo, jamais anonyme en interne) |
 | **Relecteur expert** | Valider les blocs « académiques » de son domaine | Rattaché à un/des nœuds de l'arbre |
 | **Comité scientifique (domaine)** | Adouber un article comme « validé scientifiquement », trancher les litiges | Élargi par domaine de compétence |
 | **Modérateur** | Gérer signalements, conflits d'édition, vandalisme | Type Wikipedia |
@@ -149,6 +149,15 @@ Conséquences de conception :
 
 > **Système de réputation** (à confirmer §13) : gains de droits par contributions
 > validées, à la manière de Wikipedia / StackExchange.
+
+**Principe d'identité (décidé) : « rien d'anonyme » côté contenu.**
+- **Lecture** et **pose de question** : **anonymes autorisées**.
+- **Rédaction/édition de contenu** : exige un **compte à identité vérifiée**
+  (nom réel **ou** pseudonyme, mais identité **vérifiée et traçable** en interne).
+- **Toute réponse publiée est SIGNÉE** : par le **modèle IA** (si l'IA en est
+  l'auteur principal) ou par l'**auteur principal humain** (1er auteur, ou celui
+  ayant **rédigé le plus de texte** — déterminé par le versionnage fin, §8.6).
+- **Tous les participants sont listés** et crédit, avec leur **rôle/contribution**.
 
 ---
 
@@ -352,6 +361,13 @@ d'un **autre nœud**, l'IA répond en **réorientant vers le bon nœud** et y
 ┌────────────────────────────────────────────────────┐
 │  ❓ QUESTION  (+ nœud de rattachement dans l'arbre)  │
 ├────────────────────────────────────────────────────┤
+│  ✍️ SIGNÉ PAR : Dr. Untel / @pseudo  (auteur principal)│
+│     ou « Modèle IA — SciencesWiki » si IA principale  │
+├────────────────────────────────────────────────────┤
+│  🌟 BANDEAU D'IDENTITÉ / PROMOTION (si vulgarisateur  │
+│     ou scientifique) : nom, titre, affiliation, ORCID,│
+│     bio courte, liens (site, chaîne, réseaux), photo  │
+├────────────────────────────────────────────────────┤
 │  STATUT :  ✅ Validé par le comité                   │
 │        ou  ⚠️ Généré par IA — non relu (bandeau)     │
 ├────────────────────────────────────────────────────┤
@@ -362,6 +378,10 @@ d'un **autre nœud**, l'IA répond en **réorientant vers le bon nœud** et y
 ├────────────────────────────────────────────────────┤
 │  ¹ ² ³  Notes de bas de page → publications (DOI)    │
 │  🔗 Ressources de vulgarisation « sûres » (bloc id.) │
+├────────────────────────────────────────────────────┤
+│  👥 PARTICIPANTS : tous les contributeurs listés      │
+│     (auteur principal, co-auteurs, relecteurs,        │
+│      comité validateur) + part de contribution        │
 └────────────────────────────────────────────────────┘
 ```
 
@@ -405,6 +425,38 @@ L'arbre des Q/R **réutilise les mêmes nœuds** que la base de référence, mai
 n'expose que les Q/R (canoniques ✅ d'abord, ⚠️ ensuite). C'est une **vue
 allégée** de la connaissance : navigable par notion, peuplée par les questions,
 adossée — en profondeur — aux publications sourcées.
+
+### 8.6 Attribution, signature & valorisation (décidé)
+
+Objectif : **promouvoir le travail** des vulgarisateurs et scientifiques,
+**signer** chaque réponse et **créditer tous les participants** — rien d'anonyme
+côté contenu.
+
+- **Versionnage fin de l'authorship.** Chaque édition d'une réponse crée une
+  **révision immuable** ; on calcule le **diff** (texte ajouté / supprimé /
+  modifié) et **qui** l'a fait. On en déduit, par contributeur, une **part de
+  contribution** (caractères/mots nets rédigés).
+- **Auteur principal = signataire.** C'est le **modèle IA** si l'IA reste l'auteur
+  principal, sinon l'**humain ayant rédigé le plus de texte** (à défaut, le 1er
+  auteur). Si un vulgarisateur réécrit l'essentiel d'une réponse initialement IA,
+  **il devient l'auteur principal** et la signature bascule sur lui (méritocratie
+  au texte).
+- **Bandeau d'identité / promotion.** Quand l'auteur principal est un
+  **vulgarisateur** ou un **scientifique** (profil vérifié), on affiche un
+  **bandeau de valorisation** : nom (réel ou pseudo), titre, affiliation, ORCID,
+  **bio courte**, **liens** (site, chaîne vidéo, réseaux, publications), photo,
+  bouton **suivre/soutenir**.
+- **Liste des participants.** Chaque Q/R affiche **tous** les contributeurs
+  (auteur principal, co-auteurs, relecteurs experts, comité validateur) avec leur
+  **rôle** et leur **part**. L'**IA** est créditée explicitement comme telle.
+- **Identité vérifiée (jamais anonyme côté contenu).** Tout rédacteur a une
+  identité **vérifiée** (e-mail + ORCID pour les scientifiques ; vérification
+  renforcée possible) ; le **pseudonyme public** est autorisé **mais adossé** à
+  cette identité vérifiée et traçable.
+- **Question anonyme, réponse signée.** Poser une question peut être anonyme ;
+  la **réponse publiée porte toujours une signature** (IA ou auteur principal).
+- **Page profil contributeur** : portfolio public listant ses Q/R, son impact
+  (vues, Q/R validées, publications citées) — un véritable **CV de vulgarisation**.
 
 ---
 
@@ -475,12 +527,23 @@ adossée — en profondeur — aux publications sourcées.
     `statut_validation` : `non_relu` (⚠️ public avec bandeau) /
     `en_relecture_comite` / `valide` (✅), `type` (`canonique` / `libre`),
     `genere_par_ia` (bool), `bloc_academique_valide` (bool),
-    `valide_par_comite_le`. *(Le label ✅ `valide` exige une `Review` comité ;
-    `non_relu` est public mais toujours marqué — cf. §8.4.)*
+    `valide_par_comite_le`,
+    `auteur_principal_type` (`ia` / `user`), `auteur_principal_id` (signataire,
+    recalculé selon la part de contribution — §8.6). *(Le label ✅ `valide` exige
+    une `Review` comité ; `non_relu` est public mais toujours marqué — §8.4.)*
 - **AnswerRevision** — une version d'une réponse (immuable).
   - `answer_id`, `contenu_academique`, `contenu_vulgarisation`,
-    `auteur_type` (ia/comite/contributeur), `auteur_id` (null si IA), `cree_le`,
-    `resume_modif`, `parent_revision_id` (diff/restauration).
+    `auteur_type` (ia/comite/contributeur), `auteur_id` (null si IA, mais l'IA
+    est créditée explicitement), `cree_le`, `resume_modif`,
+    `parent_revision_id`, `diff` (ajouts/suppr./modifs vs parent),
+    `chars_ajoutes`, `chars_supprimes` (mesure de contribution).
+- **AuthorshipContribution** — part de rédaction par contributeur (dérivée des
+  révisions ; sert au calcul de l'auteur principal et à la liste des participants).
+  - `answer_id`, `user_id` (ou `ia`), `chars_nets`, `mots_nets`, `part` (%),
+    `roles` (auteur/co-auteur/correcteur), `maj_le`.
+- **Participation** — crédit affiché d'un acteur sur une Q/R (vue de présentation).
+  - `answer_id`, `acteur` (user/IA), `role` (auteur_principal/co-auteur/
+    relecteur/comité), `part` (si rédacteur).
 - **Footnote / Citation** — note de bas de page liant une affirmation du bloc
   académique à une `Publication`.
   - `answer_revision_id`, `publication_id`, `marqueur` (¹²³), `ancre` (passage),
@@ -495,14 +558,22 @@ adossée — en profondeur — aux publications sourcées.
 
 ### 9.4 Domaine « Communauté & gouvernance »
 
-- **User** — `email`, `pseudo`, `orcid` (opt.), `is_chercheur`, `reputation`,
-  `2fa_actif`.
+- **User** — compte (jamais anonyme côté contenu).
+  - `email`, `nom_reel`, `pseudo` (public, optionnel), `type_profil`
+    (`scientifique` / `vulgarisateur` / `contributeur`), `is_chercheur`,
+    `reputation`, `2fa_actif`,
+    `identite_verifiee` (bool), `methode_verification` (email/orcid/renforcée).
+- **UserProfile** — données de valorisation (bandeau d'identité / page profil).
+  - `user_id`, `titre`, `affiliation`, `orcid`, `bio`, `photo`,
+    `liens` (jsonb : site, chaîne vidéo, réseaux, publications),
+    `promotion_opt_in` (bool), métriques publiques (vues, Q/R validées,
+    publications citées).
 - **Role** — `ROLE_CONTRIBUTEUR`, `ROLE_RELECTEUR`, `ROLE_COMITE`,
   `ROLE_MODERATEUR`, `ROLE_ADMIN`.
 - **DomainExpertise** — rattache un `User` (relecteur/référent/comité) à un ou des
   `TreeNode`/domaines (périmètre de ses droits de validation).
 - **Review** — relecture experte / validation comité.
-  - `article_revision_id`, `reviewer_id`, `type` (experte/comité), `statut`
+  - `answer_revision_id`, `reviewer_id`, `type` (experte/comité), `statut`
     (approuvé/rejeté/demande_modif), `commentaire`, `cree_le`.
 - **Report** — signalement de modération (`cible`, `motif`, `statut`, traitement).
 
@@ -544,16 +615,23 @@ L'API étant l'unique porte d'entrée (web, Flutter, back-office), elle est durc
 
 ---
 
-## 11. Inciter les chercheurs (volet « éducation populaire »)
+## 11. Inciter & valoriser les chercheurs et vulgarisateurs
 
+- **Bandeau d'identité / promotion** sur chaque Q/R rédigée par un vulgarisateur
+  ou un scientifique (nom, titre, affiliation, ORCID, bio, liens, photo) —
+  cf. §8.6. Met en avant **leur** travail, pas seulement le contenu.
+- **Page profil = CV de vulgarisation** : portfolio public des Q/R signées,
+  métriques d'impact (vues, Q/R validées, publications citées), liens externes.
+- **Signature & crédit systématiques** : auteur principal signataire + **tous**
+  les participants listés (rien d'anonyme côté contenu).
 - **Page « Déposer ma recherche »** expliquant la démarche libre/open source.
-- **Attribution forte** : le chercheur reste cité comme source primaire de chaque
-  affirmation vulgarisée (visibilité, ORCID).
+- **Attribution forte des sources** : le chercheur reste cité comme source
+  primaire de chaque affirmation vulgarisée (visibilité, ORCID).
 - **Statut de contributeur-chercheur** et rattachement au comité de son domaine.
 - **Garantie légale** : « nous ne diffusons que des versions légalement OA » —
   argument de confiance central (cf. §3.3).
-- **Métriques d'impact** : nombre d'articles de vulgarisation s'appuyant sur leurs
-  travaux, vues, portée pédagogique.
+- **Métriques d'impact** : nombre de Q/R s'appuyant sur leurs travaux, vues,
+  portée pédagogique.
 
 ---
 
