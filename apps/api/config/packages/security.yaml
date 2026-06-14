@@ -20,14 +20,31 @@ security:
         dev:
             pattern: ^/(_profiler|_wdt|assets|build)/
             security: false
-        main:
-            lazy: true
-            provider: app_users
-            # Authentificateurs (login form / JWT) à activer avec les endpoints d'auth.
 
-    # Lecture publique ; les écritures/admin exigeront un rôle (endpoints à venir).
+        # Connexion : email + mot de passe -> jeton JWT.
+        login:
+            pattern: ^/api/login_check$
+            stateless: true
+            json_login:
+                check_path: api_login_check
+                username_path: email
+                password_path: password
+                success_handler: lexik_jwt_authentication.handler.authentication_success
+                failure_handler: lexik_jwt_authentication.handler.authentication_failure
+
+        # API : authentification par jeton JWT (anonyme autorisé pour la lecture).
+        api:
+            pattern: ^/api
+            stateless: true
+            provider: app_users
+            jwt: ~
+
+    # Lecture publique ; /api/me et écritures/admin exigent un rôle.
     access_control:
-        # - { path: ^/api/admin, roles: ROLE_ADMIN }
+        - { path: ^/api/login_check, roles: PUBLIC_ACCESS }
+        - { path: ^/api/me, roles: ROLE_USER }
+        - { path: ^/api/admin, roles: ROLE_ADMIN }
+        - { path: ^/api, roles: PUBLIC_ACCESS }
 
 when@test:
     security:

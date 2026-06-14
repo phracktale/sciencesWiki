@@ -114,8 +114,25 @@ bin/console app:user:grant-domain dr.curie@labo.fr physical-sciences
 
 Règle d'autorisation (`AnswerVoter`) : valider une réponse exige `ROLE_COMITE`
 **et** la compétence sur le domaine du nœud (ou `ROLE_ADMIN`) ; l'édition exige
-`ROLE_REDACTEUR`. (Les endpoints d'authentification — login/JWT — seront branchés
-sur ce socle.)
+`ROLE_REDACTEUR`.
+
+### Authentification JWT
+
+```bash
+# Générer la paire de clés (une fois ; les .pem ne sont pas versionnés)
+php bin/console lexik:jwt:generate-keypair
+
+# Connexion -> jeton
+curl -X POST /api/login_check -H 'Content-Type: application/json' \
+     -d '{"email":"dr.curie@labo.fr","password":"secret"}'   # => { "token": "..." }
+
+# Appel authentifié
+curl /api/me -H "Authorization: Bearer <token>"
+```
+
+Lecture publique (`/api/tree_nodes`, `/api/publications`, `/api/answers`,
+`/api/search`) sans authentification ; `/api/me` et les futures écritures/admin
+exigent un rôle (cf. `security.yaml`).
 
 ## Rédaction RAG (brouillons de Q/R)
 

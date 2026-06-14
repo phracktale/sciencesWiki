@@ -9,3 +9,8 @@
 
 controllers:
     resource: routing.controllers
+
+# Connexion JWT : interceptée par le firewall « login » (json_login).
+api_login_check:
+    path: /api/login_check
+    methods: [POST]
