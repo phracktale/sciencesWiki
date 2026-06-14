@@ -1,6 +1,6 @@
 # Spécifications — Plateforme « SciencesWiki »
 
-> **Statut :** brouillon v0.2 — document vivant, soumis à vos réponses.
+> **Statut :** brouillon v0.3 — document vivant, soumis à vos réponses.
 > **Date :** 2026-06-14
 > **Devise du projet :** *éducation populaire, savoir libre, sources ouvertes.*
 
@@ -87,7 +87,7 @@ que **métadonnées + lien + citation**.
 
 | Source | Décision | Motif |
 |---|---|---|
-| **Sci-Hub** | **Exclue (recommandé) — en discussion** | Redistribution d'articles **en violation du droit d'auteur**. L'intégrer organiserait une infraction de masse, ruinerait la crédibilité auprès du comité scientifique et des chercheurs, et exposerait juridiquement le projet. Contredit frontalement l'argument « démarche libre et légale ». *Aucun connecteur Sci-Hub ne sera développé.* Voir l'encart « Maximiser la couverture légalement » ci-dessous. |
+| **Sci-Hub** | **Pas de connecteur dans la moissonneuse** (décidé) | La *plateforme* ne télécharge/stocke pas de PDF depuis Sci-Hub : une infrastructure publique et systématique de téléchargement crée une responsabilité **institutionnelle** (≠ usage individuel transitoire). Mais le **but étant de vulgariser, pas de redistribuer**, la plateforme n'en a pas besoin. Voir la note §3.4. |
 | **Google Scholar** | **Exclue comme moissonneuse** | N'est pas une source OA mais un index ; son scraping est **interdit par ses CGU** et bloqué techniquement. Le même besoin de découverte est couvert **légalement** par OpenAlex + Unpaywall. |
 | **Nature** (contenu paywall) | **Métadonnées seulement** | Seuls les articles Nature explicitement OA seront full-text ; le reste = métadonnées + lien éditeur. |
 
@@ -106,6 +106,33 @@ moyens légaux et on en fait un **levier d'éducation populaire** :
    **métadonnées + lien éditeur**, et l'absence devient une **invitation au
    dépôt** adressée à l'auteur — c'est la mission même du projet en action.
 
+### 3.4 Note sur Sci-Hub et l'éthique de l'accès ouvert
+
+Cette plateforme **partage l'éthos de l'accès ouvert** : la recherche, souvent
+financée par l'argent public, devrait être librement accessible, et Sci-Hub est
+de fait massivement utilisé par la communauté scientifique. Le projet **milite**
+pour cet idéal — mais par des moyens qui ne l'exposent pas juridiquement.
+
+Distinction juridique clé, **favorable au projet** :
+
+> Le droit d'auteur protège l'**expression** (le texte d'un article), **pas les
+> faits ni les idées scientifiques**. **Lire** un article — par quelque moyen que
+> ce soit — puis **rédiger sa propre vulgarisation** de ses résultats, en le
+> **citant**, est **légal**. Une découverte n'appartient à personne.
+
+Conséquences de conception :
+
+- La plateforme **ne redistribue jamais le PDF** d'un article sous paywall ;
+  elle publie un **article de vulgarisation original** + la **citation (DOI)**.
+- Pour un papier non OA, un **contributeur l'ayant lu par ses propres moyens**
+  peut en rédiger la vulgarisation ; la plateforme n'héberge que ce texte
+  original et la référence.
+- L'**activisme** s'exprime dans le **discours** (bandeau « ce savoir devrait
+  être libre », plaidoyer Open Access) et le **levier** (invitation au dépôt),
+  **pas** dans l'hébergement de copies illicites.
+- Décision de risque finale = celle du porteur de projet ; l'agent de
+  développement **n'implémentera pas** de connecteur vers une source pirate.
+
 ---
 
 ## 4. Acteurs & rôles
@@ -118,7 +145,7 @@ moyens légaux et on en fait un **levier d'éducation populaire** :
 | **Comité scientifique (domaine)** | Adouber un article comme « validé scientifiquement », trancher les litiges | Élargi par domaine de compétence |
 | **Modérateur** | Gérer signalements, conflits d'édition, vandalisme | Type Wikipedia |
 | **Administrateur** | Gestion plateforme, rôles, taxonomie de haut niveau | — |
-| **Moissonneuse (système)** | Ingestion automatique, propositions de placement | Agent non humain |
+| **Moissonneuse / IA (système)** | Ingestion automatique, propositions de placement, **rédaction des brouillons de vulgarisation** | Agent non humain ; sa production passe toujours par validation comité |
 
 > **Système de réputation** (à confirmer §13) : gains de droits par contributions
 > validées, à la manière de Wikipedia / StackExchange.
@@ -208,9 +235,14 @@ sources, **journalisation** complète de la provenance (audit/transparence).
   multilingue) servi en local.
 - **Classification** : k-NN sur embeddings vers les nœuds de l'arbre + (option)
   petit LLM open source local pour justifier/affiner le placement.
+- **Rédaction de vulgarisation** : un **LLM open source auto-hébergé** génère le
+  **brouillon** de l'article de vulgarisation à partir des publications sourcées
+  du nœud (avec citations DOI). Ce brouillon part **en draft au comité de
+  lecture** et n'est **jamais public** sans validation (cf. §8.2).
 - **Pas de dépendance à une API propriétaire** ; abstraction permettant de
   changer de modèle.
-- Toute suggestion IA est **non décisionnelle** : un humain valide le placement.
+- Toute production IA est **non décisionnelle** : un humain (comité) valide le
+  placement *et* le contenu avant publication.
 
 ### 6.4 Conformité & politesse
 
@@ -224,9 +256,12 @@ sources, **journalisation** complète de la provenance (audit/transparence).
 
 - Structure **hiérarchique** (taxonomie) des domaines → sous-domaines → notions.
 - Un nœud = une **notion scientifique** ; peut porter un ou plusieurs **articles**.
-- Besoin probable d'un **graphe** plutôt qu'un arbre strict (une notion peut
-  relever de plusieurs parents : ex. « théorie de l'information » ↔ maths/info/
-  physique). → modèle **DAG** (arbre + liens transverses) à valider §13.
+- **Modèle retenu : graphe orienté acyclique (DAG) (décidé).** Un nœud peut avoir
+  **plusieurs parents** (ex. « théorie de l'information » ↔ maths/info/physique).
+  Implémentation : table d'arêtes `parent_id → child_id` (relation N-N), avec
+  **prévention des cycles** à l'écriture et un **fil d'Ariane** multiple à
+  l'affichage. Un parent peut être marqué « **principal** » pour l'URL canonique
+  (SEO) tout en conservant les rattachements transverses.
 - **Base taxonomique de départ (décidée) :** **amorçage** depuis les *concepts
   OpenAlex* (déjà alignés sur les publications, donc le placement IA fonctionne
   immédiatement), **puis taxonomie éditable** : le **comité scientifique** ou le
@@ -264,36 +299,110 @@ sources, **journalisation** complète de la provenance (audit/transparence).
 └────────────────────────────────────────────┘
 ```
 
-### 8.2 Cycle de vie éditorial (type Wikipedia)
+### 8.2 Cycle de vie éditorial
+
+**Principe (décidé) : rédaction IA → validation par le comité de lecture AVANT
+toute mise en ligne publique.** Aucun article n'est public tant qu'il n'est pas
+validé.
 
 ```
-Brouillon → Proposition → Révision communautaire → Relecture experte
-        → Validation comité (bloc académique) → Publié
+[1] L'IA (auto-hébergée) rédige un BROUILLON de vulgarisation à partir des
+    publications sourcées rattachées au nœud.
+        │
+[2] DRAFT privé : visible uniquement du COMITÉ DE LECTURE du domaine.
+        │   ↳ discussion, annotations, corrections (itérations)
+        │   ↳ vérification : exactitude, sourcing (DOI), neutralité,
+        │     séparation bloc académique / bloc vulgarisation
+        ▼
+[3] VALIDÉ par le comité de lecture.
+        │
+[4] PUBLIC : l'accès public devient possible.
         ↺ (historique des versions, diff, restauration, page de discussion)
 ```
 
-- **Versioning** complet (chaque édition = révision, diff, auteur, date).
-- **Page de discussion** par article.
+- **Auteur initial = l'IA** ; le comité **annote et corrige** dans le draft
+  jusqu'à validation. Chaque itération est une **révision** (traçabilité).
+- **Mur de publication** : l'état `public` est inaccessible sans validation
+  comité enregistrée (contrôle applicatif, pas seulement UI).
+- **Versioning** complet (chaque édition = révision, diff, auteur, date) ;
+  l'auteur d'une révision peut être l'IA, un membre du comité ou un contributeur.
+- **Page de discussion / annotations** attachées au draft et conservées.
+- **Après publication** : corrections communautaires possibles (modèle wiki),
+  soumises à modération ; toute modification du **bloc académique** repasse par
+  l'aval du comité du domaine.
 - **Signalement / modération** (vandalisme, source douteuse, hors-sujet).
-- **Validation séparée** : le bloc *académique* exige l'aval du comité du
-  domaine ; le bloc *vulgarisation* suit la modération communautaire.
 
 ---
 
-## 9. Modèle de données (entités principales — esquisse)
+## 9. Modèle de données (entités principales)
 
-- **Source** : provenance OA (nom, type d'API, licence par défaut).
-- **Publication** : DOI, titre, auteurs, date, revue, résumé, licence, statut OA,
-  full-text (si autorisé), embedding, provenances\[].
-- **TreeNode** : nœud de l'arbre (label, parent(s), description, domaine).
-- **Article** : rattaché à un TreeNode ; blocs académique/vulgarisation ; statut.
-- **Revision** : version d'un article (contenu, auteur, date, diff).
-- **Citation** : lien Article(affirmation) → Publication(DOI).
-- **ExternalResource** : ressource de vulgarisation « sûre » (URL, type, fiabilité).
-- **User / Role** : comptes, rôles, domaines de compétence, réputation.
-- **Review** : relecture experte / validation comité (statut, commentaire).
-- **Report** : signalement de modération.
-- **IngestionJob** : trace de moisson (source, requête, résultat, horodatage).
+### 9.1 Domaine « Moisson » (Phase 1)
+
+- **Source** — un connecteur OA.
+  - `code` (openalex, unpaywall, arxiv…), `nom`, `type_api`, `licence_defaut`,
+    `actif`, `phase`, `config` (endpoints, quotas).
+- **Publication** — un travail scientifique (clé de dédoublonnage : `doi`).
+  - `doi` (unique), `ids_externes` (openalex_id, arxiv_id, pmcid…), `titre`,
+    `resume`, `date_publication`, `langue`, `revue`, `type` (article, préprint…),
+    `licence`, `statut_oa` (diamond/gold/green/closed), `url_oa_legale`,
+    `fulltext_disponible` (bool), `fulltext_stocke` (bool, ssi licence OK),
+    `embedding` (vecteur, pgvector), `statut_traitement` (à_traiter/enrichi/
+    en_validation/placé/rejeté), `horodatages`.
+- **Author** — auteur d'une publication.
+  - `nom`, `orcid`, `affiliation` ; relation N-N `Publication`↔`Author` (ordre).
+- **PublicationProvenance** — quelle Source a fourni quelle Publication.
+  - `publication_id`, `source_id`, `id_dans_source`, `recupere_le`,
+    `licence_constatee` (audit de provenance ; une publi peut venir de plusieurs).
+- **IngestionJob** — trace d'exécution de la moisson.
+  - `source_id`, `requete`, `debut`, `fin`, `nb_traites`, `nb_nouveaux`,
+    `nb_erreurs`, `statut`, `log`.
+- **PlacementSuggestion** — proposition IA de placement dans l'arbre.
+  - `publication_id`, `tree_node_id`, `score`, `methode` (knn/llm), `statut`
+    (proposé/accepté/rejeté), `valide_par`, `valide_le`.
+
+### 9.2 Domaine « Arbre des connaissances »
+
+- **TreeNode** — une notion scientifique.
+  - `slug` (URL), `label`, `description`, `domaine`, `parent_principal_id`
+    (pour l'URL canonique), `openalex_concept_id` (mapping graine), `statut`.
+- **TreeEdge** — arête du DAG (multi-parents).
+  - `parent_id`, `child_id`, `principal` (bool) ; contrainte **anti-cycle**.
+- **TreeNodeRevision** — versionnage des modifications structurelles/éditoriales
+  du nœud (qui, quand, diff, validé par référent/comité).
+
+### 9.3 Domaine « Wiki »
+
+- **Article** — rattaché à un `TreeNode`.
+  - `tree_node_id`, `titre`, `langue`, `bloc_academique_valide` (bool),
+    `statut` : `brouillon_ia` → `en_relecture_comite` → `valide` → `public`
+    (état `public` **interdit** sans `Review` comité approuvée enregistrée),
+    `genere_par_ia` (bool), `valide_par_comite_le`.
+- **ArticleRevision** — une version d'article (immuable).
+  - `article_id`, `contenu_academique`, `contenu_vulgarisation`,
+    `auteur_type` (ia/comite/contributeur), `auteur_id` (null si IA), `cree_le`,
+    `resume_modif`, `parent_revision_id` (diff/restauration).
+- **Annotation** — annotation/correction du comité sur une révision en draft.
+  - `article_revision_id`, `auteur_id`, `ancre`, `commentaire`, `statut`
+    (ouverte/résolue), `cree_le`.
+- **Citation** — lie une affirmation du bloc académique à une `Publication`.
+  - `article_revision_id`, `publication_id`, `ancre` (passage concerné), `doi`.
+- **ExternalResource** — ressource de vulgarisation « sûre » (bloc identifié).
+  - `url`, `type` (vidéo, article, podcast…), `editeur`, `niveau_fiabilite`,
+    `statut_validation`, `valide_par`, relation N-N avec `Article`.
+- **Discussion / Comment** — page de discussion par article.
+
+### 9.4 Domaine « Communauté & gouvernance »
+
+- **User** — `email`, `pseudo`, `orcid` (opt.), `is_chercheur`, `reputation`,
+  `2fa_actif`.
+- **Role** — `ROLE_CONTRIBUTEUR`, `ROLE_RELECTEUR`, `ROLE_COMITE`,
+  `ROLE_MODERATEUR`, `ROLE_ADMIN`.
+- **DomainExpertise** — rattache un `User` (relecteur/référent/comité) à un ou des
+  `TreeNode`/domaines (périmètre de ses droits de validation).
+- **Review** — relecture experte / validation comité.
+  - `article_revision_id`, `reviewer_id`, `type` (experte/comité), `statut`
+    (approuvé/rejeté/demande_modif), `commentaire`, `cree_le`.
+- **Report** — signalement de modération (`cible`, `motif`, `statut`, traitement).
 
 ---
 
@@ -310,6 +419,7 @@ Brouillon → Proposition → Révision communautaire → Relecture experte
 | IA | Modèles open source auto-hébergés (embeddings + LLM léger) | ✓ décidé |
 | Conteneurisation | Docker / Docker Compose, CI/CD | §13 |
 | Auth | JWT/OAuth2 pour API ; comptes wiki | §13 |
+| Hébergement | **Auto-hébergement** (souveraineté) ; serveur GPU pour l'IA | ✓ décidé |
 
 ### 10.1 Sécurité de l'API (exigence : « hyper sécurisée »)
 
@@ -367,25 +477,24 @@ L'API étant l'unique porte d'entrée (web, Flutter, back-office), elle est durc
 ### Décidé
 - **Sources** : toutes référencées dans le registre ; **3 codées en Phase 1**
   (OpenAlex, Unpaywall, arXiv).
+- **Sci-Hub** : **pas de connecteur dans la moissonneuse** ; éthos open access
+  assumé via le discours et l'invitation au dépôt (cf. §3.3 / §3.4).
 - **Taxonomie** : amorcée sur les *concepts OpenAlex*, puis **éditable par le
   comité/référent scientifique** (versionnée).
+- **Arbre** : **graphe DAG** (multi-parents, anti-cycle, parent principal pour SEO).
 - **Front** : **API Symfony + API Platform durcie** + **front Symfony/Twig** ;
   les **apps Flutter** consomment l'API.
+- **Hébergement** : **auto-hébergement** (serveur GPU pour l'IA).
 - **Licence contenu** : CC BY-SA 4.0. **Langue** : francophone d'abord.
   **IA** : modèles open source auto-hébergés.
 
 ### À trancher au prochain tour
-1. **Sci-Hub** : confirmer l'exclusion définitive (recommandé) — décision laissée
-   ouverte à votre demande (cf. §3.3).
-2. **Arbre strict vs graphe (DAG)** : autorise-t-on un nœud à avoir plusieurs
-   parents (notions transverses) ?
-3. **Système de réputation** : modèle Wikipedia (droits par ancienneté/édits) ou
+1. **Système de réputation** : modèle Wikipedia (droits par ancienneté/édits) ou
    StackExchange (points/badges) ? Comment recrute-t-on les comités/référents ?
-4. **Stockage du full-text** : copie locale (si licence CC le permet) ou
+2. **Stockage du full-text** : copie locale (si licence CC le permet) ou
    lien + extraction à la volée ?
-5. **Hébergement & budget** : auto-hébergement (souveraineté, coût infra IA) ?
-   cloud ? association/fondation porteuse du projet ?
-6. **Modération à grande échelle** : outils anti-vandalisme ; qui décide qu'une
+3. **Budget & structure porteuse** : association/fondation ? coût du serveur GPU ?
+4. **Modération à grande échelle** : outils anti-vandalisme ; qui décide qu'une
    ressource de vulgarisation externe (vidéo, blog) est « sûre » ?
-7. **Nom & marque** : « SciencesWiki » est-il le nom retenu ?
+5. **Nom & marque** : « SciencesWiki » est-il le nom retenu ?
 ```
