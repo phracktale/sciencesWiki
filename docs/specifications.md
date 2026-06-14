@@ -279,6 +279,37 @@ sources, **journalisation** complète de la provenance (audit/transparence).
   conservé pour que la moissonneuse continue de proposer des placements même
   après réorganisation manuelle.
 
+### 7.1 Export bibliographique (Zotero & interopérabilité)
+
+Depuis **n'importe quel nœud**, on peut **exporter le nœud et ses descendants**
+sous forme de bibliographie importable dans **Zotero** (et autres gestionnaires).
+
+- **Portée :** parcours du **DAG** à partir du nœud sélectionné, collecte de
+  **toutes les publications rattachées** au nœud **et à ses descendants**, avec
+  **dédoublonnage par DOI** (un même papier rattaché à plusieurs nœuds n'apparaît
+  qu'une fois). Option `récursif` (nœud + descendants) ou nœud seul.
+- **Formats produits** (tous importables par Zotero) :
+  - **RIS** (`.ris`) — interopérable, robuste ;
+  - **BibTeX** (`.bib`) ;
+  - **CSL-JSON** — pivot interne canonique ;
+  - **Zotero RDF** — format natif Zotero.
+- **Représentation pivot :** chaque `Publication` est mappée en **CSL-JSON**
+  (auteurs, titre, DOI, date, conteneur/revue, URL OA, licence), puis convertie
+  vers RIS / BibTeX / Zotero RDF.
+- **Endpoint API (proposé) :**
+  `GET /api/tree-nodes/{slug}/export?format=ris|bibtex|csljson|rdf&recursive=true`
+  → fichier téléchargeable (`Content-Disposition`).
+- **Intégration directe Zotero (bonus) :** exposer les **métadonnées de
+  citation** dans le HTML des pages (balises type *Dublin Core* / *Highwire* /
+  **COinS**, voire **unAPI**) pour que le **connecteur de navigateur Zotero**
+  capture les références sans téléchargement de fichier.
+- **Volumétrie :** export d'un nœud haut de l'arbre = potentiellement des
+  milliers de références → génération **paginée/asynchrone** (job) avec lien de
+  téléchargement quand prêt, au-delà d'un seuil.
+
+> Disponible dès que des publications sont placées dans l'arbre (post-Phase 1) ;
+> ne dépend ni du wiki ni des comités.
+
 ---
 
 ## 8. Le wiki
@@ -466,7 +497,7 @@ L'API étant l'unique porte d'entrée (web, Flutter, back-office), elle est durc
 | **0. Cadrage** | Valider la spec | Ce document finalisé + ADR |
 | **1. Moissonneuse (MVP)** | Ingestion légale + normalisation | Worker harvester, 2-3 sources (OpenAlex+Unpaywall+arXiv), schéma BDD, dédoublonnage |
 | **2. IA de tri** | Placement assisté | Embeddings + classif. arbre auto-hébergés |
-| **3. Arbre + API** | Exposer la connaissance | TreeNode, API Symfony, recherche |
+| **3. Arbre + API** | Exposer la connaissance | TreeNode, API Symfony, recherche, **export bibliographique Zotero (nœud + descendants)** |
 | **4. Wiki** | Édition + révision | Articles, blocs, versioning, workflow comité/modération |
 | **5. Mobile** | Lecture/navigation | App Flutter (lecture d'abord) |
 | **6. Communauté** | Réputation, incitation chercheurs | Gouvernance, page dépôt, comités |
