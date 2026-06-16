@@ -3,10 +3,13 @@
 {% block title %}{{ node.label }} — SciencesWiki{% endblock %}
 
 {% block body %}
-    {% if node.parents is not empty %}
-        <p class="crumbs muted">
-            {% for parent in node.parents %}
-                <a href="{{ path('node', { slug: parent.slug }) }}">{{ parent.label }}</a>{% if not loop.last %} · {% endif %}
+    {% set crumbs = node.breadcrumb ?? [] %}
+    {% if crumbs|length > 1 %}
+        <p class="crumbs">
+            {% set acc = '' %}
+            {% for c in crumbs %}
+                {% set acc = (acc == '' ) ? c.slug : acc ~ '/' ~ c.slug %}
+                {% if not loop.last %}<a href="/{{ acc }}">{{ c.label }}</a> › {% else %}<span class="muted">{{ c.label }}</span>{% endif %}
             {% endfor %}
         </p>
     {% endif %}
@@ -15,43 +18,102 @@
     {% if node.description %}<p class="muted">{{ node.description }}</p>{% endif %}
 
     {% if node.children is not empty %}
-        <h2>Sous-domaines</h2>
+        <h2>Sous-rubriques</h2>
         <div class="grid">
             {% for child in node.children %}
-                <a class="card" href="{{ path('node', { slug: child.slug }) }}">{{ child.label }}</a>
+                <a class="card" href="/{{ path }}/{{ child.slug }}">{{ child.label }}</a>
             {% endfor %}
         </div>
     {% endif %}
 
     <h2>Questions &amp; réponses</h2>
-    {% for answer in answers %}
-        <article class="qa">
-            <h3>{{ answer.questionText }}</h3>
-            {% if answer.validationStatus == 'valide' %}
-                <span class="badge ok">✅ Validé par le comité scientifique</span>
-            {% else %}
-                <span class="badge warn">⚠️ Réponse générée par IA — non encore relue par un comité</span>
-            {% endif %}
-
-            {% if answer.vulgarizationContent %}
-                <div class="block-vul"><h4>Vulgarisation</h4><p>{{ answer.vulgarizationContent|nl2br }}</p></div>
-            {% endif %}
-            {% if answer.academicContent %}
-                <div class="block-aca"><h4>Faits établis (sourcés)</h4><p>{{ answer.academicContent|nl2br }}</p></div>
-            {% endif %}
-
-            {% if answer.sources is not empty %}
-                <div class="sources">
-                    <strong>Sources :</strong>
-                    <ol>
-                        {% for source in answer.sources %}
-                            <li>{{ source.title }}{% if source.doi %} — <a href="https://doi.org/{{ source.doi }}" rel="noopener" target="_blank">doi:{{ source.doi }}</a>{% endif %}</li>
-                        {% endfor %}
-                    </ol>
-                </div>
-            {% endif %}
-        </article>
+    {% if answers is empty %}
+        <p class="muted">Aucune question publiée pour cette rubrique. Posez la première ci-dessous.</p>
     {% else %}
-        <p class="muted">Aucune question publiée pour cette notion pour l'instant.</p>
-    {% endfor %}
+        <ul class="qlist">
+            {% for a in answers %}
+                <li>
+                    <a class="q-title" href="{{ path('answer', { id: a.id }) }}">{{ a.title }}</a>
+                    <div class="qmeta">
+                        <span class="pill author">✍️ {{ a.askerName }}</span>
+                        {% if a.validationStatus == 'valide' %}
+                            <span class="badge ok">✅ validé</span>
+                        {% else %}
+                            <span class="badge warn">⚠️ non relu</span>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <div class="ask">
+        <h2 style="margin-top:0">Poser une question sur « {{ node.label }} »</h2>
+        <p class="muted" style="font-size:.85rem">Une réponse vulgarisée et sourcée sera rédigée par l'IA (gemma4), publiée avec la mention « non relu » en attendant la validation du comité.</p>
+        <form id="ask-form" data-node="{{ node.slug }}">
+            <label for="ask-name">Votre nom ou pseudonyme <span class="muted">(obligatoire)</span></label>
+            <input type="text" id="ask-name" name="name" maxlength="120" required autocomplete="nickname">
+            <label for="ask-q">Votre question</label>
+            <textarea id="ask-q" name="question" maxlength="400" required placeholder="Ex. : Comment fonctionne… ?"></textarea>
+            <button type="submit" id="ask-btn">Demander une réponse</button>
+            <span id="ask-msg" class="muted" style="margin-left:.6rem"></span>
+        </form>
+        <div id="stream-out" hidden></div>
+    </div>
+
+    <script>
+    (function () {
+        var form = document.getElementById('ask-form');
+        var btn = document.getElementById('ask-btn');
+        var msg = document.getElementById('ask-msg');
+        var out = document.getElementById('stream-out');
+
+        function render(raw) {
+            // Mise en forme légère du flux : on met en valeur les en-têtes de sections.
+            var html = raw
+                .replace(/^##\s*TITRE\s*$/gmi, '')
+                .replace(/^##\s*VULGARISATION\s*$/gmi, '')
+                .replace(/^##\s*ACAD[EÉ]MIQUE\s*$/gmi, '<h4>Pour aller plus loin</h4>');
+            out.innerHTML = html;
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var name = document.getElementById('ask-name').value.trim();
+            var question = document.getElementById('ask-q').value.trim();
+            if (!name) { msg.textContent = 'Le nom ou pseudo est obligatoire.'; return; }
+            if (question.length < 8) { msg.textContent = 'Votre question est trop courte.'; return; }
+
+            btn.disabled = true;
+            msg.innerHTML = '<span class="loader"></span> Envoi…';
+
+            fetch('/api/questions/ask', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: name, question: question, node: form.dataset.node })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+                if (!res.ok) { throw new Error(res.d.error || 'Erreur'); }
+                msg.innerHTML = '<span class="loader"></span> Rédaction en cours…';
+                out.hidden = false;
+                out.textContent = '';
+                var acc = '';
+                var es = new EventSource(res.d.stream);
+                es.onmessage = function (ev) {
+                    var data = JSON.parse(ev.data);
+                    if (data.delta) { acc += data.delta; render(acc); }
+                    if (data.error) { es.close(); btn.disabled = false; msg.textContent = data.error; }
+                    if (data.done) {
+                        es.close();
+                        msg.innerHTML = '<span class="loader"></span> Réponse prête, redirection…';
+                        window.location.href = '/q/' + data.answerId;
+                    }
+                };
+                es.onerror = function () { es.close(); btn.disabled = false; msg.textContent = 'Connexion interrompue.'; };
+            })
+            .catch(function (err) { btn.disabled = false; msg.textContent = err.message; });
+        });
+    })();
+    </script>
 {% endblock %}

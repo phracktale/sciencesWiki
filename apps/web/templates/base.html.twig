@@ -4,31 +4,70 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}SciencesWiki{% endblock %}</title>
+    <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée à des publications de recherche.{% endblock %}">
     <style>
-        :root { --accent:#1a5; --aca:#2563eb; --vul:#b45309; }
+        :root { --accent:#1a5; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937; }
         * { box-sizing: border-box; }
-        body { font-family: system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 1.5rem; color:#1f2937; line-height:1.55; }
-        header a { color: var(--accent); text-decoration: none; font-weight: 700; }
-        h1 { margin: .2rem 0; }
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
+        header { display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:.8rem; margin-bottom:1.2rem; }
+        header .brand { color: var(--accent); text-decoration: none; font-weight: 800; font-size:1.2rem; }
+        header nav { margin-left:auto; display:flex; gap:1rem; font-size:.9rem; }
+        h1 { margin: .3rem 0; font-size:1.7rem; }
+        h2 { margin-top:1.6rem; }
         a { color: var(--aca); }
         .muted { color:#6b7280; }
-        .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.6rem; }
-        .card { display:block; border:1px solid #e5e7eb; border-radius:10px; padding:.8rem; text-decoration:none; color:#111827; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:.6rem; }
+        .card { display:block; border:1px solid var(--line); border-radius:10px; padding:.8rem; text-decoration:none; color:#111827; transition:border-color .15s; }
         .card:hover { border-color: var(--accent); }
         .crumbs { font-size:.9rem; }
-        .qa { border:1px solid #e5e7eb; border-radius:12px; padding:1rem; margin:1rem 0; }
-        .badge { display:inline-block; font-size:.78rem; padding:.1rem .5rem; border-radius:999px; }
+        .crumbs a { color:#6b7280; text-decoration:none; }
+        .crumbs a:hover { color:var(--accent); }
+        .pill { display:inline-block; font-size:.72rem; padding:.12rem .55rem; border-radius:999px; background:#f1f5f9; color:#475569; border:1px solid var(--line); }
+        .pill.author { background:#eef2ff; color:#3730a3; border-color:#e0e7ff; }
+        .pill.node { background:#ecfdf5; color:#065f46; border-color:#d1fae5; }
+        .badge { display:inline-block; font-size:.78rem; padding:.1rem .55rem; border-radius:999px; }
         .badge.ok { background:#dcfce7; color:#166534; }
         .badge.warn { background:#fef3c7; color:#92400e; }
-        .block-aca { border-left:3px solid var(--aca); padding-left:.8rem; }
-        .block-vul { border-left:3px solid var(--vul); padding-left:.8rem; }
-        .sources { font-size:.85rem; }
-        footer { margin-top:3rem; font-size:.8rem; color:#9ca3af; }
+        .qlist { list-style:none; padding:0; margin:0; }
+        .qlist li { border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; margin:.5rem 0; }
+        .qlist a.q-title { font-weight:600; text-decoration:none; color:#111827; font-size:1.05rem; }
+        .qlist a.q-title:hover { color:var(--accent); }
+        .qmeta { margin-top:.35rem; display:flex; gap:.45rem; align-items:center; flex-wrap:wrap; font-size:.8rem; }
+        .qmeta time { color:#9ca3af; }
+        .block-aca { border-left:3px solid var(--aca); padding-left:.9rem; }
+        .block-vul { border-left:3px solid var(--vul); padding-left:.9rem; }
+        .sources { font-size:.88rem; }
+        .ask { border:1px solid var(--line); border-radius:12px; padding:1rem 1.1rem; margin:1.2rem 0; background:#fafafa; }
+        .ask label { display:block; font-size:.85rem; font-weight:600; margin:.5rem 0 .2rem; }
+        .ask input[type=text], .ask textarea { width:100%; padding:.55rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
+        .ask textarea { min-height:4.5rem; resize:vertical; }
+        .ask button { margin-top:.8rem; background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.6rem 1.1rem; font:inherit; font-weight:600; cursor:pointer; }
+        .ask button:disabled { opacity:.5; cursor:not-allowed; }
+        .loader { display:inline-block; width:1rem; height:1rem; border:2px solid #cbd5e1; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        #stream-out { white-space:pre-wrap; margin-top:1rem; padding:1rem; border:1px dashed #cbd5e1; border-radius:10px; min-height:2rem; }
+        #stream-out h4 { color:var(--vul); margin:.6rem 0 .2rem; font-size:.95rem; text-transform:uppercase; letter-spacing:.04em; }
+        .cartouche { display:flex; gap:.8rem; align-items:flex-start; border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fbfdff; margin:1rem 0; }
+        .cartouche .avatar { width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg,#1a5,#2563eb); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex:0 0 auto; }
+        .cartouche .who { font-weight:700; }
+        .cartouche .note { font-size:.85rem; color:#6b7280; }
+        footer { margin-top:3rem; border-top:1px solid var(--line); padding-top:1rem; font-size:.8rem; color:#9ca3af; }
+        footer a { color:#6b7280; }
     </style>
 </head>
 <body>
-    <header><a href="{{ path('home') }}">SciencesWiki</a> <span class="muted">— le savoir scientifique, libre et vulgarisé</span></header>
+    <header>
+        <a class="brand" href="{{ path('home') }}">SciencesWiki</a>
+        <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
+        <nav>
+            <a href="{{ path('home') }}">Accueil</a>
+            <a href="/le-projet">Le projet</a>
+        </nav>
+    </header>
     <main>{% block body %}{% endblock %}</main>
-    <footer>Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique.</footer>
+    <footer>
+        Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique ·
+        projet libre, gratuit et open source. <a href="/le-projet">En savoir plus</a>
+    </footer>
 </body>
 </html>

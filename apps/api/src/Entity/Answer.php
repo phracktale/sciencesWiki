@@ -98,6 +98,7 @@ class Answer
         $this->revisions = new ArrayCollection();
     }
 
+    #[Groups(['answer:read'])]
     public function getId(): ?int
     {
         return $this->id;
@@ -107,6 +108,20 @@ class Answer
     public function getQuestionText(): string
     {
         return $this->question->getText();
+    }
+
+    /** Titre court affiché (sinon, à défaut, le texte de la question). */
+    #[Groups(['answer:read'])]
+    public function getTitle(): string
+    {
+        return $this->question->getTitle() ?? $this->question->getText();
+    }
+
+    /** Nom/pseudo du demandeur (pour la pastille auteur). */
+    #[Groups(['answer:read'])]
+    public function getAskerName(): string
+    {
+        return $this->question->getAskerName() ?? 'SciencesWiki';
     }
 
     /**

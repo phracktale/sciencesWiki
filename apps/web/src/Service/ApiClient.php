@@ -53,6 +53,36 @@ final class ApiClient
     }
 
     /**
+     * Une réponse (Q/R) par son identifiant.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function answer(int $id): ?array
+    {
+        try {
+            return $this->get('/api/answers/'.$id);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Dernières questions posées (accueil).
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function latestQuestions(int $limit = 10): array
+    {
+        try {
+            $data = $this->get('/api/questions/latest', ['limit' => $limit]);
+
+            return $data['items'] ?? [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
      * @param array<string,mixed> $query
      *
      * @return array<string,mixed>

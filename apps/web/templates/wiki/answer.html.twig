@@ -1,0 +1,71 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ answer.title }} — SciencesWiki{% endblock %}
+{% block description %}{{ answer.vulgarizationContent|striptags|slice(0, 155) }}{% endblock %}
+
+{% block body %}
+    {% set crumbs = (node.breadcrumb ?? []) %}
+    {% if crumbs is not empty %}
+        <p class="crumbs">
+            {% set acc = '' %}
+            {% for c in crumbs %}
+                {% set acc = (acc == '') ? c.slug : acc ~ '/' ~ c.slug %}
+                <a href="/{{ acc }}">{{ c.label }}</a>{% if not loop.last %} › {% endif %}
+            {% endfor %}
+        </p>
+    {% endif %}
+
+    <h1>{{ answer.title }}</h1>
+    <p class="qmeta">
+        <span class="pill author">✍️ {{ answer.askerName }}</span>
+        {% if answer.validationStatus == 'valide' %}
+            <span class="badge ok">✅ validé par le comité scientifique</span>
+        {% else %}
+            <span class="badge warn">⚠️ généré par IA — non encore relu par un comité</span>
+        {% endif %}
+    </p>
+
+    <p class="muted"><strong>Question :</strong> {{ answer.questionText }}</p>
+
+    {% if answer.vulgarizationContent %}
+        <div class="block-vul">
+            <h4>Vulgarisation</h4>
+            <p>{{ answer.vulgarizationContent|nl2br }}</p>
+        </div>
+    {% endif %}
+
+    {% if answer.academicContent %}
+        <div class="block-aca">
+            <h4>Faits établis (sourcés)</h4>
+            <p>{{ answer.academicContent|nl2br }}</p>
+        </div>
+    {% endif %}
+
+    {% if answer.sources is not empty %}
+        <div class="sources">
+            <strong>Sources :</strong>
+            <ol>
+                {% for s in answer.sources %}
+                    <li>{{ s.title }}{% if s.doi %} — <a href="https://doi.org/{{ s.doi }}" rel="noopener" target="_blank">doi:{{ s.doi }}</a>{% endif %}</li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    <div class="cartouche">
+        <div class="avatar">IA</div>
+        <div>
+            <div class="who">Rédigé par GEMMA 4 <span class="muted">— modèle d'IA open source auto-hébergé</span></div>
+            <div class="note">
+                ⚠️ <strong>Précaution d'usage :</strong> cette réponse est générée automatiquement à partir des
+                sources citées et n'a pas encore été relue par le comité scientifique. Elle peut comporter des
+                imprécisions. Une erreur, une nuance à ajouter ?
+                <a href="mailto:phracktale@gmail.com?subject=Correction%20%E2%80%94%20{{ answer.title|url_encode }}">Proposez une correction</a>.
+            </div>
+        </div>
+    </div>
+
+    {% if answer.node.slug is defined %}
+        <p class="muted">↩ Retour à la rubrique <a href="/{{ answer.node.slug }}">{{ answer.node.label }}</a></p>
+    {% endif %}
+{% endblock %}

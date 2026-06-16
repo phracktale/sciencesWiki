@@ -1,14 +1,42 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}SciencesWiki — l'arbre des connaissances{% endblock %}
+{% block title %}SciencesWiki — l'encyclopédie scientifique libre et vulgarisée{% endblock %}
 
 {% block body %}
-    <h1>L'arbre des connaissances</h1>
-    <p class="muted">Explorez les grands domaines scientifiques. Chaque notion est vulgarisée à partir de publications de recherche en libre accès.</p>
+    <h1>Le savoir scientifique, libre et vulgarisé</h1>
+    <p class="muted">
+        Posez une question sur une notion scientifique : une réponse vous est rédigée,
+        <strong>sourcée sur des publications de recherche</strong> et expliquée simplement.
+        Projet libre, gratuit et open source. <a href="/le-projet">Découvrir le projet →</a>
+    </p>
 
+    <h2>Dernières questions</h2>
+    {% if latest is empty %}
+        <p class="muted">Aucune question pour l'instant — explorez une rubrique ci-dessous et posez la vôtre.</p>
+    {% else %}
+        <ul class="qlist">
+            {% for q in latest %}
+                <li>
+                    <a class="q-title" href="{{ path('answer', { id: q.answerId }) }}">{{ q.title }}</a>
+                    <div class="qmeta">
+                        <span class="pill author">✍️ {{ q.author }}</span>
+                        <a class="pill node" href="/{{ q.node.slug }}">{{ q.node.label }}</a>
+                        {% if q.status == 'valide' %}
+                            <span class="badge ok">✅ validé</span>
+                        {% else %}
+                            <span class="badge warn">⚠️ non relu</span>
+                        {% endif %}
+                        <time datetime="{{ q.createdAt }}">{{ q.createdAt|date('d/m/Y à H\\hi') }}</time>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <h2>Explorer par domaine</h2>
     <div class="grid">
         {% for domain in domains %}
-            <a class="card" href="{{ path('node', { slug: domain.slug }) }}">
+            <a class="card" href="/{{ domain.slug }}">
                 <strong>{{ domain.label }}</strong><br>
                 <span class="muted">{{ domain.childrenCount }} champ(s)</span>
             </a>
