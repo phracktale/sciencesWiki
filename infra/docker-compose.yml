@@ -91,6 +91,10 @@ services:
       LLM_API_TOKEN: ${LLM_API_TOKEN}
       # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
     command: ["php", "bin/console", "messenger:consume", "harvester", "failed", "-v", "--time-limit=3600", "--memory-limit=256M"]
+    # Le worker ne sert pas de HTTP : on neutralise le healthcheck HTTP hérité
+    # de l'image FrankenPHP (sinon faux « unhealthy »).
+    healthcheck:
+      disable: true
     restart: unless-stopped
 
   web:
