@@ -41,19 +41,30 @@ final class OpenAlexTaxonomySeeder
     }
 
     /**
+     * @param int $maxLevel         niveau maximal (0=domaines … 3=topics)
+     * @param int $maxChildrenPerNode 0 = illimité ; sinon ne conserve que les N
+     *                                enfants les plus importants (par works_count)
+     *                                de chaque nœud, pour un arbre équilibré
+     *
      * @return array{nodes:int,edges:int}
      */
-    public function seed(int $maxLevel): array
+    public function seed(int $maxLevel, int $maxChildrenPerNode = 0): array
     {
         $maxLevel = min($maxLevel, \count(self::ENDPOINTS) - 1);
 
-        // 1) Collecte des enregistrements (qid, label, description, level, parentQid).
-        /** @var list<array{qid:string,label:string,description:?string,level:int,parentQid:?string}> $records */
+        // 1) Collecte des enregistrements (qid, label, description, level, parentQid, worksCount).
+        /** @var list<array{qid:string,label:string,description:?string,level:int,parentQid:?string,worksCount:int}> $records */
         $records = [];
         for ($level = 0; $level <= $maxLevel; ++$level) {
             foreach ($this->fetchAll(self::ENDPOINTS[$level]) as $raw) {
                 $records[] = $this->parse($raw, $level);
             }
+        }
+
+        // 1b) Élagage top-down : ne garder que les N enfants les plus importants
+        // par nœud (descendre dans une branche n'a de sens que si le parent est gardé).
+        if ($maxChildrenPerNode > 0) {
+            $records = $this->prune($records, $maxChildrenPerNode);
         }
 
         // 2) Nœuds.
@@ -111,7 +122,48 @@ final class OpenAlexTaxonomySeeder
             'description' => isset($raw['description']) ? (string) $raw['description'] : null,
             'level' => $level,
             'parentQid' => $parentQid,
+            'worksCount' => (int) ($raw['works_count'] ?? 0),
         ];
+    }
+
+    /**
+     * Élague l'arbre top-down : conserve toutes les racines (niveau 0) puis, pour
+     * chaque nœud gardé, ses N enfants les plus importants (works_count décroissant).
+     *
+     * @param list<array{qid:string,label:string,description:?string,level:int,parentQid:?string,worksCount:int}> $records
+     *
+     * @return list<array{qid:string,label:string,description:?string,level:int,parentQid:?string,worksCount:int}>
+     */
+    private function prune(array $records, int $maxChildren): array
+    {
+        /** @var array<string,list<array<string,mixed>>> $childrenOf */
+        $childrenOf = [];
+        $roots = [];
+        foreach ($records as $rec) {
+            if (null === $rec['parentQid']) {
+                $roots[] = $rec;
+            } else {
+                $childrenOf[$rec['parentQid']][] = $rec;
+            }
+        }
+
+        /** @var list<array<string,mixed>> $kept */
+        $kept = $roots;
+        $frontier = $roots;
+        while ([] !== $frontier) {
+            $next = [];
+            foreach ($frontier as $parent) {
+                $children = $childrenOf[$parent['qid']] ?? [];
+                usort($children, static fn (array $a, array $b): int => $b['worksCount'] <=> $a['worksCount']);
+                foreach (\array_slice($children, 0, $maxChildren) as $child) {
+                    $kept[] = $child;
+                    $next[] = $child;
+                }
+            }
+            $frontier = $next;
+        }
+
+        return $kept;
     }
 
     /**

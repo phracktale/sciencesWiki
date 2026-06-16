@@ -41,6 +41,10 @@ final class PromptBuilder
             - Sépare deux blocs : "academique" (faits établis, sourcés, chaque
               affirmation suivie de sa ou ses citations entre crochets, ex. [1][3])
               et "vulgarisation" (explication pédagogique accessible, en français).
+            - La "vulgarisation" doit être rédigée pour qu'un ÉLÈVE DE COLLÈGE
+              (13-15 ans) puisse comprendre : phrases courtes, vocabulaire simple,
+              analogies concrètes, et tout terme technique expliqué avec des mots
+              simples. Le bloc "academique" peut rester plus précis/technique.
             - Les citations renvoient au NUMÉRO de la source utilisée.
             - Reste neutre, rigoureux, sans extrapolation.
 
