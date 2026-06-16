@@ -221,7 +221,9 @@ class Publication
 
     public function setVenue(?string $venue): self
     {
-        $this->venue = $venue;
+        // Certains noms de revue OpenAlex dépassent la colonne VARCHAR(512) ;
+        // on tronque pour ne pas casser la moisson (cf. bug « value too long »).
+        $this->venue = null !== $venue ? mb_substr($venue, 0, 512) : null;
 
         return $this;
     }

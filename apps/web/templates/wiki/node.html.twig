@@ -103,6 +103,11 @@
                 es.onmessage = function (ev) {
                     var data = JSON.parse(ev.data);
                     if (data.delta) { acc += data.delta; render(acc); }
+                    if (data.nosource) {
+                        es.close(); btn.disabled = false; out.hidden = true;
+                        msg.textContent = '';
+                        out.hidden = false; out.innerHTML = '<p class="muted">⚠️ ' + data.message + '</p>';
+                    }
                     if (data.error) { es.close(); btn.disabled = false; msg.textContent = data.error; }
                     if (data.done) {
                         es.close();

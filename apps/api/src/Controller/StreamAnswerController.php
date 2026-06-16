@@ -24,6 +24,9 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class StreamAnswerController
 {
+    /** Distance cosinus max pour qu'une publication soit jugée pertinente (garde-fou). */
+    private const MAX_SOURCE_DISTANCE = 0.62;
+
     public function __construct(
         private readonly QuestionRepository $questions,
         private readonly AnswerRepository $answers,
@@ -61,13 +64,30 @@ final class StreamAnswerController
                     return;
                 }
 
-                $sources = $this->drafter->retrieveSources($question, 5);
+                // Garde-fou amont : aucune source pertinente => on ne génère pas
+                // et on ne publie pas (cf. exigence : pas de réponse creuse).
+                $sources = $this->drafter->retrieveSources($question, 6, self::MAX_SOURCE_DISTANCE);
+                if ([] === $sources) {
+                    $send(['nosource' => true, 'message' => "Nous n'avons pas encore de source scientifique fiable pour répondre à cette question. Elle est enregistrée et sera traitée dès que des publications pertinentes seront disponibles dans le corpus."]);
+
+                    return;
+                }
+
                 $messages = $this->drafter->buildMessages($question, $sources);
 
                 $full = '';
                 foreach ($this->llmFactory->create()->stream($messages, ['temperature' => 0.2, 'max_tokens' => 1200]) as $chunk) {
                     $full .= $chunk;
                     $send(['delta' => $chunk]);
+                }
+
+                // Garde-fou aval : si la rédaction ne cite aucune source, elle est
+                // jugée non ancrée => non publiée.
+                $parsed = $this->drafter->analyze($full, $sources);
+                if ([] === $parsed['footnotes']) {
+                    $send(['nosource' => true, 'message' => "La rédaction n'a pas pu s'appuyer sur les sources disponibles : rien n'est publié pour éviter une réponse non sourcée."]);
+
+                    return;
                 }
 
                 $answer = $this->drafter->persistFromText($question, AnswerType::Free, $sources, $full);

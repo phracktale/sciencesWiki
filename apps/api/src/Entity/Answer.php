@@ -146,9 +146,12 @@ class Answer
     }
 
     /**
-     * Notes de bas de page (sources) de la dernière révision.
+     * Notes de bas de page (sources) de la dernière révision : métadonnées
+     * complètes du papier (auteurs, date, revue) + lien vers l'accès ouvert/DOI.
+     * Une réponse peut citer plusieurs papiers ; un papier peut servir plusieurs
+     * réponses (relation N:N côté contenu).
      *
-     * @return list<array{marker:int,doi:?string,title:string}>
+     * @return list<array{marker:int,doi:?string,title:string,authors:list<string>,year:?string,venue:?string,oaUrl:?string}>
      */
     #[Groups(['answer:read'])]
     public function getSources(): array
@@ -160,10 +163,15 @@ class Answer
 
         $sources = [];
         foreach ($revision->getFootnotes() as $footnote) {
+            $pub = $footnote->getPublication();
             $sources[] = [
                 'marker' => $footnote->getMarker(),
                 'doi' => $footnote->getDoi(),
-                'title' => $footnote->getPublication()->getTitle(),
+                'title' => $pub->getTitle(),
+                'authors' => array_map(static fn (array $a): string => $a['name'], $pub->getAuthors()),
+                'year' => $pub->getPublicationDate()?->format('Y'),
+                'venue' => $pub->getVenue(),
+                'oaUrl' => $pub->getOaUrl(),
             ];
         }
 

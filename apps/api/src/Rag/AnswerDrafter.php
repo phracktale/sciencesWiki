@@ -40,17 +40,18 @@ final class AnswerDrafter
     }
 
     /**
-     * Garantit l'embedding de la question puis récupère les sources RAG.
+     * Garantit l'embedding de la question puis récupère les sources RAG
+     * pertinentes (filtrées par distance si $maxDistance est fourni).
      *
      * @return list<Publication>
      */
-    public function retrieveSources(Question $question, int $k = 5): array
+    public function retrieveSources(Question $question, int $k = 5, ?float $maxDistance = null): array
     {
         if (null === $question->getEmbedding()) {
             $question->setEmbedding($this->embeddingFactory->create()->embed($question->getText()));
         }
 
-        return $this->retriever->retrieve($question, $k);
+        return $this->retriever->retrieve($question, $k, $maxDistance);
     }
 
     /**
@@ -71,7 +72,7 @@ final class AnswerDrafter
      */
     public function persistFromText(Question $question, AnswerType $type, array $sources, string $content): Answer
     {
-        $parsed = $this->parse($content, $sources);
+        $parsed = $this->analyze($content, $sources);
 
         if (null === $question->getTitle() && '' !== $parsed['title']) {
             $question->setTitle($parsed['title']);
@@ -102,7 +103,7 @@ final class AnswerDrafter
      *
      * @return array{title:string,academic:string,vulgarization:string,footnotes:list<array{marker:int,publication:Publication}>}
      */
-    private function parse(string $content, array $sources): array
+    public function analyze(string $content, array $sources): array
     {
         $sections = $this->splitSections($content);
         $title = trim($sections['titre'] ?? '');

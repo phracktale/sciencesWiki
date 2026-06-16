@@ -25,16 +25,22 @@ final class RagRetriever
     }
 
     /**
+     * @param float|null $maxDistance distance cosinus maximale (0 = identique) ;
+     *                                au-delà, la source est jugée hors-sujet et
+     *                                écartée. null = pas de filtrage (rétro-compat).
+     *
      * @return list<Publication>
      */
-    public function retrieve(Question $question, int $k): array
+    public function retrieve(Question $question, int $k, ?float $maxDistance = null): array
     {
         $embedding = $question->getEmbedding()?->toArray()
             ?? $this->embeddingFactory->create()->embed($question->getText());
 
-        return array_map(
-            static fn (array $hit): Publication => $hit['publication'],
-            $this->publications->nearestTo($embedding, $k),
-        );
+        $hits = $this->publications->nearestTo($embedding, $k);
+        if (null !== $maxDistance) {
+            $hits = array_values(array_filter($hits, static fn (array $h): bool => $h['distance'] <= $maxDistance));
+        }
+
+        return array_map(static fn (array $hit): Publication => $hit['publication'], $hits);
     }
 }
