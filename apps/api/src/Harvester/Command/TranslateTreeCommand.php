@@ -50,9 +50,23 @@ final class TranslateTreeCommand extends Command
         $io->progressStart(\count($all));
 
         $translated = 0;
+        $failedBatches = 0;
         foreach (array_chunk($all, $batchSize) as $chunk) {
             $labels = array_map(static fn (\App\Entity\TreeNode $n): string => $n->getLabel(), $chunk);
-            $map = $this->translateBatch($llm, $labels);
+
+            // Robustesse : un lot qui échoue (timeout Ollama, etc.) ne fait pas
+            // tomber tout le job — on garde les libellés d'origine et on continue.
+            $map = [];
+            for ($attempt = 1; $attempt <= 2 && [] === $map; ++$attempt) {
+                try {
+                    $map = $this->translateBatch($llm, $labels);
+                } catch (\Throwable) {
+                    $map = [];
+                }
+            }
+            if ([] === $map) {
+                ++$failedBatches;
+            }
 
             foreach ($chunk as $i => $node) {
                 $fr = $map[$i + 1] ?? null;
@@ -66,6 +80,9 @@ final class TranslateTreeCommand extends Command
         }
 
         $io->progressFinish();
+        if ($failedBatches > 0) {
+            $io->warning(\sprintf('%d lot(s) en échec (relancez la commande pour les rattraper).', $failedBatches));
+        }
         $io->success(\sprintf('%d intitulé(s) traduit(s).', $translated));
 
         return Command::SUCCESS;
