@@ -1,34 +1,30 @@
 #!/usr/bin/env bash
 # Déploie le service d'embeddings ml/ sur Marvin (nœud IA, 192.168.1.171).
 #
-# Prérequis : accès SSH à Marvin (`ssh marvin`) et Docker installé là-bas.
-# Usage :    ./deploy.sh            (utilise l'hôte SSH « marvin »)
-#            MARVIN_HOST=192.168.1.171 ./deploy.sh
+# Déploiement par git (pas de rsync) : Marvin clone/maj le dépôt puis build.
+# Prérequis : `ssh marvin` fonctionnel, Docker + git installés sur Marvin.
+# Usage :    ./deploy.sh
+#            MARVIN_HOST=192.168.1.171 BRANCH=main ./deploy.sh
 set -euo pipefail
 
 MARVIN_HOST="${MARVIN_HOST:-marvin}"
-REMOTE_DIR="${REMOTE_DIR:-/opt/scienceswiki-ml}"
+BRANCH="${BRANCH:-feat/infra-homelab-deploy}"
+REPO_URL="${REPO_URL:-https://github.com/phracktale/sciencesWiki.git}"
+REMOTE_DIR="${REMOTE_DIR:-\$HOME/scienceswiki}"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
-
-echo "==> Vérification de Marvin (Docker + Ollama)…"
-ssh "$MARVIN_HOST" 'docker --version && (ollama --version || echo "ATTENTION: ollama introuvable")'
-
-echo "==> Création du dossier distant $REMOTE_DIR…"
-ssh "$MARVIN_HOST" "mkdir -p '$REMOTE_DIR/ml'"
-
-echo "==> Synchronisation de ml/ et du compose…"
-rsync -az --delete "$REPO_ROOT/ml/" "$MARVIN_HOST:$REMOTE_DIR/ml/"
-rsync -az "$SCRIPT_DIR/docker-compose.yml" "$MARVIN_HOST:$REMOTE_DIR/docker-compose.yml"
-
-echo "==> Build + démarrage du service d'embeddings…"
-ssh "$MARVIN_HOST" "cd '$REMOTE_DIR' && docker compose up -d --build"
-
-echo "==> Vérification de santé…"
-ssh "$MARVIN_HOST" 'sleep 5 && curl -fsS http://127.0.0.1:8001/health && echo'
-
-echo "==> Modèles Ollama disponibles (pour renseigner LLM_MODEL sur Thor) :"
-ssh "$MARVIN_HOST" 'ollama list || true'
+ssh "$MARVIN_HOST" "bash -s" <<REMOTE
+set -euo pipefail
+if [ -d "$REMOTE_DIR/.git" ]; then
+  cd "$REMOTE_DIR" && git fetch origin --quiet && git checkout "$BRANCH" --quiet && git pull --ff-only --quiet
+else
+  git clone --quiet -b "$BRANCH" "$REPO_URL" "$REMOTE_DIR" && cd "$REMOTE_DIR"
+fi
+cd infra/marvin
+docker compose up -d --build
+sleep 5
+curl -fsS http://127.0.0.1:8001/health && echo
+echo "--- modèles Ollama (pour LLM_MODEL côté Thor) ---"
+ollama list || true
+REMOTE
 
 echo "OK. Embeddings: http://192.168.1.171:8001/embed | LLM Ollama: http://192.168.1.171:11434/v1"

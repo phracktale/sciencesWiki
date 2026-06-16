@@ -3,14 +3,16 @@
 # Ce compose ne gère que le service d'embeddings (ml/). Le LLM est servi par
 # Ollama, déjà installé nativement sur Marvin (port 11434).
 #
-# Déploiement : voir infra/marvin/deploy.sh (rsync du dossier ml/ + build ici).
+# Déploiement : voir infra/marvin/deploy.sh (git clone sur Marvin + build ici).
+# Lancer depuis ce dossier : `docker compose up -d --build`.
 # Le service écoute sur 8001 ; l'API de Thor le joint via ML_EMBED_URL.
 name: scienceswiki-ml
 
 services:
   embeddings:
     build:
-      context: ./ml
+      # ml/ est à la racine du dépôt ; ce compose vit dans infra/marvin/.
+      context: ../../ml
       dockerfile: Dockerfile
     image: scienceswiki-ml:latest
     environment:
