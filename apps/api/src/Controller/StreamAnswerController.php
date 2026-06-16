@@ -43,6 +43,8 @@ final class StreamAnswerController
 
         $response = new StreamedResponse(function () use ($question): void {
             @set_time_limit(0);
+            // La rédaction se termine et se persiste même si le visiteur ferme l'onglet.
+            ignore_user_abort(true);
             $send = static function (array $payload): void {
                 echo 'data: '.json_encode($payload, \JSON_UNESCAPED_UNICODE)."\n\n";
                 @ob_flush();
@@ -77,7 +79,7 @@ final class StreamAnswerController
                     'node' => $question->getTreeNode()->getSlug(),
                     'title' => $question->getTitle(),
                 ]);
-            } catch (\Throwable $e) {
+            } catch (\Throwable) {
                 $send(['error' => 'La rédaction a échoué. Réessayez plus tard.']);
             }
         });

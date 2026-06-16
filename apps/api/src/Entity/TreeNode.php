@@ -136,6 +136,39 @@ class TreeNode
         return $this->childEdges->count();
     }
 
+    /**
+     * Fil d'Ariane canonique (racine → ce nœud), en remontant les parents
+     * « principaux ». Sert à l'affichage et aux URLs arborescentes (SEO).
+     *
+     * @return list<array{slug:string,label:string}>
+     */
+    #[Groups(['node:item'])]
+    public function getBreadcrumb(): array
+    {
+        $chain = [];
+        $node = $this;
+        $guard = 0;
+        while (null !== $node && $guard++ < 12) {
+            array_unshift($chain, ['slug' => $node->getSlug(), 'label' => $node->getLabel()]);
+            $node = $node->principalParent();
+        }
+
+        return $chain;
+    }
+
+    private function principalParent(): ?self
+    {
+        $fallback = null;
+        foreach ($this->parentEdges as $edge) {
+            if ($edge->isPrincipal()) {
+                return $edge->getParent();
+            }
+            $fallback ??= $edge->getParent();
+        }
+
+        return $fallback;
+    }
+
     public function getId(): ?int
     {
         return $this->id;
