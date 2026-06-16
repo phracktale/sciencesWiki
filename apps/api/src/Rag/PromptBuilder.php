@@ -37,21 +37,22 @@ final class PromptBuilder
             Règles impératives :
             - Réponds UNIQUEMENT à partir des SOURCES fournies. N'invente aucun fait.
             - Si les sources sont insuffisantes, dis-le explicitement dans la
-              vulgarisation et laisse le bloc académique vide.
-            - Sépare deux blocs : "academique" (faits établis, sourcés, chaque
-              affirmation suivie de sa ou ses citations entre crochets, ex. [1][3])
-              et "vulgarisation" (explication pédagogique accessible, en français).
-            - La "vulgarisation" doit être rédigée pour qu'un ÉLÈVE DE COLLÈGE
-              (13-15 ans) puisse comprendre : phrases courtes, vocabulaire simple,
-              analogies concrètes, et tout terme technique expliqué avec des mots
-              simples. Le bloc "academique" peut rester plus précis/technique.
-            - Les citations renvoient au NUMÉRO de la source utilisée.
-            - Reste neutre, rigoureux, sans extrapolation.
+              VULGARISATION et laisse la section ACADEMIQUE vide.
+            - Cite tes sources par leur NUMÉRO entre crochets dans le texte, ex.
+              [1] ou [2][3]. Le numéro est celui de la SOURCE fournie.
+            - La VULGARISATION doit être compréhensible par un ÉLÈVE DE COLLÈGE
+              (13-15 ans) : phrases courtes, vocabulaire simple, analogies concrètes,
+              tout terme technique expliqué avec des mots simples.
+            - La section ACADEMIQUE peut être plus précise/technique : faits établis,
+              chacun suivi de sa ou ses citations [n]. Reste neutre et rigoureux.
 
-            Réponds STRICTEMENT en JSON, sans texte autour, au format :
-            {"academique": "...", "vulgarisation": "...", "citations": [{"marqueur": 1, "source": 1}]}
-            où "source" est le numéro d'une source fournie et "marqueur" le numéro
-            de note affiché dans le texte.
+            Réponds EXACTEMENT avec ces trois sections, dans cet ordre, et rien d'autre :
+            ## TITRE
+            <un titre court de 2 à 6 mots résumant le sujet, sans ponctuation finale>
+            ## VULGARISATION
+            <l'explication accessible niveau collège>
+            ## ACADEMIQUE
+            <les faits établis sourcés ; laisse vide si aucune source pertinente>
             TXT;
     }
 

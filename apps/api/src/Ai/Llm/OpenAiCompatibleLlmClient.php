@@ -68,6 +68,62 @@ final class OpenAiCompatibleLlmClient implements LlmClient
         );
     }
 
+    public function stream(array $messages, array $options = []): iterable
+    {
+        $payload = [
+            'model' => $this->model,
+            'messages' => array_map(static fn (LlmMessage $m): array => $m->toArray(), $messages),
+            'temperature' => $options['temperature'] ?? 0.2,
+            'stream' => true,
+        ];
+        if (isset($options['max_tokens'])) {
+            $payload['max_tokens'] = $options['max_tokens'];
+        }
+
+        $headers = ['Content-Type' => 'application/json'];
+        if ('' !== $this->apiToken) {
+            $headers['Authorization'] = 'Bearer '.$this->apiToken;
+        }
+
+        $response = $this->httpClient->request('POST', $this->chatUrl(), [
+            'headers' => $headers,
+            'json' => $payload,
+            'timeout' => 600,
+            'buffer' => false,
+        ]);
+
+        $buffer = '';
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            if ($chunk->isTimeout()) {
+                continue;
+            }
+            if ($chunk->isLast()) {
+                break;
+            }
+            $buffer .= $chunk->getContent();
+            while (false !== ($pos = strpos($buffer, "\n"))) {
+                $line = trim(substr($buffer, 0, $pos));
+                $buffer = substr($buffer, $pos + 1);
+                if ('' === $line || !str_starts_with($line, 'data:')) {
+                    continue;
+                }
+                $data = trim(substr($line, 5));
+                if ('[DONE]' === $data) {
+                    return;
+                }
+                try {
+                    $json = json_decode($data, true, 512, \JSON_THROW_ON_ERROR);
+                } catch (\JsonException) {
+                    continue;
+                }
+                $delta = $json['choices'][0]['delta']['content'] ?? null;
+                if (\is_string($delta) && '' !== $delta) {
+                    yield $delta;
+                }
+            }
+        }
+    }
+
     public function model(): string
     {
         return $this->model;

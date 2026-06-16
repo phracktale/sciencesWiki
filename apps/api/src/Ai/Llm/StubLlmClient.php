@@ -26,6 +26,14 @@ final class StubLlmClient implements LlmClient
         return new LlmCompletion($content, 'stub', null, null);
     }
 
+    public function stream(array $messages, array $options = []): iterable
+    {
+        // Émet le contenu factice mot à mot (simule le flux pour le front).
+        foreach (explode(' ', $this->complete($messages, $options)->content) as $i => $word) {
+            yield (0 === $i ? '' : ' ').$word;
+        }
+    }
+
     public function model(): string
     {
         return 'stub';

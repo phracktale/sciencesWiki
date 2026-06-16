@@ -33,15 +33,49 @@ final class AnswerDrafter
 
     public function draft(Question $question, AnswerType $type, int $k = 5): Answer
     {
+        $sources = $this->retrieveSources($question, $k);
+        $completion = $this->llm->complete($this->buildMessages($question, $sources), ['temperature' => 0.2, 'max_tokens' => 1200]);
+
+        return $this->persistFromText($question, $type, $sources, $completion->content);
+    }
+
+    /**
+     * Garantit l'embedding de la question puis récupère les sources RAG.
+     *
+     * @return list<Publication>
+     */
+    public function retrieveSources(Question $question, int $k = 5): array
+    {
         if (null === $question->getEmbedding()) {
             $question->setEmbedding($this->embeddingFactory->create()->embed($question->getText()));
         }
 
-        $sources = $this->retriever->retrieve($question, $k);
-        $messages = $this->promptBuilder->build($question, $sources);
-        $completion = $this->llm->complete($messages, ['temperature' => 0.2, 'max_tokens' => 1200]);
+        return $this->retriever->retrieve($question, $k);
+    }
 
-        $parsed = $this->parse($completion->content, $sources);
+    /**
+     * @param list<Publication> $sources
+     *
+     * @return list<\App\Ai\Llm\LlmMessage>
+     */
+    public function buildMessages(Question $question, array $sources): array
+    {
+        return $this->promptBuilder->build($question, $sources);
+    }
+
+    /**
+     * Parse le texte (sections délimitées) et persiste Answer + révision IA +
+     * notes de bas de page. Sert à la fois à la génération directe et au flux SSE.
+     *
+     * @param list<Publication> $sources
+     */
+    public function persistFromText(Question $question, AnswerType $type, array $sources, string $content): Answer
+    {
+        $parsed = $this->parse($content, $sources);
+
+        if (null === $question->getTitle() && '' !== $parsed['title']) {
+            $question->setTitle($parsed['title']);
+        }
 
         $answer = new Answer($question, $type);
         $revision = (new AnswerRevision(RevisionAuthorType::Ai))
@@ -61,64 +95,61 @@ final class AnswerDrafter
     }
 
     /**
+     * Parse la sortie en sections « ## TITRE / ## VULGARISATION / ## ACADEMIQUE »
+     * et déduit les notes de bas de page des marqueurs [n] présents dans le texte.
+     *
      * @param list<Publication> $sources
      *
-     * @return array{academic:string,vulgarization:string,footnotes:list<array{marker:int,publication:Publication}>}
+     * @return array{title:string,academic:string,vulgarization:string,footnotes:list<array{marker:int,publication:Publication}>}
      */
     private function parse(string $content, array $sources): array
     {
-        $json = $this->extractJson($content);
-        if (null !== $json) {
-            $footnotes = [];
-            $seen = [];
-            foreach (($json['citations'] ?? []) as $citation) {
-                $sourceIndex = (int) ($citation['source'] ?? 0) - 1;
-                $marker = (int) ($citation['marqueur'] ?? 0);
-                if (!isset($sources[$sourceIndex]) || isset($seen[$marker])) {
-                    continue;
-                }
-                $seen[$marker] = true;
-                $footnotes[] = ['marker' => $marker, 'publication' => $sources[$sourceIndex]];
-            }
+        $sections = $this->splitSections($content);
+        $title = trim($sections['titre'] ?? '');
+        $vulgarization = trim($sections['vulgarisation'] ?? '');
+        $academic = trim($sections['academique'] ?? '');
 
-            return [
-                'academic' => trim((string) ($json['academique'] ?? '')),
-                'vulgarization' => trim((string) ($json['vulgarisation'] ?? '')),
-                'footnotes' => $footnotes,
-            ];
+        // Aucune section reconnue (ex. LLM stub) : tout en vulgarisation.
+        if ('' === $vulgarization && '' === $academic && '' === $title) {
+            $vulgarization = trim($content);
         }
 
-        // Sortie non structurée (ex. LLM stub) : on conserve le texte en
-        // vulgarisation et on rattache toutes les sources récupérées.
+        // Notes de bas de page : marqueurs [n] cités dans le texte → source n.
         $footnotes = [];
-        foreach ($sources as $i => $source) {
-            $footnotes[] = ['marker' => $i + 1, 'publication' => $source];
+        $seen = [];
+        if (preg_match_all('/\[(\d{1,2})\]/', $vulgarization.' '.$academic, $m)) {
+            foreach ($m[1] as $raw) {
+                $marker = (int) $raw;
+                $idx = $marker - 1;
+                if (isset($sources[$idx]) && !isset($seen[$marker])) {
+                    $seen[$marker] = true;
+                    $footnotes[] = ['marker' => $marker, 'publication' => $sources[$idx]];
+                }
+            }
         }
 
-        return ['academic' => '', 'vulgarization' => trim($content), 'footnotes' => $footnotes];
+        return ['title' => $title, 'academic' => $academic, 'vulgarization' => $vulgarization, 'footnotes' => $footnotes];
     }
 
     /**
-     * @return array<string,mixed>|null
+     * @return array<string,string> clés normalisées : titre | vulgarisation | academique
      */
-    private function extractJson(string $content): ?array
+    private function splitSections(string $content): array
     {
-        $content = trim($content);
-        // Retire d'éventuelles barrières Markdown ```json ... ```.
-        $content = (string) preg_replace('/^```(?:json)?|```$/m', '', $content);
-
-        $start = strpos($content, '{');
-        $end = strrpos($content, '}');
-        if (false === $start || false === $end || $end < $start) {
-            return null;
+        $content = (string) preg_replace('/^```[a-z]*|```$/mi', '', trim($content));
+        $sections = [];
+        // Découpe sur les en-têtes « ## XXX » (insensible à la casse/accents simples).
+        $parts = preg_split('/^\s*#{1,3}\s*(TITRE|VULGARISATION|ACAD[EÉ]MIQUE)\s*$/mui', $content, -1, \PREG_SPLIT_DELIM_CAPTURE);
+        if (false === $parts || \count($parts) < 3) {
+            return [];
         }
 
-        try {
-            $decoded = json_decode(substr($content, $start, $end - $start + 1), true, 16, \JSON_THROW_ON_ERROR);
-        } catch (\JsonException) {
-            return null;
+        for ($i = 1; $i < \count($parts); $i += 2) {
+            $key = mb_strtolower((string) $parts[$i]);
+            $key = str_replace(['é', 'è'], 'e', $key);
+            $sections[$key] = (string) ($parts[$i + 1] ?? '');
         }
 
-        return \is_array($decoded) ? $decoded : null;
+        return $sections;
     }
 }

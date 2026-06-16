@@ -23,4 +23,17 @@ class QuestionRepository extends ServiceEntityRepository
     {
         return $this->findOneBy(['treeNode' => $node, 'text' => $text]);
     }
+
+    /** Nombre de questions posées par une IP depuis une date (anti-abus). */
+    public function countRecentByIp(string $ip, \DateTimeImmutable $since): int
+    {
+        return (int) $this->createQueryBuilder('q')
+            ->select('COUNT(q.id)')
+            ->andWhere('q.askerIp = :ip')
+            ->andWhere('q.createdAt >= :since')
+            ->setParameter('ip', $ip)
+            ->setParameter('since', $since)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
 }
