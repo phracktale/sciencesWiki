@@ -82,10 +82,10 @@ docker compose --env-file .env.prod exec api \
 
 ```bash
 # Sur Heimdall (convention homelab : vhosts dans sites-enabled/, certs Let's Encrypt).
-# 1) Obtenir le certificat (DNS scienceswiki.phracktale.com -> Heimdall requis) :
-sudo certbot certonly --webroot -w /var/www/letsencrypt -d scienceswiki.phracktale.com
+# 1) Obtenir le certificat (DNS scienceswiki.eu -> Heimdall requis) :
+sudo certbot certonly --webroot -w /var/www/letsencrypt -d scienceswiki.eu
 # 2) Déposer le vhost (déjà rempli avec l'IP de Thor 192.168.1.36) :
-sudo cp scienceswiki.phracktale.com.conf /etc/nginx/sites-enabled/
+sudo cp scienceswiki.eu.conf /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
