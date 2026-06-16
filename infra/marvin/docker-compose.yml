@@ -1,0 +1,28 @@
+# SciencesWiki — nœud IA « Marvin » (192.168.1.171).
+#
+# Ce compose ne gère que le service d'embeddings (ml/). Le LLM est servi par
+# Ollama, déjà installé nativement sur Marvin (port 11434).
+#
+# Déploiement : voir infra/marvin/deploy.sh (rsync du dossier ml/ + build ici).
+# Le service écoute sur 8001 ; l'API de Thor le joint via ML_EMBED_URL.
+name: scienceswiki-ml
+
+services:
+  embeddings:
+    build:
+      context: ./ml
+      dockerfile: Dockerfile
+    image: scienceswiki-ml:latest
+    environment:
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
+      EMBEDDING_DIMENSIONS: "384"
+    ports:
+      # Exposé sur le réseau privé homelab uniquement (ne pas publier sur Internet).
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped

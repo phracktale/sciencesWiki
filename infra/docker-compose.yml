@@ -1,0 +1,117 @@
+# SciencesWiki — pile applicative du homelab (nœud « Thor »).
+#
+#   database  : PostgreSQL + pgvector (embeddings)
+#   api       : Symfony 8 / API Platform (FrankenPHP)  — init: migrations, JWT, seed
+#   worker    : même image que l'api, consomme la file Messenger (moisson async)
+#   web       : front public Symfony/Twig (FrankenPHP), client de l'API
+#
+# Le TLS et l'exposition publique sont assurés par nginx sur « Heimdall »
+# (cf. infra/heimdall/scienceswiki.conf). L'IA (embeddings + LLM) tourne sur
+# « Marvin » et est jointe par le réseau privé (ML_EMBED_URL, LLM_BASE_URL).
+#
+# Démarrage :  docker compose --env-file .env.prod up -d --build
+name: scienceswiki
+
+services:
+  database:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - database_data:/var/lib/postgresql/data:rw
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]
+      timeout: 5s
+      interval: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=1"
+      SERVER_NAME: ":80"
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
+      DEFAULT_URI: ${PUBLIC_URL}
+      # JWT (lexik) — la clé est générée au 1er démarrage dans le volume jwt_keys.
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      # Moisson + IA (Marvin)
+      HARVESTER_CONTACT_EMAIL: ${HARVESTER_CONTACT_EMAIL}
+      EMBEDDING_DRIVER: http
+      ML_EMBED_URL: ${ML_EMBED_URL}
+      LLM_DRIVER: ${LLM_DRIVER}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_API_TOKEN: ${LLM_API_TOKEN}
+      # Cette instance initialise la base (migrations + clés JWT + seed).
+      RUN_INIT: "1"
+    volumes:
+      - jwt_keys:/app/config/jwt:rw
+    ports:
+      - "${API_PORT:-8000}:80"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      database:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=1"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      HARVESTER_CONTACT_EMAIL: ${HARVESTER_CONTACT_EMAIL}
+      EMBEDDING_DRIVER: http
+      ML_EMBED_URL: ${ML_EMBED_URL}
+      LLM_DRIVER: ${LLM_DRIVER}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_API_TOKEN: ${LLM_API_TOKEN}
+      # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
+    command: ["php", "bin/console", "messenger:consume", "harvester", "failed", "-v", "--time-limit=3600", "--memory-limit=256M"]
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      - api
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${WEB_APP_SECRET}
+      SERVER_NAME: ":80"
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES}
+      DEFAULT_URI: ${PUBLIC_URL}
+      # Appel server-side de l'API via le réseau interne du compose.
+      API_BASE_URL: "http://api"
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+volumes:
+  database_data:
+  jwt_keys:
