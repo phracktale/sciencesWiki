@@ -58,7 +58,8 @@
         }
 
         function badge(job) {
-            if (job.rateLimited) return '<span class="badge warn">⛔ quota OpenAlex</span>';
+            if (job.rateLimited) return '<span class="badge warn">⛔ limite OpenAlex</span>';
+            if (job.stale) return '<span class="badge warn">⚠️ interrompue</span>';
             switch (job.status) {
                 case 'running': return '<span class="badge warn">⏳ en cours</span>';
                 case 'ok': return '<span class="badge ok">✅ terminée</span>';
@@ -70,8 +71,9 @@
 
         function bar(job) {
             var pct = Math.min(100, Math.round((job.processed / MAX_PER_RUN) * 100));
-            var color = job.status === 'running' ? 'var(--accent)' : (job.errors > 0 || job.status === 'failed' ? '#dc2626' : '#16a34a');
-            var anim = job.status === 'running' ? 'opacity:.85' : '';
+            var running = job.status === 'running' && !job.stale;
+            var color = job.stale ? '#9ca3af' : (running ? 'var(--accent)' : (job.errors > 0 || job.status === 'failed' ? '#dc2626' : '#16a34a'));
+            var anim = running ? 'opacity:.85' : '';
             return '<div style="height:9px; background:var(--line); border-radius:5px; overflow:hidden">' +
                    '<div style="height:100%; width:' + pct + '%; background:' + color + ';' + anim + '"></div></div>' +
                    '<span class="muted" style="font-size:.78rem">' + job.processed + ' traité(s)</span>';

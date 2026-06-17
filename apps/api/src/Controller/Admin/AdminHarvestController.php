@@ -33,7 +33,8 @@ final class AdminHarvestController
         $rows = $conn->executeQuery(
             "SELECT j.id, j.query->>'rubric' AS rubric, tn.label AS label,
                     j.started_at, j.finished_at, j.processed, j.created, j.errors,
-                    j.status, j.log
+                    j.status, j.log,
+                    (j.status = 'running' AND j.started_at < now() - interval '10 minutes') AS stale
              FROM ingestion_job j
              LEFT JOIN tree_node tn ON tn.slug = (j.query->>'rubric')
              WHERE j.query->>'rubric' IS NOT NULL
@@ -59,6 +60,9 @@ final class AdminHarvestController
                 'status' => $r['status'],
                 'log' => $log,
                 'rateLimited' => $isQuota,
+                // Job « en cours » mais sans activité depuis longtemps : worker
+                // arrêté en plein traitement (ex. redémarrage), job orphelin.
+                'stale' => (bool) $r['stale'],
             ];
         }, $rows);
 

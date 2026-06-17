@@ -76,11 +76,12 @@
                         box.hidden = false;
                         var label, color;
                         if (job.rateLimited) { label = '⛔ Limite OpenAlex atteinte — ' + (job.log || ''); color = '#b91c1c'; }
+                        else if (job.stale) { label = '⚠️ Moisson interrompue (worker arrêté). Relancez-la.'; color = '#b45309'; }
                         else if (job.status === 'running') { label = '⏳ Moisson en cours — ' + job.processed + ' traité(s), ' + job.created + ' nouveau(x)'; color = 'var(--accent)'; }
                         else if (job.status === 'failed') { label = '⛔ Échec : ' + (job.log || 'erreur'); color = '#b91c1c'; }
                         else { label = (job.status === 'partial' ? '⚠️' : '✅') + ' Dernière moisson : ' + job.created + ' nouveau(x) sur ' + job.processed + ' traité(s)' + (job.errors ? ', ' + job.errors + ' erreur(s)' : ''); color = '#16a34a'; }
                         box.innerHTML = '<span style="color:' + color + '">' + label + '</span>';
-                        if (job.status === 'running') setTimeout(refresh, 4000);
+                        if (job.status === 'running' && !job.stale) setTimeout(refresh, 4000);
                     }).catch(function () {});
             }
             refresh();

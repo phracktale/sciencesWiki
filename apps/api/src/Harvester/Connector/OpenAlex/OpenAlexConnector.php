@@ -21,6 +21,9 @@ final class OpenAlexConnector implements SourceConnector
 {
     private const PER_PAGE = 200;
 
+    /** Nombre maximal de tentatives en cas de 429/503 (limite transitoire OpenAlex). */
+    private const MAX_ATTEMPTS = 4;
+
     private ?string $lastCursor = null;
 
     public function __construct(
@@ -80,11 +83,7 @@ final class OpenAlexConnector implements SourceConnector
             return $this->mapper->map($ref->payload);
         }
 
-        $this->throttle->tick();
-        $work = $this->httpClient->request('GET', $this->baseUrl.'/works/'.$ref->idInSource, [
-            'query' => ['mailto' => $this->contactEmail],
-            'headers' => ['User-Agent' => $this->userAgent()],
-        ])->toArray();
+        $work = $this->getJson($this->baseUrl.'/works/'.$ref->idInSource, ['mailto' => $this->contactEmail]);
 
         return $this->mapper->map($work);
     }
@@ -117,12 +116,47 @@ final class OpenAlexConnector implements SourceConnector
             $query['filter'] = implode(',', $filters);
         }
 
-        $this->throttle->tick();
+        return $this->getJson($this->baseUrl.'/works', $query);
+    }
 
-        return $this->httpClient->request('GET', $this->baseUrl.'/works', [
-            'query' => $query,
-            'headers' => ['User-Agent' => $this->userAgent()],
-        ])->toArray();
+    /**
+     * Requête OpenAlex avec respect du débit (throttle) et résilience aux limites
+     * transitoires : un HTTP 429 (Too Many Requests) ou 503 déclenche un nouvel
+     * essai après le délai « Retry-After » (ou un backoff exponentiel), jusqu'à
+     * {@see self::MAX_ATTEMPTS}. Au-delà, l'exception remonte (le job sera marqué
+     * en échec et l'erreur visible dans le suivi de moisson).
+     *
+     * @param array<string,mixed> $query
+     *
+     * @return array<string,mixed>
+     */
+    private function getJson(string $url, array $query): array
+    {
+        for ($attempt = 1; ; ++$attempt) {
+            $this->throttle->tick();
+
+            $response = $this->httpClient->request('GET', $url, [
+                'query' => $query,
+                'headers' => ['User-Agent' => $this->userAgent()],
+            ]);
+
+            $status = $response->getStatusCode();
+            if (429 !== $status && 503 !== $status) {
+                return $response->toArray(); // 2xx attendu ; sinon lève une exception explicite
+            }
+
+            if ($attempt >= self::MAX_ATTEMPTS) {
+                throw new \RuntimeException(\sprintf(
+                    'Limite OpenAlex atteinte : HTTP %d après %d tentatives sur %s. Réessayez plus tard (réduisez la cadence des moissons simultanées).',
+                    $status, $attempt, $url,
+                ));
+            }
+
+            // Délai d'attente : en-tête Retry-After si présent, sinon backoff 2^n (borné à 30 s).
+            $retryAfter = (int) ($response->getHeaders(false)['retry-after'][0] ?? 0);
+            $delay = $retryAfter > 0 ? min($retryAfter, 30) : min(2 ** $attempt, 30);
+            sleep($delay);
+        }
     }
 
     private function userAgent(): string
