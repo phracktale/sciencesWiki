@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Tableau de bord{% endblock %}
+{% block body %}
+    <p class="crumbs"><strong>Administration</strong> · <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    <h1>Tableau de bord</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <h2>Domaines</h2>
+    <div class="grid">
+        {% for d in domains %}
+            <a class="card" href="{{ path('admin_node', { slug: d.slug }) }}">{{ d.label }} <span class="muted">({{ d.childrenCount }})</span></a>
+        {% endfor %}
+    </div>
+
+    <h2>Créer un domaine racine</h2>
+    <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="action" value="add-child">
+        <label for="label">Libellé</label>
+        <input type="text" id="label" name="label" required>
+        <button type="submit">Créer</button>
+    </form>
+{% endblock %}

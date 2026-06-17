@@ -1,0 +1,75 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — {{ node.label }}{% endblock %}
+{% block body %}
+    <p class="crumbs">
+        <a href="{{ path('admin_dashboard') }}">Administration</a> ·
+        {% for c in node.breadcrumb ?? [] %}{% if not loop.first %} › {% endif %}{{ c.label }}{% endfor %}
+        · <a href="/{{ node.slug }}" target="_blank">voir public ↗</a> · <a href="{{ path('admin_logout') }}">déconnexion</a>
+    </p>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <h1>{{ node.label }} <span class="muted">#{{ node.id }}</span></h1>
+
+    <h2>Renommer / décrire</h2>
+    <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="action" value="rename">
+        <input type="hidden" name="id" value="{{ node.id }}">
+        <input type="hidden" name="back" value="{{ node.slug }}">
+        <label>Libellé</label>
+        <input type="text" name="label" value="{{ node.label }}" required>
+        <label>Description</label>
+        <textarea name="description">{{ node.description }}</textarea>
+        <button type="submit">Enregistrer</button>
+    </form>
+
+    <h2>Déplacer cette rubrique</h2>
+    <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="action" value="move-node">
+        <input type="hidden" name="id" value="{{ node.id }}">
+        <input type="hidden" name="back" value="{{ node.slug }}">
+        <label>Slug de la nouvelle rubrique parente</label>
+        <input type="text" name="targetSlug" placeholder="ex. medicine" required>
+        <button type="submit">Déplacer</button>
+    </form>
+
+    <h2>Ajouter une sous-rubrique</h2>
+    <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="action" value="add-child">
+        <input type="hidden" name="parentId" value="{{ node.id }}">
+        <input type="hidden" name="back" value="{{ node.slug }}">
+        <label>Libellé</label>
+        <input type="text" name="label" required>
+        <button type="submit">Ajouter</button>
+    </form>
+
+    {% if node.children is not empty %}
+        <h2>Sous-rubriques</h2>
+        <ul class="qlist">
+            {% for c in node.children %}
+                <li><a class="q-title" href="{{ path('admin_node', { slug: c.slug }) }}">{{ c.label }}</a></li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <h2>Questions publiées ici</h2>
+    {% if answers is empty %}
+        <p class="muted">Aucune.</p>
+    {% else %}
+        <ul class="qlist">
+            {% for a in answers %}
+                <li>
+                    <strong>{{ a.title }}</strong>
+                    <form method="post" action="{{ path('admin_action') }}" style="margin-top:.4rem; display:flex; gap:.4rem; align-items:center; flex-wrap:wrap">
+                        <input type="hidden" name="action" value="move-question">
+                        <input type="hidden" name="questionId" value="{{ a.questionId }}">
+                        <input type="hidden" name="back" value="{{ node.slug }}">
+                        <input type="text" name="targetSlug" placeholder="slug rubrique cible" required
+                               style="padding:.3rem .5rem; border:1px solid #d1d5db; border-radius:6px">
+                        <button type="submit" style="padding:.3rem .7rem">Déplacer</button>
+                    </form>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock %}

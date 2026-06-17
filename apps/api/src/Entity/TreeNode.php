@@ -106,7 +106,7 @@ class TreeNode
         $children = [];
         foreach ($this->childEdges as $edge) {
             $node = $edge->getChild();
-            $children[] = ['slug' => $node->getSlug(), 'label' => $node->getLabel(), 'level' => $node->getLevel()];
+            $children[] = ['id' => $node->getId(), 'slug' => $node->getSlug(), 'label' => $node->getLabel(), 'level' => $node->getLevel()];
         }
         usort($children, static fn (array $a, array $b): int => $a['label'] <=> $b['label']);
 
@@ -181,6 +181,7 @@ class TreeNode
         return $this->parentEdges;
     }
 
+    #[Groups(['node:read'])]
     public function getId(): ?int
     {
         return $this->id;
