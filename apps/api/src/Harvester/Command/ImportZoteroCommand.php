@@ -78,17 +78,19 @@ final class ImportZoteroCommand extends Command
             return Command::FAILURE;
         }
 
+        $doc = new \DOMDocument();
         $imported = $created = $skipped = 0;
         while ($reader->read()) {
             if (\XMLReader::ELEMENT !== $reader->nodeType || 1 !== $reader->depth) {
                 continue;
             }
 
-            $node = $reader->expand();
+            // expand($doc) rattache le nœud à un document => simplexml l'accepte.
+            $node = $reader->expand($doc);
             if (false === $node) {
                 continue;
             }
-            $xml = simplexml_import_dom($node);
+            $xml = simplexml_import_dom($doc->importNode($node, true));
             if (false === $xml || null === $xml) {
                 continue;
             }
