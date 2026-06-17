@@ -34,6 +34,7 @@ final class StreamAnswerController
         private readonly AnswerDrafter $drafter,
         private readonly LlmClientFactory $llmFactory,
         private readonly TreeNodeRepository $nodes,
+        private readonly \App\Service\SettingsService $settings,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -68,7 +69,7 @@ final class StreamAnswerController
 
                 // Garde-fou amont : aucune source pertinente => on ne génère pas
                 // et on ne publie pas (cf. exigence : pas de réponse creuse).
-                $sources = $this->drafter->retrieveSources($question, 6, self::MAX_SOURCE_DISTANCE);
+                $sources = $this->drafter->retrieveSources($question, $this->settings->neighbors(), self::MAX_SOURCE_DISTANCE);
 
                 // Réorientation (spec §8.2) : rattacher la question au nœud le plus
                 // proche sémantiquement, quel que soit le nœud d'origine.
@@ -88,8 +89,13 @@ final class StreamAnswerController
 
                 $messages = $this->drafter->buildMessages($question, $sources);
 
+                $opts = ['temperature' => $this->settings->temperature(), 'max_tokens' => $this->settings->maxTokens()];
+                if (null !== $this->settings->model()) {
+                    $opts['model'] = $this->settings->model();
+                }
+
                 $full = '';
-                foreach ($this->llmFactory->create()->stream($messages, ['temperature' => 0.2, 'max_tokens' => 1200]) as $chunk) {
+                foreach ($this->llmFactory->create()->stream($messages, $opts) as $chunk) {
                     $full .= $chunk;
                     $send(['delta' => $chunk]);
                 }

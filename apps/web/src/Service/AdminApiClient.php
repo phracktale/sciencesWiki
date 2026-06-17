@@ -80,24 +80,47 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/questions/'.$id.'/move', ['nodeId' => $nodeId]);
     }
 
+    /** @return array<string,mixed> réglages courants */
+    public function getSettings(): array
+    {
+        $res = $this->send('GET', '/api/admin/settings', null);
+
+        return $res['ok'] ? $res['data'] : [];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function saveSettings(array $values): array
+    {
+        return $this->send('PUT', '/api/admin/settings', $values);
+    }
+
+    /** @return array<string,mixed> données du dashboard admin */
+    public function adminStats(): array
+    {
+        $res = $this->send('GET', '/api/admin/dashboard', null);
+
+        return $res['ok'] ? $res['data'] : [];
+    }
+
     /**
-     * @param array<string,mixed> $body
+     * @param array<string,mixed>|null $body
      *
      * @return array{ok:bool,status:int,data:array<string,mixed>}
      */
-    private function send(string $method, string $path, array $body): array
+    private function send(string $method, string $path, ?array $body): array
     {
         $token = $this->session()->get(self::SESSION_KEY);
         if (!\is_string($token)) {
             return ['ok' => false, 'status' => 401, 'data' => ['error' => 'Non authentifié.']];
         }
 
+        $options = ['headers' => ['Authorization' => 'Bearer '.$token], 'timeout' => 20];
+        if (null !== $body) {
+            $options['json'] = $body;
+        }
+
         try {
-            $response = $this->httpClient->request($method, $this->baseUrl.$path, [
-                'headers' => ['Authorization' => 'Bearer '.$token, 'Content-Type' => 'application/json'],
-                'json' => $body,
-                'timeout' => 15,
-            ]);
+            $response = $this->httpClient->request($method, $this->baseUrl.$path, $options);
             $status = $response->getStatusCode();
             $data = $response->toArray(false);
         } catch (\Throwable $e) {

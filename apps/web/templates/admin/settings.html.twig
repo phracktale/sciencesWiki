@@ -1,0 +1,35 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Paramètres IA{% endblock %}
+{% block body %}
+    <p class="crumbs"><a href="{{ path('admin_dashboard') }}">Administration</a> · Paramètres IA · <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    <h1>Paramètres IA</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <form class="ask" method="post" action="{{ path('admin_settings') }}">
+        <label>Prompt système (rédaction RAG)</label>
+        <textarea name="system_prompt" style="min-height:18rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ settings['rag.system_prompt'] }}</textarea>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem; margin-top:.6rem">
+            <div>
+                <label>Longueur max (tokens)</label>
+                <input type="text" name="max_tokens" value="{{ settings['rag.max_tokens'] }}">
+            </div>
+            <div>
+                <label>Température (0–1, créativité)</label>
+                <input type="text" name="temperature" value="{{ settings['rag.temperature'] }}">
+            </div>
+            <div>
+                <label>Sources récupérées (kNN)</label>
+                <input type="text" name="neighbors" value="{{ settings['rag.neighbors'] }}">
+            </div>
+            <div>
+                <label>Modèle (vide = défaut serveur)</label>
+                <input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">
+            </div>
+        </div>
+
+        <button type="submit">Enregistrer les paramètres</button>
+    </form>
+    <p class="muted" style="font-size:.85rem">Ces réglages s'appliquent immédiatement à la rédaction des réponses (sans redéploiement).</p>
+{% endblock %}

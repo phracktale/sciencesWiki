@@ -61,6 +61,29 @@ final class AdminController extends AbstractController
         ]);
     }
 
+    #[Route('/admin/settings', name: 'admin_settings', methods: ['GET', 'POST'])]
+    public function settings(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        if ($request->isMethod('POST')) {
+            $result = $this->admin->saveSettings([
+                'rag.system_prompt' => (string) $request->request->get('system_prompt'),
+                'rag.temperature' => (string) $request->request->get('temperature'),
+                'rag.max_tokens' => (string) $request->request->get('max_tokens'),
+                'rag.neighbors' => (string) $request->request->get('neighbors'),
+                'rag.model' => (string) $request->request->get('model'),
+            ]);
+            $this->addFlash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Paramètres IA enregistrés.' : 'Échec de l\'enregistrement.');
+
+            return $this->redirectToRoute('admin_settings');
+        }
+
+        return $this->render('admin/settings.html.twig', ['settings' => $this->admin->getSettings()]);
+    }
+
     #[Route('/admin/r/{slug}', name: 'admin_node', methods: ['GET'])]
     public function node(string $slug): Response
     {

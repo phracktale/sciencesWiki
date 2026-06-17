@@ -30,7 +30,7 @@ final class OpenAiCompatibleLlmClient implements LlmClient
     public function complete(array $messages, array $options = []): LlmCompletion
     {
         $payload = [
-            'model' => $this->model,
+            'model' => $options['model'] ?? $this->model,
             'messages' => array_map(static fn (LlmMessage $m): array => $m->toArray(), $messages),
             'temperature' => $options['temperature'] ?? 0.2,
             'stream' => false,
@@ -71,7 +71,7 @@ final class OpenAiCompatibleLlmClient implements LlmClient
     public function stream(array $messages, array $options = []): iterable
     {
         $payload = [
-            'model' => $this->model,
+            'model' => $options['model'] ?? $this->model,
             'messages' => array_map(static fn (LlmMessage $m): array => $m->toArray(), $messages),
             'temperature' => $options['temperature'] ?? 0.2,
             'stream' => true,

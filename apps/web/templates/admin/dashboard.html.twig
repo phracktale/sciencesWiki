@@ -3,6 +3,7 @@
 {% block body %}
     <p class="crumbs"><strong>Administration</strong> · <a href="{{ path('admin_logout') }}">déconnexion</a></p>
     <h1>Tableau de bord</h1>
+    <p><a class="pill" href="{{ path('admin_settings') }}">⚙️ Paramètres IA</a></p>
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
 
