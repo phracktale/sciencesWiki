@@ -72,6 +72,14 @@ class Question
         return $this->treeNode;
     }
 
+    /** Réorientation (spec §8.2) : rattacher la question au bon nœud. */
+    public function setTreeNode(TreeNode $treeNode): self
+    {
+        $this->treeNode = $treeNode;
+
+        return $this;
+    }
+
     public function getText(): string
     {
         return $this->text;

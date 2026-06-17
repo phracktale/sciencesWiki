@@ -9,6 +9,7 @@ use App\Enum\AnswerType;
 use App\Rag\AnswerDrafter;
 use App\Repository\AnswerRepository;
 use App\Repository\QuestionRepository;
+use App\Repository\TreeNodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Response;
@@ -32,6 +33,7 @@ final class StreamAnswerController
         private readonly AnswerRepository $answers,
         private readonly AnswerDrafter $drafter,
         private readonly LlmClientFactory $llmFactory,
+        private readonly TreeNodeRepository $nodes,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -67,6 +69,17 @@ final class StreamAnswerController
                 // Garde-fou amont : aucune source pertinente => on ne génère pas
                 // et on ne publie pas (cf. exigence : pas de réponse creuse).
                 $sources = $this->drafter->retrieveSources($question, 6, self::MAX_SOURCE_DISTANCE);
+
+                // Réorientation (spec §8.2) : rattacher la question au nœud le plus
+                // proche sémantiquement, quel que soit le nœud d'origine.
+                $embedding = $question->getEmbedding();
+                if (null !== $embedding) {
+                    $best = $this->nodes->nearestTo($embedding->toArray(), 1);
+                    if ([] !== $best) {
+                        $question->setTreeNode($best[0]['node']);
+                    }
+                }
+
                 if ([] === $sources) {
                     $send(['nosource' => true, 'message' => "Nous n'avons pas encore de source scientifique fiable pour répondre à cette question. Elle est enregistrée et sera traitée dès que des publications pertinentes seront disponibles dans le corpus."]);
 
