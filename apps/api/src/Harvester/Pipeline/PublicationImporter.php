@@ -136,8 +136,16 @@ final class PublicationImporter
      */
     private function attachAuthors(Publication $publication, array $rawAuthors): void
     {
+        // Dédoublonnage par publication : un même auteur (résolu vers la même
+        // entité) ne doit être rattaché qu'une fois (contrainte uniq_authorship).
+        $seen = [];
         foreach ($rawAuthors as $rawAuthor) {
             $author = $this->resolveAuthor($rawAuthor);
+            $key = spl_object_id($author);
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
             $publication->addAuthorship(new Authorship($author, $rawAuthor->position));
         }
     }
