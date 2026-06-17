@@ -127,19 +127,26 @@ final class ImportZoteroCommand extends Command
 
     private function toRawPublication(\SimpleXMLElement $xml, string $sourceCode): ?RawPublication
     {
+        // Seules les vraies références ont un z:itemType ; on écarte les journaux
+        // (bib:Journal, sans itemType), pièces jointes et notes.
+        $type = $this->first($xml, './/z:itemType');
+        if (null === $type || \in_array(strtolower(trim($type)), ['attachment', 'note'], true)) {
+            return null;
+        }
+
         $title = $this->first($xml, './/dc:title');
         if (null === $title || '' === trim($title)) {
-            return null; // n'est pas une référence (journal, personne, pièce jointe…)
+            return null;
         }
 
         $doi = $this->extractDoi($xml);
         $url = $this->extractUrl($xml);
         $abstract = $this->first($xml, './/dcterms:abstract') ?? $this->first($xml, './/dc:description');
         $venue = $this->first($xml, './/dcterms:isPartOf//dc:title');
-        $type = $this->first($xml, './/z:itemType');
         $date = $this->parseDate($this->first($xml, './/dc:date'));
 
         $authors = [];
+        $seen = [];
         $i = 0;
         foreach ($xml->xpath('.//bib:authors//foaf:Person') ?: [] as $person) {
             foreach (self::NS as $p => $u) {
@@ -148,7 +155,9 @@ final class ImportZoteroCommand extends Command
             $surname = $this->first($person, './foaf:surname') ?? '';
             $given = $this->first($person, './foaf:givenName') ?? '';
             $name = trim($given.' '.$surname);
-            if ('' !== $name) {
+            $key = mb_strtolower($name);
+            if ('' !== $name && !isset($seen[$key])) {
+                $seen[$key] = true;
                 $authors[] = new RawAuthor($name, null, null, $i++);
             }
         }
