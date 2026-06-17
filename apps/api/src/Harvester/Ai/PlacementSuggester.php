@@ -33,8 +33,27 @@ final class PlacementSuggester
             return 0;
         }
 
+        // Placements déjà existants pour cette publication (idempotence : évite la
+        // collision UNIQUE (publication_id, tree_node_id) sur un re-run).
+        $existing = [];
+        if (null !== $publication->getId()) {
+            foreach ($this->em->getConnection()->executeQuery(
+                'SELECT tree_node_id FROM placement_suggestion WHERE publication_id = :p',
+                ['p' => $publication->getId()],
+            )->fetchFirstColumn() as $nid) {
+                $existing[(int) $nid] = true;
+            }
+        }
+
         $created = 0;
         foreach ($this->nodes->nearestTo($embedding->toArray(), $k) as $hit) {
+            $nodeId = $hit['node']->getId();
+            if (null !== $nodeId && isset($existing[$nodeId])) {
+                continue; // déjà proposé (ou doublon dans le kNN)
+            }
+            if (null !== $nodeId) {
+                $existing[$nodeId] = true;
+            }
             // Score de similarité cosinus = 1 - distance.
             $score = 1.0 - $hit['distance'];
             $this->em->persist(new PlacementSuggestion($publication, $hit['node'], $score));
