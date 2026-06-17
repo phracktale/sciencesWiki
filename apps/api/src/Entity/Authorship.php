@@ -25,7 +25,7 @@ class Authorship
     #[ORM\JoinColumn(nullable: false, onDelete: 'CASCADE')]
     private ?Publication $publication = null;
 
-    #[ORM\ManyToOne(targetEntity: Author::class)]
+    #[ORM\ManyToOne(targetEntity: Author::class, cascade: ['persist'])]
     #[ORM\JoinColumn(nullable: false)]
     private Author $author;
 
