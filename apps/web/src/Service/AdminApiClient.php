@@ -158,6 +158,14 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/nodes/'.$nodeId.'/harvest', []);
     }
 
+    /** @return array<string,mixed> état des moissons (workers, progression, quota OpenAlex) */
+    public function harvestStatus(): array
+    {
+        $res = $this->send('GET', '/api/admin/harvest/status', null);
+
+        return $res['ok'] ? $res['data'] : ['jobs' => [], 'queued' => 0, 'running' => [], 'openalex' => ['used' => 0, 'cap' => 100000, 'exhausted' => false]];
+    }
+
     /**
      * @param array<string,mixed>|null $body
      *

@@ -1,0 +1,122 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Suivi de la moisson{% endblock %}
+{% block body %}
+    <p class="crumbs"><strong><a href="{{ path('admin_dashboard') }}">Administration</a></strong> ·
+        <a href="{{ path('admin_articles') }}">Articles</a> ·
+        <a href="{{ path('admin_harvest') }}">Moisson</a> ·
+        <a href="{{ path('admin_users') }}">Utilisateurs</a> ·
+        <a href="{{ path('admin_settings') }}">Paramètres IA</a> ·
+        <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+
+    <h1>Suivi de la moisson <span id="live" class="pill" style="font-size:.7rem; vertical-align:middle">● en direct</span></h1>
+    <p class="muted">État de chaque moisson lancée depuis le back-office : en attente, en cours, terminée ou en erreur. Les dépassements des limites de l'API OpenAlex (quota quotidien) sont signalés en rouge. Rafraîchi automatiquement.</p>
+
+    <div class="grid">
+        <div class="card">
+            <span class="muted">File d'attente (workers)</span><br>
+            <strong id="queued" style="font-size:1.6rem">{{ status.queued ?? 0 }}</strong> moisson(s) en attente
+        </div>
+        <div class="card" id="oa-card">
+            <span class="muted">Quota OpenAlex aujourd'hui ({{ status.openalex.date ?? '' }})</span><br>
+            <strong id="oa-used" style="font-size:1.6rem">{{ (status.openalex.used ?? 0)|number_format(0,',',' ') }}</strong>
+            <span class="muted">/ {{ (status.openalex.cap ?? 100000)|number_format(0,',',' ') }} requêtes</span>
+            <div style="margin-top:.4rem; height:8px; background:var(--line); border-radius:4px; overflow:hidden">
+                <div id="oa-bar" style="height:100%; width:0%; background:var(--accent)"></div>
+            </div>
+            <p id="oa-warn" class="badge warn" hidden style="margin-top:.4rem">⛔ Quota quotidien OpenAlex atteint — les moissons échoueront jusqu'à demain.</p>
+        </div>
+    </div>
+
+    <h2>Moissons par rubrique</h2>
+    <table style="width:100%; border-collapse:collapse; font-size:.92rem">
+        <thead>
+            <tr style="text-align:left; border-bottom:2px solid var(--line)">
+                <th style="padding:.5rem .4rem">Rubrique</th>
+                <th style="padding:.5rem .4rem">État</th>
+                <th style="padding:.5rem .4rem; width:28%">Progression</th>
+                <th style="padding:.5rem .4rem; text-align:right">Nouveaux</th>
+                <th style="padding:.5rem .4rem; text-align:right">Erreurs</th>
+                <th style="padding:.5rem .4rem">Démarrée</th>
+            </tr>
+        </thead>
+        <tbody id="jobs"><tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Chargement…</td></tr></tbody>
+    </table>
+
+    <script type="application/json" id="bootstrap">{{ status|json_encode|raw }}</script>
+    <script>
+    (function () {
+        var tbody = document.getElementById('jobs');
+        if (!tbody) return;
+        var MAX_PER_RUN = 500; // borne par exécution côté worker (proxy de progression)
+
+        function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+        function fmtDate(s) {
+            if (!s) return '—';
+            var d = new Date(s.replace(' ', 'T'));
+            return isNaN(d) ? esc(s) : d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function badge(job) {
+            if (job.rateLimited) return '<span class="badge warn">⛔ quota OpenAlex</span>';
+            switch (job.status) {
+                case 'running': return '<span class="badge warn">⏳ en cours</span>';
+                case 'ok': return '<span class="badge ok">✅ terminée</span>';
+                case 'partial': return '<span class="badge warn">⚠️ terminée (erreurs)</span>';
+                case 'failed': return '<span class="badge warn">⛔ échec</span>';
+                default: return '<span class="muted">' + esc(job.status) + '</span>';
+            }
+        }
+
+        function bar(job) {
+            var pct = Math.min(100, Math.round((job.processed / MAX_PER_RUN) * 100));
+            var color = job.status === 'running' ? 'var(--accent)' : (job.errors > 0 || job.status === 'failed' ? '#dc2626' : '#16a34a');
+            var anim = job.status === 'running' ? 'opacity:.85' : '';
+            return '<div style="height:9px; background:var(--line); border-radius:5px; overflow:hidden">' +
+                   '<div style="height:100%; width:' + pct + '%; background:' + color + ';' + anim + '"></div></div>' +
+                   '<span class="muted" style="font-size:.78rem">' + job.processed + ' traité(s)</span>';
+        }
+
+        function row(job) {
+            var label = esc(job.label || job.rubric || '—');
+            var name = job.rubric ? '<a class="q-title" href="/admin/r/' + esc(job.rubric) + '">' + label + '</a>' : label;
+            var errLine = job.log ? '<div class="muted" style="font-size:.78rem; color:#b91c1c; margin-top:.2rem">' + esc(job.log) + '</div>' : '';
+            return '<tr style="border-bottom:1px solid var(--line)">' +
+                '<td style="padding:.5rem .4rem">' + name + errLine + '</td>' +
+                '<td style="padding:.5rem .4rem">' + badge(job) + '</td>' +
+                '<td style="padding:.5rem .4rem">' + bar(job) + '</td>' +
+                '<td style="padding:.5rem .4rem; text-align:right"><strong>' + job.created + '</strong></td>' +
+                '<td style="padding:.5rem .4rem; text-align:right">' + (job.errors > 0 ? '<span style="color:#b91c1c">' + job.errors + '</span>' : '0') + '</td>' +
+                '<td style="padding:.5rem .4rem">' + fmtDate(job.startedAt) + '</td>' +
+                '</tr>';
+        }
+
+        function render(data) {
+            var jobs = data.jobs || [];
+            tbody.innerHTML = jobs.length ? jobs.map(row).join('') :
+                '<tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Aucune moisson lancée pour le moment. Utilisez « Moissonner cette rubrique » depuis une rubrique.</td></tr>';
+
+            document.getElementById('queued').textContent = data.queued || 0;
+            var oa = data.openalex || {};
+            document.getElementById('oa-used').textContent = (oa.used || 0).toLocaleString('fr-FR');
+            var pct = oa.cap ? Math.min(100, (oa.used / oa.cap) * 100) : 0;
+            var oaBar = document.getElementById('oa-bar');
+            oaBar.style.width = pct + '%';
+            oaBar.style.background = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : 'var(--accent)');
+            document.getElementById('oa-warn').hidden = !oa.exhausted;
+        }
+
+        try { render(JSON.parse(document.getElementById('bootstrap').textContent)); } catch (e) {}
+
+        var timer = setInterval(function () {
+            fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) { if (d) render(d); })
+                .catch(function () {});
+        }, 4000);
+
+        // Arrête le polling quand on quitte la page (navigation Turbo).
+        document.addEventListener('turbo:before-cache', function () { clearInterval(timer); }, { once: true });
+    })();
+    </script>
+{% endblock %}

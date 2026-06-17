@@ -148,6 +148,27 @@ final class AdminController extends AbstractController
         return $this->render('admin/users.html.twig', ['data' => $this->admin->users()]);
     }
 
+    #[Route('/admin/harvest', name: 'admin_harvest', methods: ['GET'])]
+    public function harvest(): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/harvest.html.twig', ['status' => $this->admin->harvestStatus()]);
+    }
+
+    /** Polling AJAX du suivi de moisson (le navigateur ne peut pas joindre /api/admin directement). */
+    #[Route('/admin/harvest/status.json', name: 'admin_harvest_status', methods: ['GET'])]
+    public function harvestStatus(): JsonResponse
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+
+        return new JsonResponse($this->admin->harvestStatus());
+    }
+
     #[Route('/admin/openalex-search', name: 'admin_openalex_search', methods: ['GET'])]
     public function openalexSearch(Request $request): Response
     {

@@ -26,8 +26,44 @@ final class AskQuestionController
     public function __construct(
         private readonly TreeNodeRepository $nodes,
         private readonly QuestionRepository $questions,
+        private readonly \App\Rag\QuestionSuggester $suggester,
         private readonly EntityManagerInterface $em,
     ) {
+    }
+
+    /**
+     * L'IA imagine et pose une question sur la rubrique courante (cf. spec §8.2),
+     * puis le front en streame la réponse. Rate-limité par IP comme la pose libre.
+     */
+    #[Route('/api/questions/suggest', name: 'api_question_suggest', methods: ['POST'])]
+    public function suggest(Request $request): JsonResponse
+    {
+        /** @var array<string,mixed> $data */
+        $data = json_decode($request->getContent() ?: '[]', true) ?? [];
+        $node = '' !== trim((string) ($data['node'] ?? '')) ? $this->nodes->findOneBy(['slug' => trim((string) $data['node'])]) : null;
+        if (null === $node) {
+            return $this->error('Rubrique introuvable.', 404);
+        }
+
+        $ip = $request->getClientIp() ?? '0.0.0.0';
+        if ($this->questions->countRecentByIp($ip, new \DateTimeImmutable('-1 hour')) >= self::RATE_LIMIT_PER_HOUR) {
+            return $this->error('Trop de demandes récentes. Merci de réessayer dans un moment.', Response::HTTP_TOO_MANY_REQUESTS);
+        }
+
+        $created = $this->suggester->suggest($node, 1);
+        if ([] === $created) {
+            return $this->error('L\'IA n\'a pas pu proposer de question sur cette rubrique pour le moment.', 422);
+        }
+        $question = $created[0];
+        $question->setAskerName('IA — SciencesWiki')->setAskerIp($ip);
+        $this->em->flush();
+
+        return new JsonResponse([
+            'id' => $question->getId(),
+            'node' => $node->getSlug(),
+            'question' => $question->getText(),
+            'stream' => '/api/questions/'.$question->getId().'/stream',
+        ], Response::HTTP_CREATED);
     }
 
     #[Route('/api/questions/ask', name: 'api_question_ask', methods: ['POST'])]

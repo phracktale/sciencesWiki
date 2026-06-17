@@ -59,6 +59,33 @@
             <input type="hidden" name="back" value="{{ node.slug }}">
             <button type="submit">Moissonner (en arrière-plan)</button>
         </form>
+        <div id="harvest-state" data-rubric="{{ node.slug }}" class="card" style="margin-top:.7rem" hidden></div>
+        <p class="muted" style="font-size:.85rem; margin-top:.4rem">→ <a href="{{ path('admin_harvest') }}">Suivi de toutes les moissons</a> (progression et erreurs en direct).</p>
+        <script>
+        (function () {
+            var box = document.getElementById('harvest-state');
+            if (!box) return;
+            var rubric = box.dataset.rubric;
+            function refresh() {
+                fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (!d) return;
+                        var job = (d.jobs || []).filter(function (j) { return j.rubric === rubric; })[0];
+                        if (!job) { box.hidden = true; return; }
+                        box.hidden = false;
+                        var label, color;
+                        if (job.rateLimited) { label = '⛔ Limite OpenAlex atteinte — ' + (job.log || ''); color = '#b91c1c'; }
+                        else if (job.status === 'running') { label = '⏳ Moisson en cours — ' + job.processed + ' traité(s), ' + job.created + ' nouveau(x)'; color = 'var(--accent)'; }
+                        else if (job.status === 'failed') { label = '⛔ Échec : ' + (job.log || 'erreur'); color = '#b91c1c'; }
+                        else { label = (job.status === 'partial' ? '⚠️' : '✅') + ' Dernière moisson : ' + job.created + ' nouveau(x) sur ' + job.processed + ' traité(s)' + (job.errors ? ', ' + job.errors + ' erreur(s)' : ''); color = '#16a34a'; }
+                        box.innerHTML = '<span style="color:' + color + '">' + label + '</span>';
+                        if (job.status === 'running') setTimeout(refresh, 4000);
+                    }).catch(function () {});
+            }
+            refresh();
+        })();
+        </script>
     {% endif %}
 
     {% if node.openalexConceptId and node.level < 3 %}
