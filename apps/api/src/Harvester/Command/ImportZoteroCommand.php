@@ -106,7 +106,7 @@ final class ImportZoteroCommand extends Command
 
             $result = $this->importer->import($raw, $source);
             ++$imported;
-            $result->isCreated() && ++$created;
+            $result->created && ++$created;
 
             if (0 === $imported % 50) {
                 $this->em->flush();
