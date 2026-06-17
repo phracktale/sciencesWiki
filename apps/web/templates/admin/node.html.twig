@@ -13,6 +13,7 @@
 
     <h2>Renommer / décrire</h2>
     <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
         <input type="hidden" name="action" value="rename">
         <input type="hidden" name="id" value="{{ node.id }}">
         <input type="hidden" name="back" value="{{ node.slug }}">
@@ -25,6 +26,7 @@
 
     <h2>Déplacer cette rubrique</h2>
     <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
         <input type="hidden" name="action" value="move-node">
         <input type="hidden" name="id" value="{{ node.id }}">
         <input type="hidden" name="back" value="{{ node.slug }}">
@@ -35,6 +37,7 @@
 
     <h2>Ajouter une sous-rubrique</h2>
     <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
         <input type="hidden" name="action" value="add-child">
         <input type="hidden" name="parentId" value="{{ node.id }}">
         <input type="hidden" name="back" value="{{ node.slug }}">
@@ -61,6 +64,7 @@
                 <li>
                     <strong>{{ a.title }}</strong>
                     <form method="post" action="{{ path('admin_action') }}" style="margin-top:.4rem; display:flex; gap:.4rem; align-items:center; flex-wrap:wrap">
+                        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                         <input type="hidden" name="action" value="move-question">
                         <input type="hidden" name="questionId" value="{{ a.questionId }}">
                         <input type="hidden" name="back" value="{{ node.slug }}">

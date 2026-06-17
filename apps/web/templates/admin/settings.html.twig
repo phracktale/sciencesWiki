@@ -7,6 +7,7 @@
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
 
     <form class="ask" method="post" action="{{ path('admin_settings') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
         <label>Prompt système (rédaction RAG)</label>
         <textarea name="system_prompt" style="min-height:18rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ settings['rag.system_prompt'] }}</textarea>
 

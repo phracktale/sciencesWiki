@@ -8,6 +8,7 @@
 
     <h2>Inviter / créer un utilisateur</h2>
     <form class="ask" method="post" action="{{ path('admin_users') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
         <input type="hidden" name="op" value="create">
         <label>E-mail</label>
         <input type="text" name="email" required>
@@ -29,6 +30,7 @@
             <li>
                 <strong>{{ u.email }}</strong> <span class="muted">— {{ u.name }}</span>
                 <form method="post" action="{{ path('admin_users') }}" style="margin-top:.4rem; display:flex; gap:.8rem; align-items:center; flex-wrap:wrap">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                     <input type="hidden" name="op" value="roles">
                     <input type="hidden" name="id" value="{{ u.id }}">
                     {% for role in data.availableRoles %}

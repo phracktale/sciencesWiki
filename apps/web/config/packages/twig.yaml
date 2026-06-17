@@ -1,5 +1,7 @@
 twig:
     file_name_pattern: '*.twig'
+    globals:
+        admin_csrf: '@App\Service\AdminCsrf'
 
 when@test:
     twig:

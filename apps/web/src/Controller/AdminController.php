@@ -21,6 +21,7 @@ final class AdminController extends AbstractController
     public function __construct(
         private readonly ApiClient $api,
         private readonly AdminApiClient $admin,
+        private readonly \App\Service\AdminCsrf $csrf,
     ) {
     }
 
@@ -28,6 +29,11 @@ final class AdminController extends AbstractController
     public function login(Request $request): Response
     {
         if ($request->isMethod('POST')) {
+            if (!$this->csrf->isValid($request)) {
+                $this->addFlash('error', 'Jeton de sécurité invalide, réessayez.');
+
+                return $this->redirectToRoute('admin_login');
+            }
             $ok = $this->admin->login(
                 (string) $request->request->get('email'),
                 (string) $request->request->get('password'),
@@ -70,6 +76,11 @@ final class AdminController extends AbstractController
         }
 
         if ($request->isMethod('POST')) {
+            if (!$this->csrf->isValid($request)) {
+                $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+                return $this->redirectToRoute('admin_settings');
+            }
             $result = $this->admin->saveSettings([
                 'rag.system_prompt' => (string) $request->request->get('system_prompt'),
                 'rag.temperature' => (string) $request->request->get('temperature'),
@@ -108,6 +119,11 @@ final class AdminController extends AbstractController
         }
 
         if ($request->isMethod('POST')) {
+            if (!$this->csrf->isValid($request)) {
+                $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+                return $this->redirectToRoute('admin_users');
+            }
             $op = (string) $request->request->get('op');
             if ('create' === $op) {
                 $res = $this->admin->createUser(
@@ -153,6 +169,11 @@ final class AdminController extends AbstractController
     {
         if (!$this->admin->isLogged()) {
             return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_dashboard');
         }
 
         $action = (string) $request->request->get('action');

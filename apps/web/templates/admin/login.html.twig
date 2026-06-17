@@ -4,6 +4,7 @@
     <h1>Administration</h1>
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
     <form class="ask" method="post" action="{{ path('admin_login') }}" style="max-width:420px">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
         <label for="email">Email administrateur</label>
         <input type="text" id="email" name="email" required autocomplete="username">
         <label for="password">Mot de passe</label>

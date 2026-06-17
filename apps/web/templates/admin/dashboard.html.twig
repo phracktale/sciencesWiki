@@ -66,6 +66,7 @@
 
     <h2>Créer un domaine racine</h2>
     <form class="ask" method="post" action="{{ path('admin_action') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
         <input type="hidden" name="action" value="add-child">
         <label for="label">Libellé</label>
         <input type="text" id="label" name="label" required>
