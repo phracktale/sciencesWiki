@@ -79,6 +79,7 @@ final class ImportZoteroCommand extends Command
         }
 
         $doc = new \DOMDocument();
+        $seen = [];
         $imported = $created = $skipped = 0;
         while ($reader->read()) {
             if (\XMLReader::ELEMENT !== $reader->nodeType || 1 !== $reader->depth) {
@@ -103,6 +104,15 @@ final class ImportZoteroCommand extends Command
                 ++$skipped;
                 continue;
             }
+
+            // Dédoublonnage intra-fichier (le même papier peut figurer 2×) :
+            // évite la collision UNIQUE sur des entités non encore flushées.
+            $key = null !== $raw->doi ? 'doi:'.mb_strtolower($raw->doi) : 'title:'.mb_strtolower($raw->title);
+            if (isset($seen[$key])) {
+                ++$skipped;
+                continue;
+            }
+            $seen[$key] = true;
 
             $result = $this->importer->import($raw, $source);
             ++$imported;
