@@ -1,0 +1,42 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Utilisateurs{% endblock %}
+{% block body %}
+    <p class="crumbs"><a href="{{ path('admin_dashboard') }}">Administration</a> · Utilisateurs · <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    <h1>Utilisateurs</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <h2>Inviter / créer un utilisateur</h2>
+    <form class="ask" method="post" action="{{ path('admin_users') }}">
+        <input type="hidden" name="op" value="create">
+        <label>E-mail</label>
+        <input type="text" name="email" required>
+        <label>Nom / pseudo</label>
+        <input type="text" name="name">
+        <label>Rôles</label>
+        <div style="display:flex; gap:1rem; flex-wrap:wrap">
+            {% for role in data.availableRoles %}
+                <label style="font-weight:400"><input type="checkbox" name="roles[]" value="{{ role }}" {{ role == 'ROLE_USER' ? 'checked' : '' }}> {{ role }}</label>
+            {% endfor %}
+        </div>
+        <button type="submit">Créer (mot de passe généré)</button>
+    </form>
+    <p class="muted" style="font-size:.85rem">L'envoi d'e-mail d'invitation sera activé avec le SMTP ; en attendant, le mot de passe temporaire s'affiche après création (à transmettre).</p>
+
+    <h2>Comptes existants</h2>
+    <ul class="qlist">
+        {% for u in data.items %}
+            <li>
+                <strong>{{ u.email }}</strong> <span class="muted">— {{ u.name }}</span>
+                <form method="post" action="{{ path('admin_users') }}" style="margin-top:.4rem; display:flex; gap:.8rem; align-items:center; flex-wrap:wrap">
+                    <input type="hidden" name="op" value="roles">
+                    <input type="hidden" name="id" value="{{ u.id }}">
+                    {% for role in data.availableRoles %}
+                        <label style="font-weight:400; font-size:.85rem"><input type="checkbox" name="roles[]" value="{{ role }}" {{ role in u.roles ? 'checked' : '' }}> {{ role|replace({'ROLE_': ''}) }}</label>
+                    {% endfor %}
+                    <button type="submit" style="padding:.3rem .7rem">Mettre à jour</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+{% endblock %}

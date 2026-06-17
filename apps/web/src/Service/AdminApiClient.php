@@ -110,6 +110,34 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0, 'query' => $q];
     }
 
+    /** @return array<string,mixed> liste des utilisateurs + rôles disponibles */
+    public function users(): array
+    {
+        $res = $this->send('GET', '/api/admin/users', null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'availableRoles' => []];
+    }
+
+    /**
+     * @param list<string> $roles
+     *
+     * @return array{ok:bool,status:int,data:array<string,mixed>}
+     */
+    public function createUser(string $email, string $name, array $roles): array
+    {
+        return $this->send('POST', '/api/admin/users', ['email' => $email, 'name' => $name, 'roles' => $roles]);
+    }
+
+    /**
+     * @param list<string> $roles
+     *
+     * @return array{ok:bool,status:int,data:array<string,mixed>}
+     */
+    public function updateUserRoles(int $id, array $roles): array
+    {
+        return $this->send('PATCH', '/api/admin/users/'.$id, ['roles' => $roles]);
+    }
+
     /**
      * @param array<string,mixed>|null $body
      *

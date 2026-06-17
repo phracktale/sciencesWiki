@@ -100,6 +100,37 @@ final class AdminController extends AbstractController
         ]);
     }
 
+    #[Route('/admin/users', name: 'admin_users', methods: ['GET', 'POST'])]
+    public function users(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        if ($request->isMethod('POST')) {
+            $op = (string) $request->request->get('op');
+            if ('create' === $op) {
+                $res = $this->admin->createUser(
+                    trim((string) $request->request->get('email')),
+                    trim((string) $request->request->get('name')),
+                    $request->request->all('roles'),
+                );
+                if ($res['ok']) {
+                    $this->addFlash('success', \sprintf('Utilisateur créé. Mot de passe temporaire à transmettre : %s', $res['data']['temporaryPassword'] ?? '—'));
+                } else {
+                    $this->addFlash('error', (string) ($res['data']['error'] ?? 'Échec.'));
+                }
+            } elseif ('roles' === $op) {
+                $res = $this->admin->updateUserRoles((int) $request->request->get('id'), $request->request->all('roles'));
+                $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Rôles mis à jour.' : 'Échec.');
+            }
+
+            return $this->redirectToRoute('admin_users');
+        }
+
+        return $this->render('admin/users.html.twig', ['data' => $this->admin->users()]);
+    }
+
     #[Route('/admin/r/{slug}', name: 'admin_node', methods: ['GET'])]
     public function node(string $slug): Response
     {
