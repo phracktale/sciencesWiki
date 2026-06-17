@@ -19,6 +19,9 @@
     {% if corpusCount is defined and corpusCount > 0 %}
         <p><span class="pill">📚 {{ corpusCount|number_format(0, ',', ' ') }} publication(s) dans cette rubrique et ses sous-rubriques</span></p>
     {% endif %}
+    {% if node.openalexUrl %}
+        <p class="muted" style="font-size:.85rem">Concept de référence : <a href="{{ node.openalexUrl }}" rel="noopener" target="_blank">OpenAlex ↗</a></p>
+    {% endif %}
 
     {% if node.children is not empty %}
         <h2>Sous-rubriques</h2>
@@ -53,7 +56,7 @@
     <div class="ask">
         <h2 style="margin-top:0">Poser une question sur « {{ node.label }} »</h2>
         <p class="muted" style="font-size:.85rem">Une réponse vulgarisée et sourcée sera rédigée par l'IA (gemma4), publiée avec la mention « non relu » en attendant la validation du comité.</p>
-        <form id="ask-form" data-node="{{ node.slug }}">
+        <form id="ask-form" data-turbo="false" data-node="{{ node.slug }}">
             <label for="ask-name">Votre nom ou pseudonyme <span class="muted">(obligatoire)</span></label>
             <input type="text" id="ask-name" name="name" maxlength="120" required autocomplete="nickname">
             <label for="ask-q">Votre question</label>

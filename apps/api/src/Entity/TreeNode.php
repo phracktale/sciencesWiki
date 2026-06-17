@@ -228,9 +228,17 @@ class TreeNode
         return $this;
     }
 
+    #[Groups(['node:read'])]
     public function getOpenalexConceptId(): ?string
     {
         return $this->openalexConceptId;
+    }
+
+    /** URL publique OpenAlex du concept (mapping graine), si disponible. */
+    #[Groups(['node:read'])]
+    public function getOpenalexUrl(): ?string
+    {
+        return null !== $this->openalexConceptId ? 'https://openalex.org/'.$this->openalexConceptId : null;
     }
 
     public function setOpenalexConceptId(?string $openalexConceptId): self
