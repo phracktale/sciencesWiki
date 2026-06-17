@@ -25,6 +25,7 @@ final class WikiController extends AbstractController
         return $this->render('wiki/home.html.twig', [
             'domains' => $this->api->domains(),
             'latest' => $this->api->latestQuestions(10),
+            'stats' => $this->api->stats(),
         ]);
     }
 
@@ -71,6 +72,7 @@ final class WikiController extends AbstractController
             'node' => $node,
             'path' => $canonical,
             'answers' => $this->api->answers($slug),
+            'corpusCount' => $this->api->nodeCorpus($slug),
         ]);
     }
 }

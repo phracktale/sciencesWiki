@@ -16,6 +16,9 @@
 
     <h1>{{ node.label }}</h1>
     {% if node.description %}<p class="muted">{{ node.description }}</p>{% endif %}
+    {% if corpusCount is defined and corpusCount > 0 %}
+        <p><span class="pill">📚 {{ corpusCount|number_format(0, ',', ' ') }} publication(s) dans cette rubrique et ses sous-rubriques</span></p>
+    {% endif %}
 
     {% if node.children is not empty %}
         <h2>Sous-rubriques</h2>

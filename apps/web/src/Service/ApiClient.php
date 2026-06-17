@@ -83,6 +83,30 @@ final class ApiClient
     }
 
     /**
+     * Statistiques globales du corpus.
+     *
+     * @return array<string,mixed>
+     */
+    public function stats(): array
+    {
+        try {
+            return $this->get('/api/stats');
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /** Nombre de publications d'une branche (nœud + descendants). */
+    public function nodeCorpus(string $slug): int
+    {
+        try {
+            return (int) ($this->get('/api/tree_nodes/'.rawurlencode($slug).'/corpus')['publications'] ?? 0);
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
      * @param array<string,mixed> $query
      *
      * @return array<string,mixed>

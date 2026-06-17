@@ -10,6 +10,14 @@
         Projet libre, gratuit et open source. <a href="/le-projet">Découvrir le projet →</a>
     </p>
 
+    {% if stats.publications is defined and stats.publications > 0 %}
+        <p class="muted" style="border:1px solid var(--line); border-radius:10px; padding:.6rem .9rem; display:inline-block">
+            📚 <strong>{{ stats.publications|number_format(0, ',', ' ') }}</strong> publications dans le corpus
+            · 💬 <strong>{{ stats.publishedAnswers }}</strong> réponse(s) publiée(s)
+            {% if stats.lastUpdate %}· mis à jour le {{ stats.lastUpdate|date('d/m/Y') }}{% endif %}
+        </p>
+    {% endif %}
+
     <h2>Dernières questions</h2>
     {% if latest is empty %}
         <p class="muted">Aucune question pour l'instant — explorez une rubrique ci-dessous et posez la vôtre.</p>
