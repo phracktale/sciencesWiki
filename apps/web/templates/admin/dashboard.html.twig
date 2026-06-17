@@ -1,13 +1,61 @@
 {% extends 'base.html.twig' %}
 {% block title %}Admin — Tableau de bord{% endblock %}
 {% block body %}
-    <p class="crumbs"><strong>Administration</strong> · <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    <p class="crumbs"><strong>Administration</strong> ·
+        <a href="{{ path('admin_settings') }}">Paramètres IA</a> ·
+        <a href="{{ path('admin_logout') }}">déconnexion</a></p>
     <h1>Tableau de bord</h1>
-    <p><a class="pill" href="{{ path('admin_settings') }}">⚙️ Paramètres IA</a></p>
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
 
-    <h2>Domaines</h2>
+    {% set c = stats.corpus ?? {} %}
+    <h2>Corpus</h2>
+    <div class="grid">
+        <div class="card"><strong style="font-size:1.6rem">{{ (c.publications ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">publications moissonnées</span></div>
+        <div class="card"><strong style="font-size:1.6rem">{{ c.answers ?? 0 }}</strong><br><span class="muted">réponses publiées</span></div>
+        <div class="card"><strong style="font-size:1.6rem">{{ c.questions ?? 0 }}</strong><br><span class="muted">questions</span></div>
+        <div class="card"><strong style="font-size:1.6rem">{{ (c.treeNodes ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">rubriques</span></div>
+    </div>
+
+    <h3>Publications par domaine</h3>
+    <div class="grid">
+        {% for r in c.roots ?? [] %}
+            <a class="card" href="{{ path('admin_node', { slug: r.slug }) }}">{{ r.label }}<br><strong>{{ r.publications|number_format(0,',',' ') }}</strong> <span class="muted">publications</span></a>
+        {% endfor %}
+    </div>
+
+    {% set hist = stats.history ?? [] %}
+    {% if hist|length > 0 %}
+        <h2>Progression du corpus</h2>
+        {% set maxPub = (hist|map(h => h.publications))|max ?: 1 %}
+        <div style="display:flex; align-items:flex-end; gap:4px; height:110px; border-bottom:1px solid var(--line); padding:.3rem 0">
+            {% for h in hist %}
+                <div title="{{ h.day }} : {{ h.publications }} publications, {{ h.answers }} réponses"
+                     style="flex:1; min-width:6px; background:var(--accent); border-radius:3px 3px 0 0; height:{{ (h.publications / maxPub * 100)|round }}%"></div>
+            {% endfor %}
+        </div>
+        <p class="muted" style="font-size:.8rem">{{ hist|first.day }} → {{ hist|last.day }} ({{ hist|length }} jour(s)). Snapshot enregistré à chaque visite.</p>
+    {% endif %}
+
+    {% set db = stats.database ?? {} %}
+    <h2>Base de données</h2>
+    <p>{{ db.engine ?? '—' }} · version <strong>{{ db.version ?? '—' }}</strong> · taille <strong>{{ ((db.sizeBytes ?? 0) / 1048576)|round }} Mo</strong></p>
+    <ul class="qlist">
+        {% for name, n in db.tables ?? {} %}
+            <li style="display:flex; justify-content:space-between"><span>{{ name }}</span><strong>{{ n|number_format(0,',',' ') }}</strong></li>
+        {% endfor %}
+    </ul>
+
+    {% set sys = stats.system ?? {} %}
+    <h2>Système</h2>
+    <ul class="qlist">
+        <li>OS : <strong>{{ sys.os ?? '—' }}</strong></li>
+        <li>PHP : <strong>{{ sys.php ?? '—' }}</strong></li>
+        <li>Serveur web : <strong>{{ sys.webServer ?? '—' }}</strong></li>
+        <li>Disque (conteneur) : <strong>{{ ((sys.diskUsedBytes ?? 0)/1073741824)|round(1) }} Go</strong> utilisés / {{ ((sys.diskTotalBytes ?? 0)/1073741824)|round(1) }} Go</li>
+    </ul>
+
+    <h2>Domaines (édition)</h2>
     <div class="grid">
         {% for d in domains %}
             <a class="card" href="{{ path('admin_node', { slug: d.slug }) }}">{{ d.label }} <span class="muted">({{ d.childrenCount }})</span></a>

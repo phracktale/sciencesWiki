@@ -58,6 +58,7 @@ final class AdminController extends AbstractController
 
         return $this->render('admin/dashboard.html.twig', [
             'domains' => $this->api->domains(),
+            'stats' => $this->admin->adminStats(),
         ]);
     }
 
