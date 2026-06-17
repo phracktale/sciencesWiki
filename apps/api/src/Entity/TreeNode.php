@@ -86,6 +86,11 @@ class TreeNode
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
+    /** Dernière moisson ciblée de cette rubrique (pour la reprise incrémentale). */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $lastHarvestedAt = null;
+
     public function __construct(string $slug, string $label)
     {
         $this->slug = $slug;
@@ -276,5 +281,17 @@ class TreeNode
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getLastHarvestedAt(): ?\DateTimeImmutable
+    {
+        return $this->lastHarvestedAt;
+    }
+
+    public function markHarvested(): self
+    {
+        $this->lastHarvestedAt = new \DateTimeImmutable();
+
+        return $this;
     }
 }

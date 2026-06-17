@@ -46,6 +46,21 @@
         <button type="submit">Ajouter</button>
     </form>
 
+    {% if node.openalexConceptId %}
+        <h2>Moissonner cette rubrique</h2>
+        <p class="muted" style="font-size:.85rem">
+            Récupère d'OpenAlex les publications de ce concept (incrémental, dédupliqué par DOI), puis calcule embeddings et placement.
+            {% if node.lastHarvestedAt %}Dernière moisson : {{ node.lastHarvestedAt|date('d/m/Y H:i') }}.{% else %}Jamais moissonnée.{% endif %}
+        </p>
+        <form method="post" action="{{ path('admin_action') }}">
+            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+            <input type="hidden" name="action" value="harvest">
+            <input type="hidden" name="id" value="{{ node.id }}">
+            <input type="hidden" name="back" value="{{ node.slug }}">
+            <button type="submit">Moissonner (en arrière-plan)</button>
+        </form>
+    {% endif %}
+
     {% if node.openalexConceptId and node.level < 3 %}
         <h2>Greffer depuis OpenAlex</h2>
         <p class="muted" style="font-size:.85rem">Récupère d'OpenAlex les sous-rubriques de ce concept et ajoute celles qui manquent (concept : <a href="{{ node.openalexUrl }}" target="_blank">{{ node.openalexConceptId }}</a>).</p>

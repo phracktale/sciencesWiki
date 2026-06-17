@@ -16,6 +16,7 @@ framework:
         routing:
             App\Harvester\Message\ProcessWork: harvester
             App\Harvester\Message\ResolveOpenAccess: harvester
+            App\Harvester\Message\HarvestRubric: harvester
 
 # when@test:
 #    framework:

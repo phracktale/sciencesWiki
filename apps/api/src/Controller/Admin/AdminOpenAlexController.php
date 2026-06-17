@@ -37,6 +37,7 @@ final class AdminOpenAlexController
         private readonly EntityManagerInterface $em,
         private readonly HttpClientInterface $httpClient,
         private readonly OpenAlexThrottle $throttle,
+        private readonly \Symfony\Component\Messenger\MessageBusInterface $bus,
         EmbeddingClientFactory $embeddingFactory,
         #[Autowire(env: 'HARVESTER_CONTACT_EMAIL')]
         private readonly string $contactEmail,
@@ -123,6 +124,22 @@ final class AdminOpenAlexController
         $this->em->flush();
 
         return new JsonResponse(['added' => $added, 'message' => \sprintf('%d sous-rubrique(s) ajoutée(s).', $added)]);
+    }
+
+    #[\Symfony\Component\Routing\Attribute\Route('/api/admin/nodes/{id}/harvest', name: 'admin_node_harvest', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function harvest(int $id): JsonResponse
+    {
+        $node = $this->nodes->find($id);
+        if (null === $node) {
+            return new JsonResponse(['error' => 'Rubrique introuvable.'], 404);
+        }
+        if (null === $node->getOpenalexConceptId()) {
+            return new JsonResponse(['error' => 'Cette rubrique n\'est pas mappée à un concept OpenAlex.'], 422);
+        }
+
+        $this->bus->dispatch(new \App\Harvester\Message\HarvestRubric($id));
+
+        return new JsonResponse(['message' => 'Moisson de la rubrique lancée en arrière-plan (le worker traite la file).']);
     }
 
     /** @return array<string,true> */

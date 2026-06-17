@@ -1,0 +1,89 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Harvester\MessageHandler;
+
+use App\Harvester\Ai\PublicationEmbedder;
+use App\Harvester\Ai\PlacementSuggester;
+use App\Harvester\Dto\DiscoveryCursor;
+use App\Harvester\HarvestRunner;
+use App\Harvester\Message\HarvestRubric;
+use App\Repository\PublicationRepository;
+use App\Repository\SourceRepository;
+use App\Repository\TreeNodeRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Symfony\Component\Messenger\Attribute\AsMessageHandler;
+
+/**
+ * Moisson ciblée d'une rubrique : récupère d'OpenAlex les travaux dont le
+ * concept primaire correspond à la rubrique (incrémental via la date de
+ * dernière moisson), les importe (dédup DOI), calcule les embeddings et propose
+ * leur placement. Borné par exécution ; re-déclencher reprend l'incrément.
+ */
+#[AsMessageHandler]
+final class HarvestRubricHandler
+{
+    private const MAX_PER_RUN = 500;
+
+    /** Niveau du nœud → segment de filtre OpenAlex « primary_topic.X.id ». */
+    private const FILTER_KEY = [0 => 'domain', 1 => 'field', 2 => 'subfield'];
+
+    public function __construct(
+        private readonly TreeNodeRepository $nodes,
+        private readonly SourceRepository $sources,
+        private readonly HarvestRunner $runner,
+        private readonly PublicationRepository $publications,
+        private readonly PublicationEmbedder $embedder,
+        private readonly PlacementSuggester $suggester,
+        private readonly EntityManagerInterface $em,
+        private readonly LoggerInterface $logger,
+    ) {
+    }
+
+    public function __invoke(HarvestRubric $message): void
+    {
+        $node = $this->nodes->find($message->nodeId);
+        $concept = $node?->getOpenalexConceptId();
+        if (null === $node || null === $concept) {
+            return;
+        }
+        $source = $this->sources->findOneByCode('openalex');
+        if (null === $source) {
+            return;
+        }
+
+        // Filtre concept : primary_topic.{domain|field|subfield}.id:<concept>,
+        // ou primary_topic.id:<concept> pour un topic (niveau 3).
+        $key = self::FILTER_KEY[$node->getLevel()] ?? null;
+        $filter = null !== $key ? 'primary_topic.'.$key.'.id:'.$concept : 'primary_topic.id:'.$concept;
+
+        $cursor = new DiscoveryCursor(
+            since: $node->getLastHarvestedAt(),
+            maxRecords: self::MAX_PER_RUN,
+            filter: $filter,
+        );
+
+        $job = $this->runner->run($source, $cursor, false, ['rubric' => $node->getSlug(), 'filter' => $filter]);
+        $this->logger->info('Moisson rubrique', ['rubric' => $node->getSlug(), 'created' => $job->getCreated(), 'processed' => $job->getProcessed()]);
+
+        // Enrichissement des nouvelles publications (embeddings puis placement).
+        foreach ($this->publications->findNeedingEmbedding(self::MAX_PER_RUN * 2) as $publication) {
+            try {
+                $this->embedder->embed($publication);
+            } catch (\Throwable) {
+                // on continue : une publication non embeddée sera reprise plus tard
+            }
+        }
+        $this->em->flush();
+
+        foreach ($this->publications->findNeedingPlacement(self::MAX_PER_RUN * 2) as $publication) {
+            $this->suggester->suggest($publication, 3);
+        }
+        $this->em->flush();
+
+        $node->markHarvested();
+        $this->em->flush();
+    }
+}

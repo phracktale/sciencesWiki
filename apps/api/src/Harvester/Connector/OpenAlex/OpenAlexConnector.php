@@ -46,7 +46,7 @@ final class OpenAlexConnector implements SourceConnector
         $yielded = 0;
 
         while (null !== $cursorToken) {
-            $data = $this->request($cursorToken, $cursor->since);
+            $data = $this->request($cursorToken, $cursor->since, $cursor->filter);
             $results = \is_array($data['results'] ?? null) ? $data['results'] : [];
 
             foreach ($results as $work) {
@@ -97,7 +97,7 @@ final class OpenAlexConnector implements SourceConnector
     /**
      * @return array<string,mixed>
      */
-    private function request(string $cursor, ?\DateTimeImmutable $since): array
+    private function request(string $cursor, ?\DateTimeImmutable $since, ?string $extraFilter = null): array
     {
         $query = [
             'per-page' => self::PER_PAGE,
@@ -105,8 +105,16 @@ final class OpenAlexConnector implements SourceConnector
             'mailto' => $this->contactEmail,
         ];
 
+        // Filtres OpenAlex combinés (ET = séparés par des virgules).
+        $filters = [];
         if (null !== $since) {
-            $query['filter'] = 'from_updated_date:'.$since->format('Y-m-d');
+            $filters[] = 'from_updated_date:'.$since->format('Y-m-d');
+        }
+        if (null !== $extraFilter && '' !== $extraFilter) {
+            $filters[] = $extraFilter;
+        }
+        if ([] !== $filters) {
+            $query['filter'] = implode(',', $filters);
         }
 
         $this->throttle->tick();

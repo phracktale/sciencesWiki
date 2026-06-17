@@ -152,6 +152,12 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/nodes/'.$nodeId.'/graft-children', []);
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function harvestNode(int $nodeId): array
+    {
+        return $this->send('POST', '/api/admin/nodes/'.$nodeId.'/harvest', []);
+    }
+
     /**
      * @param array<string,mixed>|null $body
      *

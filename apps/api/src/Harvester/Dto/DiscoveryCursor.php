@@ -21,6 +21,9 @@ final class DiscoveryCursor
         public ?string $cursor = null,
         public ?string $set = null,
         public ?int $maxRecords = null,
+        // Filtre supplémentaire propre à la source (ex. OpenAlex :
+        // « primary_topic.field.id:fields/31 » pour moissonner une rubrique).
+        public ?string $filter = null,
     ) {
     }
 }

@@ -210,6 +210,7 @@ final class AdminController extends AbstractController
                 trim((string) $request->request->get('targetSlug')),
             ),
             'graft' => $this->admin->graftChildren((int) $request->request->get('id')),
+            'harvest' => $this->admin->harvestNode((int) $request->request->get('id')),
             default => ['ok' => false, 'status' => 400, 'data' => ['error' => 'Action inconnue.']],
         };
 
