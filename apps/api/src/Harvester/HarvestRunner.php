@@ -78,7 +78,7 @@ final class HarvestRunner
             $job->finish();
         } catch (\Throwable $e) {
             $job->fail($e->getMessage());
-            $this->logger->error('Échec de la moisson.', ['source' => $source->getCode(), 'exception' => $e]);
+            $this->logger->error('Échec de la moisson : '.$e->getMessage(), ['source' => $source->getCode(), 'exception' => $e]);
         }
 
         $this->em->flush();
