@@ -27,7 +27,7 @@
     {% set hist = stats.history ?? [] %}
     {% if hist|length > 0 %}
         <h2>Progression du corpus</h2>
-        {% set maxPub = (hist|map(h => h.publications))|max ?: 1 %}
+        {% set maxPub = max(hist|map(h => h.publications)) ?: 1 %}
         <div style="display:flex; align-items:flex-end; gap:4px; height:110px; border-bottom:1px solid var(--line); padding:.3rem 0">
             {% for h in hist %}
                 <div title="{{ h.day }} : {{ h.publications }} publications, {{ h.answers }} réponses"
