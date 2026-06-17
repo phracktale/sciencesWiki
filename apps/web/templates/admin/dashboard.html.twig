@@ -10,6 +10,32 @@
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
 
+    <h2>Aller à une rubrique (concept OpenAlex)</h2>
+    <input type="text" id="oa-search" placeholder="Tapez un nom de rubrique…" autocomplete="off"
+           style="width:100%; max-width:480px; padding:.55rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+    <ul id="oa-results" class="qlist"></ul>
+    <script>
+    (function () {
+        var inp = document.getElementById('oa-search'), out = document.getElementById('oa-results'), t;
+        if (!inp) return;
+        inp.addEventListener('input', function () {
+            clearTimeout(t);
+            var q = inp.value.trim();
+            if (q.length < 2) { out.innerHTML = ''; return; }
+            t = setTimeout(function () {
+                fetch('/admin/openalex-search?q=' + encodeURIComponent(q))
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        out.innerHTML = (d.items || []).map(function (i) {
+                            return '<li><a class="q-title" href="/admin/r/' + i.slug + '">' + i.label +
+                                '</a> <span class="muted">niv. ' + i.level + (i.openalexId ? ' · ' + i.openalexId : '') + '</span></li>';
+                        }).join('');
+                    });
+            }, 250);
+        });
+    })();
+    </script>
+
     {% set c = stats.corpus ?? {} %}
     <h2>Corpus</h2>
     <div class="grid">

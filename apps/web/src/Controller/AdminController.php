@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Service\AdminApiClient;
 use App\Service\ApiClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -147,6 +148,16 @@ final class AdminController extends AbstractController
         return $this->render('admin/users.html.twig', ['data' => $this->admin->users()]);
     }
 
+    #[Route('/admin/openalex-search', name: 'admin_openalex_search', methods: ['GET'])]
+    public function openalexSearch(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['items' => []], 401);
+        }
+
+        return new JsonResponse(['items' => $this->admin->openalexSearch(trim((string) $request->query->get('q', '')))]);
+    }
+
     #[Route('/admin/r/{slug}', name: 'admin_node', methods: ['GET'])]
     public function node(string $slug): Response
     {
@@ -198,11 +209,12 @@ final class AdminController extends AbstractController
                 (int) $request->request->get('questionId'),
                 trim((string) $request->request->get('targetSlug')),
             ),
+            'graft' => $this->admin->graftChildren((int) $request->request->get('id')),
             default => ['ok' => false, 'status' => 400, 'data' => ['error' => 'Action inconnue.']],
         };
 
         if ($result['ok']) {
-            $this->addFlash('success', 'Action effectuée.');
+            $this->addFlash('success', (string) ($result['data']['message'] ?? 'Action effectuée.'));
             // Création d'une rubrique : on suit le nouveau slug si fourni.
             if ('add-child' === $action && isset($result['data']['slug'])) {
                 return $this->redirectToRoute('admin_node', ['slug' => $result['data']['slug']]);

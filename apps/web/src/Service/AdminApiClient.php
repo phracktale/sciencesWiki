@@ -138,6 +138,20 @@ final class AdminApiClient
         return $this->send('PATCH', '/api/admin/users/'.$id, ['roles' => $roles]);
     }
 
+    /** @return list<array<string,mixed>> concepts correspondants (recherche locale) */
+    public function openalexSearch(string $q): array
+    {
+        $res = $this->send('GET', '/api/admin/openalex/search?'.http_build_query(['q' => $q]), null);
+
+        return $res['ok'] ? ($res['data']['items'] ?? []) : [];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function graftChildren(int $nodeId): array
+    {
+        return $this->send('POST', '/api/admin/nodes/'.$nodeId.'/graft-children', []);
+    }
+
     /**
      * @param array<string,mixed>|null $body
      *
