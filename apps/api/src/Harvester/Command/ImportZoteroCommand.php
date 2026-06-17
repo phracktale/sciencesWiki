@@ -144,7 +144,9 @@ final class ImportZoteroCommand extends Command
             return null;
         }
 
-        $title = $this->first($xml, './/dc:title');
+        // Enfant DIRECT seulement : évite de capter le titre de la revue
+        // (dcterms:isPartOf//dc:title) à la place du titre de l'article.
+        $title = $this->first($xml, './dc:title');
         if (null === $title || '' === trim($title)) {
             return null;
         }
@@ -153,7 +155,7 @@ final class ImportZoteroCommand extends Command
         $url = $this->extractUrl($xml);
         $abstract = $this->first($xml, './/dcterms:abstract') ?? $this->first($xml, './/dc:description');
         $venue = $this->first($xml, './/dcterms:isPartOf//dc:title');
-        $date = $this->parseDate($this->first($xml, './/dc:date'));
+        $date = $this->parseDate($this->first($xml, './dc:date'));
 
         $authors = [];
         $seen = [];
