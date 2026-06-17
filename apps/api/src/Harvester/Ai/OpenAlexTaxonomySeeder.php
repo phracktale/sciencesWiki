@@ -32,6 +32,7 @@ final class OpenAlexTaxonomySeeder
         EmbeddingClientFactory $embeddingFactory,
         private readonly TreeNodeRepository $nodes,
         private readonly EntityManagerInterface $em,
+        private readonly \App\Harvester\OpenAlexThrottle $throttle,
         #[Autowire(env: 'HARVESTER_CONTACT_EMAIL')]
         private readonly string $contactEmail,
         #[Autowire(env: 'OPENALEX_BASE_URL')]
@@ -215,6 +216,7 @@ final class OpenAlexTaxonomySeeder
     private function requestJson(string $endpoint, string $cursor): array
     {
         for ($attempt = 1; $attempt <= 5; ++$attempt) {
+            $this->throttle->tick();
             $response = $this->httpClient->request('GET', $this->baseUrl.'/'.$endpoint, [
                 'query' => ['per-page' => 200, 'cursor' => $cursor, 'mailto' => $this->contactEmail],
                 'headers' => ['User-Agent' => $this->userAgent()],

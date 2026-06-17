@@ -58,7 +58,7 @@ final class AdminDashboardController
         $dbVersion = (string) $conn->executeQuery('SHOW server_version')->fetchOne();
         $dbSize = (int) $conn->executeQuery('SELECT pg_database_size(current_database())')->fetchOne();
         $tables = [];
-        foreach (['publication', 'tree_node', 'tree_edge', 'question', 'answer', 'answer_revision', 'footnote', 'placement_suggestion', 'author', 'authorship', '"user"'] as $t) {
+        foreach (['publication', 'tree_node', 'tree_edge', 'question', 'answer', 'answer_revision', 'footnote', 'placement_suggestion', 'author', 'authorship', 'app_user'] as $t) {
             try {
                 $tables[trim($t, '"')] = (int) $conn->executeQuery('SELECT count(*) FROM '.$t)->fetchOne();
             } catch (\Throwable) {

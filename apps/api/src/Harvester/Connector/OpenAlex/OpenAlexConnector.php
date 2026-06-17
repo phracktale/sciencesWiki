@@ -26,6 +26,7 @@ final class OpenAlexConnector implements SourceConnector
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly OpenAlexMapper $mapper,
+        private readonly \App\Harvester\OpenAlexThrottle $throttle,
         #[Autowire(env: 'HARVESTER_CONTACT_EMAIL')]
         private readonly string $contactEmail,
         #[Autowire(env: 'OPENALEX_BASE_URL')]
@@ -79,6 +80,7 @@ final class OpenAlexConnector implements SourceConnector
             return $this->mapper->map($ref->payload);
         }
 
+        $this->throttle->tick();
         $work = $this->httpClient->request('GET', $this->baseUrl.'/works/'.$ref->idInSource, [
             'query' => ['mailto' => $this->contactEmail],
             'headers' => ['User-Agent' => $this->userAgent()],
@@ -106,6 +108,8 @@ final class OpenAlexConnector implements SourceConnector
         if (null !== $since) {
             $query['filter'] = 'from_updated_date:'.$since->format('Y-m-d');
         }
+
+        $this->throttle->tick();
 
         return $this->httpClient->request('GET', $this->baseUrl.'/works', [
             'query' => $query,
