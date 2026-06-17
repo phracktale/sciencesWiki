@@ -188,6 +188,13 @@ class Answer
         return $this->treeNode;
     }
 
+    public function setTreeNode(TreeNode $treeNode): self
+    {
+        $this->treeNode = $treeNode;
+
+        return $this;
+    }
+
     public function getLanguage(): string
     {
         return $this->language;

@@ -169,6 +169,18 @@ class TreeNode
         return $fallback;
     }
 
+    /** @return Collection<int,TreeEdge> arêtes où ce nœud est parent */
+    public function getChildEdges(): Collection
+    {
+        return $this->childEdges;
+    }
+
+    /** @return Collection<int,TreeEdge> arêtes où ce nœud est enfant */
+    public function getParentEdges(): Collection
+    {
+        return $this->parentEdges;
+    }
+
     public function getId(): ?int
     {
         return $this->id;

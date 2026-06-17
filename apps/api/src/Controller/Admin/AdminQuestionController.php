@@ -1,0 +1,53 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Controller\Admin;
+
+use App\Repository\AnswerRepository;
+use App\Repository\QuestionRepository;
+use App\Repository\TreeNodeRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Symfony\Component\Routing\Attribute\Route;
+
+/**
+ * Actions admin sur les questions (ROLE_ADMIN). Déplacer manuellement une
+ * question (et ses réponses) vers une autre rubrique.
+ */
+final class AdminQuestionController
+{
+    public function __construct(
+        private readonly QuestionRepository $questions,
+        private readonly AnswerRepository $answers,
+        private readonly TreeNodeRepository $nodes,
+        private readonly EntityManagerInterface $em,
+    ) {
+    }
+
+    #[Route('/api/admin/questions/{id}/move', name: 'admin_question_move', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function move(int $id, Request $request): JsonResponse
+    {
+        $question = $this->questions->find($id);
+        if (null === $question) {
+            return new JsonResponse(['error' => 'Question introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+        /** @var array<string,mixed> $data */
+        $data = json_decode($request->getContent() ?: '[]', true) ?? [];
+        $node = !empty($data['nodeId']) ? $this->nodes->find((int) $data['nodeId']) : null;
+        if (null === $node) {
+            return new JsonResponse(['error' => 'Rubrique cible introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $question->setTreeNode($node);
+        // Les réponses suivent la question.
+        foreach ($this->answers->findBy(['question' => $question]) as $answer) {
+            $answer->setTreeNode($node);
+        }
+        $this->em->flush();
+
+        return new JsonResponse(['id' => $id, 'node' => ['slug' => $node->getSlug(), 'label' => $node->getLabel()]]);
+    }
+}
