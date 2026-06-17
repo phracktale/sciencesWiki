@@ -146,9 +146,12 @@ final class OpenAlexConnector implements SourceConnector
             }
 
             if ($attempt >= self::MAX_ATTEMPTS) {
+                // On joint la raison renvoyée par OpenAlex (corps de la réponse) pour
+                // diagnostiquer (limite/seconde, quota, clé requise…) dans le suivi.
+                $reason = mb_substr(trim((string) $response->getContent(false)), 0, 300);
                 throw new \RuntimeException(\sprintf(
-                    'Limite OpenAlex atteinte : HTTP %d après %d tentatives sur %s. Réessayez plus tard (réduisez la cadence des moissons simultanées).',
-                    $status, $attempt, $url,
+                    'Limite OpenAlex atteinte : HTTP %d après %d tentatives. Réponse : %s',
+                    $status, $attempt, '' !== $reason ? $reason : '(corps vide)',
                 ));
             }
 
