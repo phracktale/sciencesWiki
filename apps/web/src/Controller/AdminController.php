@@ -85,6 +85,21 @@ final class AdminController extends AbstractController
         return $this->render('admin/settings.html.twig', ['settings' => $this->admin->getSettings()]);
     }
 
+    #[Route('/admin/articles', name: 'admin_articles', methods: ['GET'])]
+    public function articles(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/articles.html.twig', [
+            'data' => $this->admin->articles(
+                trim((string) $request->query->get('q', '')),
+                max(1, (int) $request->query->get('page', '1')),
+            ),
+        ]);
+    }
+
     #[Route('/admin/r/{slug}', name: 'admin_node', methods: ['GET'])]
     public function node(string $slug): Response
     {

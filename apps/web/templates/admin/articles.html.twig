@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Articles moissonnés{% endblock %}
+{% block body %}
+    <p class="crumbs"><a href="{{ path('admin_dashboard') }}">Administration</a> · Articles · <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    <h1>Articles moissonnés <span class="muted">({{ data.total|number_format(0,',',' ') }})</span></h1>
+
+    <form method="get" action="{{ path('admin_articles') }}" style="display:flex; gap:.5rem; margin:1rem 0">
+        <input type="text" name="q" value="{{ data.query }}" placeholder="Rechercher (titre ou auteur)…"
+               style="flex:1; padding:.55rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+        <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.55rem 1rem; cursor:pointer">Rechercher</button>
+    </form>
+
+    {% if data.items is empty %}
+        <p class="muted">Aucun article.</p>
+    {% else %}
+        <table style="width:100%; border-collapse:collapse; font-size:.9rem">
+            <thead>
+                <tr style="text-align:left; border-bottom:2px solid var(--line)">
+                    <th style="padding:.4rem">Titre</th><th>Auteurs</th><th>Date</th><th>Revue</th><th>Accès</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in data.items %}
+                    <tr style="border-bottom:1px solid var(--line)">
+                        <td style="padding:.4rem">{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.title|slice(0,90) }}</a>{% else %}{{ a.title|slice(0,90) }}{% endif %}</td>
+                        <td class="muted">{{ a.authors|slice(0,60) }}</td>
+                        <td class="muted">{{ a.date }}</td>
+                        <td class="muted">{{ a.venue|slice(0,30) }}</td>
+                        <td>
+                            {% if a.access == 'libre' %}<span class="badge ok">libre</span>
+                            {% elseif a.access == 'payant' %}<span class="badge warn">payant</span>
+                            {% else %}<span class="pill">inconnu</span>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="margin-top:1rem; display:flex; gap:1rem; align-items:center">
+            {% if data.page > 1 %}<a href="{{ path('admin_articles', { q: data.query, page: data.page - 1 }) }}">← Précédent</a>{% endif %}
+            <span class="muted">Page {{ data.page }} / {{ data.pages }}</span>
+            {% if data.page < data.pages %}<a href="{{ path('admin_articles', { q: data.query, page: data.page + 1 }) }}">Suivant →</a>{% endif %}
+        </p>
+    {% endif %}
+{% endblock %}
