@@ -51,7 +51,7 @@ final class OpenAlexConnector implements SourceConnector
         $yielded = 0;
 
         while (null !== $cursorToken) {
-            $data = $this->request($cursorToken, $cursor->since, $cursor->filter);
+            $data = $this->request($cursorToken, $cursor);
             $results = \is_array($data['results'] ?? null) ? $data['results'] : [];
 
             foreach ($results as $work) {
@@ -115,7 +115,7 @@ final class OpenAlexConnector implements SourceConnector
     /**
      * @return array<string,mixed>
      */
-    private function request(string $cursor, ?\DateTimeImmutable $since, ?string $extraFilter = null): array
+    private function request(string $cursor, DiscoveryCursor $disc): array
     {
         $query = [
             'per-page' => self::PER_PAGE,
@@ -125,14 +125,17 @@ final class OpenAlexConnector implements SourceConnector
 
         // Filtres OpenAlex combinés (ET = séparés par des virgules).
         $filters = [];
-        if (null !== $since) {
-            $filters[] = 'from_updated_date:'.$since->format('Y-m-d');
+        if (null !== $disc->since) {
+            $filters[] = 'from_updated_date:'.$disc->since->format('Y-m-d');
         }
-        if (null !== $extraFilter && '' !== $extraFilter) {
-            $filters[] = $extraFilter;
+        if (null !== $disc->filter && '' !== $disc->filter) {
+            $filters[] = $disc->filter;
         }
         if ([] !== $filters) {
             $query['filter'] = implode(',', $filters);
+        }
+        if (null !== $disc->sort && '' !== $disc->sort) {
+            $query['sort'] = $disc->sort;
         }
 
         return $this->getJson($this->baseUrl.'/works', $query);

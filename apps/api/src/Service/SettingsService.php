@@ -24,6 +24,12 @@ final class SettingsService
     public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
     public const OPENALEX_PER_DAY = 'openalex.per_day';
 
+    // Stratégie de moisson (librement paramétrable en back-office).
+    public const HARVEST_SORT = 'harvest.sort';                 // tri OpenAlex
+    public const HARVEST_RECENT_YEARS = 'harvest.recent_years'; // 0 = pas de limite d'années
+    public const HARVEST_CAP_PER_RUBRIC = 'harvest.cap_per_rubric'; // 0 = illimité
+    public const HARVEST_MAX_PER_RUN = 'harvest.max_per_run';   // taille de lot par exécution
+
     public const DEFAULT_SYSTEM_PROMPT = <<<'TXT'
         Tu es un rédacteur de vulgarisation scientifique pour SciencesWiki, une
         encyclopédie libre d'éducation populaire en français.
@@ -58,6 +64,11 @@ final class SettingsService
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
         self::OPENALEX_PER_DAY => '10000',
+        // Par défaut : les plus cités, sur les 5 dernières années, plafonné à 3000/rubrique.
+        self::HARVEST_SORT => 'cited_by_count:desc',
+        self::HARVEST_RECENT_YEARS => '5',
+        self::HARVEST_CAP_PER_RUBRIC => '3000',
+        self::HARVEST_MAX_PER_RUN => '500',
     ];
 
     /** @var array<string,string>|null */
@@ -111,6 +122,30 @@ final class SettingsService
         return max(1, (int) ($this->get(self::OPENALEX_PER_DAY) ?? self::DEFAULTS[self::OPENALEX_PER_DAY]));
     }
 
+    /** Tri OpenAlex de la moisson (vide = ordre par défaut de l'API). */
+    public function harvestSort(): string
+    {
+        return trim((string) ($this->get(self::HARVEST_SORT) ?? ''));
+    }
+
+    /** Fenêtre de récence en années (0 = pas de limite). */
+    public function harvestRecentYears(): int
+    {
+        return max(0, (int) ($this->get(self::HARVEST_RECENT_YEARS) ?? '0'));
+    }
+
+    /** Plafond de publications moissonnées par rubrique (0 = illimité). */
+    public function harvestCapPerRubric(): int
+    {
+        return max(0, (int) ($this->get(self::HARVEST_CAP_PER_RUBRIC) ?? '0'));
+    }
+
+    /** Nombre de travaux traités par exécution de moisson (≥ 1). */
+    public function harvestMaxPerRun(): int
+    {
+        return max(1, (int) ($this->get(self::HARVEST_MAX_PER_RUN) ?? '500'));
+    }
+
     public function get(string $name): ?string
     {
         $this->cache ??= $this->repository->allAsMap();
@@ -133,13 +168,17 @@ final class SettingsService
             self::RAG_MODEL => (string) ($this->model() ?? ''),
             self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
             self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
+            self::HARVEST_SORT => $this->harvestSort(),
+            self::HARVEST_RECENT_YEARS => (string) $this->harvestRecentYears(),
+            self::HARVEST_CAP_PER_RUBRIC => (string) $this->harvestCapPerRubric(),
+            self::HARVEST_MAX_PER_RUN => (string) $this->harvestMaxPerRun(),
         ];
     }
 
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

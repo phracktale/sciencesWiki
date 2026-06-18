@@ -47,4 +47,13 @@ class IngestionJobRepository extends ServiceEntityRepository
 
         return false === $cursor || null === $cursor ? null : (string) $cursor;
     }
+
+    /** Total de travaux déjà traités (toutes exécutions) pour une rubrique — pour le plafond. */
+    public function sumProcessedForRubric(string $rubricSlug): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeQuery(
+            "SELECT COALESCE(SUM(processed), 0) FROM ingestion_job WHERE query->>'rubric' = :slug",
+            ['slug' => $rubricSlug],
+        )->fetchOne();
+    }
 }

@@ -26,8 +26,6 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 #[AsMessageHandler]
 final class HarvestRubricHandler
 {
-    private const MAX_PER_RUN = 500;
-
     /** Articles OA dont on tente le texte intégral par exécution (borne la charge). */
     private const MAX_FULLTEXT_PER_RUN = 20;
 
@@ -46,6 +44,7 @@ final class HarvestRubricHandler
         private readonly \App\Harvester\Connector\OpenAlex\OpenAlexConnector $openalex,
         private readonly \App\Harvester\OpenAlexThrottle $throttle,
         private readonly \App\Service\ActivityLogger $activity,
+        private readonly \App\Service\SettingsService $settings,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {
@@ -63,16 +62,32 @@ final class HarvestRubricHandler
             return;
         }
 
+        // Stratégie de moisson librement paramétrable en back-office.
+        $maxPerRun = $this->settings->harvestMaxPerRun();
+        $cap = $this->settings->harvestCapPerRubric();
+        $sort = $this->settings->harvestSort();
+        $recentYears = $this->settings->harvestRecentYears();
+
+        // Plafond par rubrique : si déjà atteint, on n'inonde pas davantage.
+        if ($cap > 0 && $this->jobs->sumProcessedForRubric($node->getSlug()) >= $cap) {
+            $this->activity->log('harvest', 'harvest_capped', 'worker', \sprintf('Plafond de %d atteint pour « %s » — moisson ignorée.', $cap, $node->getLabel()), ['rubric' => $node->getSlug()]);
+
+            return;
+        }
+
         // Filtre concept : primary_topic.{domain|field|subfield}.id:<concept>,
         // ou primary_topic.id:<concept> pour un topic (niveau 3).
         $key = self::FILTER_KEY[$node->getLevel()] ?? null;
         $filter = null !== $key ? 'primary_topic.'.$key.'.id:'.$concept : 'primary_topic.id:'.$concept;
 
-        // NB : on n'utilise PAS le filtre `from_updated_date` d'OpenAlex : il est
-        // désormais réservé aux offres payantes (réponse 429 « Plan upgrade
-        // required »). L'incrémental se fait donc par reprise du curseur de
-        // pagination de la dernière exécution réussie (gratuit). Le dédoublonnage
-        // par DOI garantit l'absence de doublons en cas de recouvrement.
+        // Fenêtre de récence (paramétrable) : ne garder que les N dernières années.
+        if ($recentYears > 0) {
+            $from = (new \DateTimeImmutable())->modify('-'.$recentYears.' years')->format('Y-m-d');
+            $filter .= ',from_publication_date:'.$from;
+        }
+
+        // Incrémental SANS `from_updated_date` (filtre payant) : reprise du curseur
+        // de pagination de la dernière exécution réussie ; dédup DOI contre les recouvrements.
         $resume = $this->jobs->findResumeCursorForRubric($node->getSlug());
 
         // Volume total disponible chez OpenAlex (meta.count) → permet de savoir ce
@@ -88,15 +103,16 @@ final class HarvestRubricHandler
 
         $cursor = new DiscoveryCursor(
             cursor: $resume,
-            maxRecords: self::MAX_PER_RUN,
+            maxRecords: $maxPerRun,
             filter: $filter,
+            sort: '' !== $sort ? $sort : null,
         );
 
         $job = $this->runner->run($source, $cursor, false, ['rubric' => $node->getSlug(), 'filter' => $filter]);
         $this->logger->info('Moisson rubrique', ['rubric' => $node->getSlug(), 'created' => $job->getCreated(), 'processed' => $job->getProcessed()]);
 
         // Enrichissement des nouvelles publications (embeddings puis placement).
-        foreach ($this->publications->findNeedingEmbedding(self::MAX_PER_RUN * 2) as $publication) {
+        foreach ($this->publications->findNeedingEmbedding($maxPerRun * 2) as $publication) {
             try {
                 $this->embedder->embed($publication);
             } catch (\Throwable) {
@@ -105,7 +121,7 @@ final class HarvestRubricHandler
         }
         $this->em->flush();
 
-        foreach ($this->publications->findNeedingPlacement(self::MAX_PER_RUN * 2) as $publication) {
+        foreach ($this->publications->findNeedingPlacement($maxPerRun * 2) as $publication) {
             $this->suggester->suggest($publication, 3);
         }
         $this->em->flush();

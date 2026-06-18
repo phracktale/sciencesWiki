@@ -53,6 +53,34 @@
             </div>
         </div>
 
+        <h2 style="margin-top:1.4rem">Stratégie de moisson</h2>
+        <p class="muted" style="font-size:.85rem">Détermine quels articles sont moissonnés en priorité, et borne le volume pour que la moisson reste finie.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.8rem">
+            <div>
+                <label>Tri OpenAlex</label>
+                {% set hsort = settings['harvest.sort'] %}
+                <select name="harvest_sort">
+                    <option value="cited_by_count:desc" {{ hsort == 'cited_by_count:desc' ? 'selected' : '' }}>Les plus cités</option>
+                    <option value="publication_date:desc" {{ hsort == 'publication_date:desc' ? 'selected' : '' }}>Les plus récents</option>
+                    <option value="relevance_score:desc" {{ hsort == 'relevance_score:desc' ? 'selected' : '' }}>Pertinence</option>
+                    <option value="" {{ hsort == '' ? 'selected' : '' }}>Ordre par défaut</option>
+                </select>
+            </div>
+            <div>
+                <label>Fenêtre de récence (années, 0 = illimité)</label>
+                <input type="text" name="harvest_recent_years" value="{{ settings['harvest.recent_years'] }}" placeholder="5">
+            </div>
+            <div>
+                <label>Plafond par rubrique (0 = illimité)</label>
+                <input type="text" name="harvest_cap_per_rubric" value="{{ settings['harvest.cap_per_rubric'] }}" placeholder="3000">
+            </div>
+            <div>
+                <label>Articles par exécution</label>
+                <input type="text" name="harvest_max_per_run" value="{{ settings['harvest.max_per_run'] }}" placeholder="500">
+            </div>
+        </div>
+        <p class="muted" style="font-size:.82rem">« Top-cité + récents » = tri <em>Les plus cités</em> + récence <em>5 ans</em>. Mets la récence à 0 pour inclure les classiques de tous temps.</p>
+
         <button type="submit" style="margin-top:1rem">Enregistrer les paramètres</button>
     </form>
     <p class="muted" style="font-size:.85rem">Ces réglages s'appliquent immédiatement (sans redéploiement).</p>

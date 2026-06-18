@@ -90,6 +90,10 @@ final class AdminController extends AbstractController
                 'rag.model' => (string) $request->request->get('model'),
                 'openalex.per_minute' => (string) $request->request->get('openalex_per_minute'),
                 'openalex.per_day' => (string) $request->request->get('openalex_per_day'),
+                'harvest.sort' => (string) $request->request->get('harvest_sort'),
+                'harvest.recent_years' => (string) $request->request->get('harvest_recent_years'),
+                'harvest.cap_per_rubric' => (string) $request->request->get('harvest_cap_per_rubric'),
+                'harvest.max_per_run' => (string) $request->request->get('harvest_max_per_run'),
             ]);
             $this->addFlash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Paramètres IA enregistrés.' : 'Échec de l\'enregistrement.');
 

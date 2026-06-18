@@ -24,6 +24,8 @@ final class DiscoveryCursor
         // Filtre supplémentaire propre à la source (ex. OpenAlex :
         // « primary_topic.field.id:fields/31 » pour moissonner une rubrique).
         public ?string $filter = null,
+        // Tri propre à la source (ex. OpenAlex : « cited_by_count:desc »).
+        public ?string $sort = null,
     ) {
     }
 }
