@@ -139,8 +139,14 @@ final class AdminHarvestController
         foreach ($conn->executeQuery("SELECT name, value FROM setting WHERE name LIKE 'openalex.total.%'")->fetchAllAssociative() as $row) {
             $totals[substr((string) $row['name'], \strlen('openalex.total.'))] = (int) $row['value'];
         }
+        // Cumul moissonné par rubrique (toutes exécutions) → progression réelle.
+        $cumulative = [];
+        foreach ($conn->executeQuery("SELECT query->>'rubric' AS r, COALESCE(SUM(processed),0) AS s FROM ingestion_job WHERE query->>'rubric' IS NOT NULL GROUP BY query->>'rubric'")->fetchAllAssociative() as $row) {
+            $cumulative[(string) $row['r']] = (int) $row['s'];
+        }
         foreach ($jobs as &$job) {
             $job['available'] = $job['rubric'] !== null && isset($totals[$job['rubric']]) ? $totals[$job['rubric']] : null;
+            $job['cumulativeProcessed'] = $cumulative[$job['rubric']] ?? $job['processed'];
         }
         unset($job);
 
@@ -164,6 +170,13 @@ final class AdminHarvestController
             'jobs' => $jobs,
             'queued' => $queued,
             'embeddingModel' => $_SERVER['EMBEDDING_MODEL'] ?? $_ENV['EMBEDDING_MODEL'] ?? 'sentence-transformers (Marvin)',
+            // Stratégie effective : sert à calculer la progression (cumul / cible).
+            'harvest' => [
+                'maxPerRun' => $this->settings->harvestMaxPerRun(),
+                'capPerRubric' => $this->settings->harvestCapPerRubric(),
+                'sort' => $this->settings->harvestSort(),
+                'recentYears' => $this->settings->harvestRecentYears(),
+            ],
             'openalex' => [
                 'date' => $today,
                 'usesApiKey' => '' !== $this->openalexApiKey,

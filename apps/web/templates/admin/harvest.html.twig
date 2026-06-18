@@ -62,7 +62,7 @@
     (function () {
         var tbody = document.getElementById('jobs');
         if (!tbody) return;
-        var MAX_PER_RUN = 500;
+        var HARVEST = { maxPerRun: 500, capPerRubric: 0 }; // mis à jour par render() depuis l'API
         var CSRF = {{ admin_csrf.token|json_encode|raw }};
 
         function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -97,13 +97,19 @@
         }
 
         function bar(job) {
-            var pct = Math.min(100, Math.round((job.processed / MAX_PER_RUN) * 100));
+            // Progression = cumul moissonné pour la rubrique / cible. Cible = plafond
+            // configuré, sinon total dispo chez OpenAlex, sinon la taille de lot.
+            var cumulative = job.cumulativeProcessed != null ? job.cumulativeProcessed : job.processed;
+            var target = HARVEST.capPerRubric > 0 ? HARVEST.capPerRubric
+                       : (job.available != null && job.available > 0 ? job.available : HARVEST.maxPerRun);
+            if (job.available != null && job.available > 0 && target > job.available) target = job.available;
+            var pct = target > 0 ? Math.min(100, Math.round((cumulative / target) * 100)) : 0;
             var running = job.status === 'running' && !job.stale;
             var color = job.stale ? '#9ca3af' : (running ? 'var(--accent)' : (job.errors > 0 || job.status === 'failed' ? '#dc2626' : '#16a34a'));
             var anim = running ? 'opacity:.85' : '';
-            return '<div style="height:9px; background:var(--line); border-radius:5px; overflow:hidden">' +
+            return '<div style="height:9px; background:var(--line); border-radius:5px; overflow:hidden" title="' + cumulative + ' / ' + target + '">' +
                    '<div style="height:100%; width:' + pct + '%; background:' + color + ';' + anim + '"></div></div>' +
-                   '<span class="muted" style="font-size:.78rem">' + job.processed + ' traité(s)</span>';
+                   '<span class="muted" style="font-size:.78rem">' + cumulative.toLocaleString('fr-FR') + ' / ' + target.toLocaleString('fr-FR') + ' (' + pct + '%)</span>';
         }
 
         function actions(job) {
@@ -137,6 +143,7 @@
         }
 
         function render(data) {
+            if (data.harvest) HARVEST = data.harvest;
             var jobs = data.jobs || [];
             tbody.innerHTML = jobs.length ? jobs.map(row).join('') :
                 '<tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Aucune moisson lancée. Utilisez « Moissonner cette rubrique » depuis une rubrique.</td></tr>';
