@@ -149,14 +149,27 @@ final class AdminController extends AbstractController
             return new Response('Aucun PDF en accès libre pour cet article.', 404);
         }
 
-        // Suivi manuel des redirections avec validation anti-SSRF à chaque saut.
+        // Suivi manuel des redirections avec validation anti-SSRF à chaque saut :
+        // résolution + validation de toutes les IP, puis ÉPINGLAGE de la connexion
+        // à l'IP validée (anti DNS-rebinding / IPv6).
         $current = $url;
         $response = null;
         for ($hop = 0; $hop < 5; ++$hop) {
-            if (!$this->isPublicHttpUrl($current)) {
+            $p = parse_url($current);
+            $scheme = strtolower($p['scheme'] ?? '');
+            $host = trim((string) ($p['host'] ?? ''), '[]');
+            if (!\in_array($scheme, ['http', 'https'], true) || '' === $host) {
                 return new Response('URL non autorisée.', 422);
             }
-            $response = $this->httpClient->request('GET', $current, ['timeout' => 30, 'max_redirects' => 0]);
+            $pinnedIp = $this->validatedIp($host);
+            if (null === $pinnedIp) {
+                return new Response('URL non autorisée (hôte non public).', 422);
+            }
+            $options = ['timeout' => 30, 'max_redirects' => 0];
+            if (!filter_var($host, \FILTER_VALIDATE_IP)) {
+                $options['resolve'] = [$host => $pinnedIp];
+            }
+            $response = $this->httpClient->request('GET', $current, $options);
             $status = $response->getStatusCode();
             if ($status >= 300 && $status < 400) {
                 $loc = $response->getHeaders(false)['location'][0] ?? null;
@@ -186,26 +199,53 @@ final class AdminController extends AbstractController
         ]);
     }
 
-    /** Vrai si http(s) et toutes les IP résolues sont publiques (anti-SSRF). */
-    private function isPublicHttpUrl(string $url): bool
+    /**
+     * Résout l'hôte (A + AAAA), valide que TOUTES les IP sont publiques, et renvoie
+     * UNE IP validée à épingler. null si non résolu ou IP privée/réservée (échec fermé).
+     */
+    private function validatedIp(string $host): ?string
     {
-        $p = parse_url($url);
-        $scheme = strtolower($p['scheme'] ?? '');
-        $host = trim((string) ($p['host'] ?? ''), '[]');
-        if (!\in_array($scheme, ['http', 'https'], true) || '' === $host) {
-            return false;
+        if (filter_var($host, \FILTER_VALIDATE_IP)) {
+            return $this->isPublicIp($host) ? $host : null;
         }
-        $ips = filter_var($host, \FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
+        $ips = [];
+        foreach (@dns_get_record($host, \DNS_A) ?: [] as $r) {
+            if (isset($r['ip'])) {
+                $ips[] = $r['ip'];
+            }
+        }
+        foreach (@dns_get_record($host, \DNS_AAAA) ?: [] as $r) {
+            if (isset($r['ipv6'])) {
+                $ips[] = $r['ipv6'];
+            }
+        }
         if ([] === $ips) {
-            return false;
+            $ips = gethostbynamel($host) ?: [];
+        }
+        if ([] === $ips) {
+            return null;
         }
         foreach ($ips as $ip) {
-            if (false === filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE)) {
-                return false;
+            if (!$this->isPublicIp($ip)) {
+                return null;
             }
         }
 
-        return true;
+        return $ips[0];
+    }
+
+    /** IP publique uniquement (rejette privées/réservées + IPv4-mapped IPv6). */
+    private function isPublicIp(string $ip): bool
+    {
+        // Rejette explicitement les IPv6 mappées/compatibles IPv4 (ex. ::ffff:169.254.169.254).
+        if (preg_match('/^::ffff:(\d+\.\d+\.\d+\.\d+)$/i', $ip, $m) || preg_match('/^::(\d+\.\d+\.\d+\.\d+)$/', $ip, $m)) {
+            $ip = $m[1];
+        }
+        if ('0.0.0.0' === $ip) {
+            return false;
+        }
+
+        return false !== filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE);
     }
 
     #[Route('/admin/users', name: 'admin_users', methods: ['GET', 'POST'])]
