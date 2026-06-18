@@ -26,7 +26,7 @@ class Journal
     #[Groups(['journal:read'])]
     private ?int $id = null;
 
-    #[ORM\Column(length: 64, unique: true, nullable: true)]
+    #[ORM\Column(name: 'openalex_id', length: 64, unique: true, nullable: true)]
     #[Groups(['journal:read'])]
     private ?string $openAlexId = null;
 
