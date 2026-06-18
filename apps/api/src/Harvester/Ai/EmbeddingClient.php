@@ -21,5 +21,14 @@ interface EmbeddingClient
      */
     public function embed(string $text): array;
 
+    /**
+     * Embeddings de plusieurs textes en un seul appel (bien plus rapide qu'unitaire).
+     *
+     * @param list<string> $texts
+     *
+     * @return list<list<float>> vecteurs dans le même ordre que $texts
+     */
+    public function embedBatch(array $texts): array;
+
     public function dimensions(): int;
 }

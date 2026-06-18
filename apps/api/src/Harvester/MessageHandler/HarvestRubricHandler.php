@@ -111,15 +111,17 @@ final class HarvestRubricHandler
         $job = $this->runner->run($source, $cursor, false, ['rubric' => $node->getSlug(), 'filter' => $filter]);
         $this->logger->info('Moisson rubrique', ['rubric' => $node->getSlug(), 'created' => $job->getCreated(), 'processed' => $job->getProcessed()]);
 
-        // Enrichissement des nouvelles publications (embeddings puis placement).
-        foreach ($this->publications->findNeedingEmbedding($maxPerRun * 2) as $publication) {
+        // Enrichissement des nouvelles publications : embeddings PAR LOTS (un seul
+        // appel au service ml/ pour ~64 publications → bien plus rapide qu'unitaire).
+        $needing = $this->publications->findNeedingEmbedding($maxPerRun * 2);
+        foreach (array_chunk($needing, 64) as $batch) {
             try {
-                $this->embedder->embed($publication);
-            } catch (\Throwable) {
-                // on continue : une publication non embeddée sera reprise plus tard
+                $this->embedder->embedMany($batch);
+                $this->em->flush();
+            } catch (\Throwable $e) {
+                $this->logger->warning('Lot d\'embeddings échoué : '.$e->getMessage());
             }
         }
-        $this->em->flush();
 
         foreach ($this->publications->findNeedingPlacement($maxPerRun * 2) as $publication) {
             $this->suggester->suggest($publication, 3);

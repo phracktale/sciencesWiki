@@ -29,6 +29,11 @@ final class HashingEmbeddingClient implements EmbeddingClient
         return $this->normalize($vector);
     }
 
+    public function embedBatch(array $texts): array
+    {
+        return array_map(fn (string $t): array => $this->embed($t), array_values($texts));
+    }
+
     public function dimensions(): int
     {
         return self::DIMENSIONS;

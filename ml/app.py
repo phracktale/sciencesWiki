@@ -34,12 +34,34 @@ class EmbedRequest(BaseModel):
     text: str
 
 
+class EmbedBatchRequest(BaseModel):
+    texts: list[str]
+
+
 @app.post("/embed")
 def embed(request: EmbedRequest) -> dict:
     vector = model.encode(request.text, normalize_embeddings=True)
     return {
         "embedding": vector.tolist(),
         "dimensions": len(vector),
+        "model": MODEL_NAME,
+    }
+
+
+@app.post("/embed-batch")
+def embed_batch(request: EmbedBatchRequest) -> dict:
+    """Encode plusieurs textes en un seul appel (vectorisé) : bien plus rapide
+    que des appels unitaires. Renvoie les vecteurs dans le même ordre."""
+    if not request.texts:
+        return {"embeddings": [], "dimensions": EXPECTED_DIM, "model": MODEL_NAME}
+    vectors = model.encode(
+        request.texts,
+        normalize_embeddings=True,
+        batch_size=int(os.getenv("EMBEDDING_BATCH_SIZE", "32")),
+    )
+    return {
+        "embeddings": [v.tolist() for v in vectors],
+        "dimensions": len(vectors[0]),
         "model": MODEL_NAME,
     }
 

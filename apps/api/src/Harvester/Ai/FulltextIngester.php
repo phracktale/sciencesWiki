@@ -64,13 +64,20 @@ final class FulltextIngester
             }
 
             $chunks = $this->chunk($text);
+            if ([] === $chunks) {
+                return 0;
+            }
+            // Embeddings des fragments PAR LOT (un seul appel au service ml/).
+            $vectors = $this->embedder->embedBatch($chunks);
             $ord = 0;
-            foreach ($chunks as $chunk) {
-                $vec = (string) new Vector($this->embedder->embed($chunk));
+            foreach ($chunks as $i => $chunk) {
+                if (!isset($vectors[$i])) {
+                    continue;
+                }
                 $this->conn->executeStatement(
                     'INSERT INTO publication_chunk (publication_id, ord, content, embedding)
                      VALUES (:p, :o, :c, CAST(:v AS vector))',
-                    ['p' => $id, 'o' => $ord++, 'c' => $chunk, 'v' => $vec],
+                    ['p' => $id, 'o' => $ord++, 'c' => $chunk, 'v' => (string) new Vector($vectors[$i])],
                 );
             }
 
