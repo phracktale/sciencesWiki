@@ -10,7 +10,33 @@
     <style>
         :root { --accent:#1a5; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937; }
         * { box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, sans-serif; max-width: 900px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
+        body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
+        /* Accueil : 2 colonnes (principal + barre latérale). */
+        .home-grid { display:grid; grid-template-columns: 1.7fr 1fr; gap:1.6rem; align-items:start; }
+        @media (max-width:880px) { .home-grid { grid-template-columns:1fr; } }
+        .side-block { border:1px solid var(--line); border-radius:14px; padding:1rem 1.1rem; margin-bottom:1.2rem; }
+        .side-block h2 { margin:.1rem 0 .7rem; font-size:1.1rem; }
+        /* Lanceurs de domaines colorés. */
+        .domains { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.8rem; }
+        .domain-card { position:relative; overflow:hidden; display:block; border-radius:14px; padding:1.1rem; min-height:120px;
+            color:#fff; text-decoration:none; box-shadow:0 1px 3px rgba(0,0,0,.12); transition:transform .18s ease, box-shadow .18s ease; }
+        .domain-card::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,.30); transition:background .18s ease; z-index:0; }
+        .domain-card:hover { transform:scale(1.03); box-shadow:0 6px 18px rgba(0,0,0,.2); }
+        .domain-card:hover::after { background:rgba(0,0,0,.40); }
+        .domain-card > * { position:relative; z-index:1; }
+        .domain-card .d-label { font-weight:800; font-size:1.05rem; text-shadow:0 1px 3px rgba(0,0,0,.4); }
+        .domain-card .d-sub { font-size:.82rem; opacity:.95; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+        /* Onglets « Nous rejoindre ». */
+        .join-tabs { display:flex; gap:.2rem; border-bottom:2px solid var(--line); margin-bottom:.8rem; flex-wrap:wrap; }
+        .join-tabs button { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px; padding:.45rem .7rem; font:inherit; font-weight:600; color:#6b7280; cursor:pointer; }
+        .join-tabs button[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent); }
+        .join-pane[hidden] { display:none; }
+        .join-pane label { display:block; font-size:.82rem; font-weight:600; margin:.4rem 0 .15rem; }
+        .join-pane input[type=text], .join-pane input[type=email], .join-pane textarea, .join-pane select { width:100%; padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
+        .join-pane button[type=submit] { margin-top:.7rem; background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1rem; font:inherit; font-weight:600; cursor:pointer; }
+        .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+        .stat-grid .s { border:1px solid var(--line); border-radius:10px; padding:.6rem .7rem; }
+        .stat-grid .s strong { font-size:1.3rem; display:block; }
         header { display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:.8rem; margin-bottom:1.2rem; }
         header .brand { color: var(--accent); text-decoration: none; font-weight: 800; font-size:1.2rem; }
         header nav { margin-left:auto; display:flex; gap:1rem; font-size:.9rem; }

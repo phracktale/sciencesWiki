@@ -26,6 +26,9 @@ final class StatsController
         $total = (int) $conn->executeQuery('SELECT count(*) FROM publication')->fetchOne();
         $placed = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM placement_suggestion')->fetchOne();
         $answers = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status IN ('valide','non_relu')")->fetchOne();
+        $validated = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'valide'")->fetchOne();
+        $questions = (int) $conn->executeQuery('SELECT count(*) FROM question')->fetchOne();
+        $fulltext = (int) ($conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne() ?: 0);
         $lastUpdate = $conn->executeQuery('SELECT max(updated_at) FROM publication')->fetchOne();
 
         $recent = $conn->executeQuery(
@@ -36,6 +39,9 @@ final class StatsController
             'publications' => $total,
             'placedPublications' => $placed,
             'publishedAnswers' => $answers,
+            'validatedAnswers' => $validated,
+            'questions' => $questions,
+            'fulltextPdfs' => $fulltext,
             'lastUpdate' => \is_string($lastUpdate) ? $lastUpdate : null,
             'recent' => array_map(static fn (array $r): array => [
                 'title' => $r['title'],

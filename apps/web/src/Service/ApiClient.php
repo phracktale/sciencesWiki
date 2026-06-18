@@ -71,6 +71,18 @@ final class ApiClient
      *
      * @return list<array<string,mixed>>
      */
+    /** @return array{items: list<array<string,mixed>>, page:int, hasMore:bool} */
+    public function latestQuestionsPage(int $perPage, int $page): array
+    {
+        try {
+            $data = $this->get('/api/questions/latest', ['limit' => $perPage, 'page' => $page]);
+
+            return ['items' => $data['items'] ?? [], 'page' => $data['page'] ?? $page, 'hasMore' => (bool) ($data['hasMore'] ?? false)];
+        } catch (\Throwable) {
+            return ['items' => [], 'page' => $page, 'hasMore' => false];
+        }
+    }
+
     public function latestQuestions(int $limit = 10): array
     {
         try {

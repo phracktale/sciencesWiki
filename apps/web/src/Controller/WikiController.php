@@ -24,8 +24,17 @@ final class WikiController extends AbstractController
     {
         return $this->render('wiki/home.html.twig', [
             'domains' => $this->api->domains(),
-            'latest' => $this->api->latestQuestions(10),
+            'latestFrame' => $this->api->latestQuestionsPage(5, 1),
             'stats' => $this->api->stats(),
+        ]);
+    }
+
+    /** Fragment Turbo : page de 5 dernières Q/R (pagination dans le cadre). */
+    #[Route('/_frame/latest-questions/{page}', name: 'latest_frame', requirements: ['page' => '\d+'], methods: ['GET'])]
+    public function latestFrame(int $page): Response
+    {
+        return $this->render('wiki/_latest_frame.html.twig', [
+            'latest' => $this->api->latestQuestionsPage(5, max(1, $page)),
         ]);
     }
 

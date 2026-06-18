@@ -49,13 +49,14 @@ class AnswerRepository extends ServiceEntityRepository
      *
      * @return list<Answer>
      */
-    public function findLatestPublic(int $limit = 10): array
+    public function findLatestPublic(int $limit = 10, int $offset = 0): array
     {
         /** @var list<Answer> $r */
         $r = $this->createQueryBuilder('a')
             ->andWhere('a.validationStatus IN (:pub)')
             ->setParameter('pub', self::PUBLIC_STATUSES)
             ->orderBy('a.createdAt', 'DESC')
+            ->setFirstResult(max(0, $offset))
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
