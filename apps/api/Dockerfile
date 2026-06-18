@@ -12,6 +12,7 @@ WORKDIR /app
 #  - opcache, apcu : performance prod
 RUN apt-get update && apt-get install -y --no-install-recommends \
         acl file gettext git \
+        poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \

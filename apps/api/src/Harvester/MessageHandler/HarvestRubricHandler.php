@@ -28,6 +28,9 @@ final class HarvestRubricHandler
 {
     private const MAX_PER_RUN = 500;
 
+    /** Articles OA dont on tente le texte intégral par exécution (borne la charge). */
+    private const MAX_FULLTEXT_PER_RUN = 20;
+
     /** Niveau du nœud → segment de filtre OpenAlex « primary_topic.X.id ». */
     private const FILTER_KEY = [0 => 'domain', 1 => 'field', 2 => 'subfield'];
 
@@ -37,6 +40,7 @@ final class HarvestRubricHandler
         private readonly HarvestRunner $runner,
         private readonly PublicationRepository $publications,
         private readonly PublicationEmbedder $embedder,
+        private readonly \App\Harvester\Ai\FulltextIngester $fulltext,
         private readonly PlacementSuggester $suggester,
         private readonly IngestionJobRepository $jobs,
         private readonly \App\Harvester\Connector\OpenAlex\OpenAlexConnector $openalex,
@@ -106,6 +110,14 @@ final class HarvestRubricHandler
         }
         $this->em->flush();
 
+        // Texte intégral des publications en accès libre : téléchargement du PDF
+        // sur le site de l'éditeur/dépôt, extraction et vectorisation par fragments
+        // (borné par exécution pour ne pas surcharger l'inférence d'embeddings).
+        $fulltextChunks = 0;
+        foreach ($this->publications->findNeedingFulltext(self::MAX_FULLTEXT_PER_RUN) as $publication) {
+            $fulltextChunks += $this->fulltext->ingest($publication);
+        }
+
         $node->markHarvested();
         $this->em->flush();
 
@@ -115,13 +127,14 @@ final class HarvestRubricHandler
             'harvest',
             'harvest_run',
             'worker',
-            \sprintf('Moisson « %s » : %d nouveaux / %d traités (%s), %d s.', $node->getLabel(), $job->getCreated(), $job->getProcessed(), $job->getStatus()->value, (int) $duration),
+            \sprintf('Moisson « %s » : %d nouveaux / %d traités (%s), %d fragments texte intégral, %d s.', $node->getLabel(), $job->getCreated(), $job->getProcessed(), $job->getStatus()->value, $fulltextChunks, (int) $duration),
             [
                 'rubric' => $node->getSlug(),
                 'created' => $job->getCreated(),
                 'processed' => $job->getProcessed(),
                 'errors' => $job->getErrors(),
                 'status' => $job->getStatus()->value,
+                'fulltextChunks' => $fulltextChunks,
                 'durationSeconds' => (int) $duration,
             ],
         );

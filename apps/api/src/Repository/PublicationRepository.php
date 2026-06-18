@@ -59,6 +59,34 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Publications en accès libre (oaUrl) dont le texte intégral n'a pas encore
+     * été récupéré/vectorisé.
+     *
+     * @return list<Publication>
+     */
+    public function findNeedingFulltext(int $limit): array
+    {
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                "SELECT id FROM publication
+                 WHERE oa_url IS NOT NULL AND oa_url <> '' AND fulltext_fetched_at IS NULL
+                 ORDER BY id DESC LIMIT %d",
+                max(1, $limit),
+            ),
+        )->fetchFirstColumn();
+
+        $out = [];
+        foreach ($ids as $id) {
+            $pub = $this->find((int) $id);
+            if (null !== $pub) {
+                $out[] = $pub;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Publications avec embedding mais pas encore placées dans l'arbre.
      *
      * @return list<Publication>
@@ -88,11 +116,20 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         $literal = (string) new Vector($embedding);
         $k = max(1, $k);
 
+        // Recherche kNN combinée : embedding du résumé (publication) ET fragments
+        // de texte intégral (publication_chunk). On retient la meilleure distance
+        // par publication, afin qu'un article dont le corps répond précisément
+        // ressorte même si son résumé est moins proche. L'unité reste la publication.
         $rows = $this->getEntityManager()->getConnection()->executeQuery(
             \sprintf(
-                'SELECT id, embedding <=> CAST(:vec AS vector) AS distance
-                 FROM publication
-                 WHERE embedding IS NOT NULL
+                'SELECT id, MIN(distance) AS distance FROM (
+                    SELECT id, embedding <=> CAST(:vec AS vector) AS distance
+                    FROM publication WHERE embedding IS NOT NULL
+                    UNION ALL
+                    SELECT publication_id AS id, embedding <=> CAST(:vec AS vector) AS distance
+                    FROM publication_chunk WHERE embedding IS NOT NULL
+                 ) AS combined
+                 GROUP BY id
                  ORDER BY distance ASC
                  LIMIT %d',
                 $k,
