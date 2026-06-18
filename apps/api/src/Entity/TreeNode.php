@@ -159,7 +159,7 @@ class TreeNode
         $node = $this;
         $guard = 0;
         while (null !== $node && $guard++ < 12) {
-            array_unshift($chain, ['slug' => $node->getSlug(), 'label' => $node->getLabel()]);
+            array_unshift($chain, ['id' => $node->getId(), 'slug' => $node->getSlug(), 'label' => $node->getLabel()]);
             $node = $node->principalParent();
         }
 

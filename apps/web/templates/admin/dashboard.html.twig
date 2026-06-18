@@ -44,13 +44,24 @@
         {% if hist|length > 0 %}
             <h3>Progression du corpus</h3>
             {% set maxPub = max(hist|map(h => h.publications)) ?: 1 %}
-            <div style="display:flex; align-items:flex-end; gap:4px; height:110px; border-bottom:1px solid var(--line); padding:.3rem 0">
-                {% for h in hist %}
-                    <div title="{{ h.day }} : {{ h.publications }} publications, {{ h.answers }} réponses"
-                         style="flex:1; min-width:6px; background:var(--accent); border-radius:3px 3px 0 0; height:{{ (h.publications / maxPub * 100)|round }}%"></div>
-                {% endfor %}
+            {% set chartH = 160 %}
+            {# Échelle : 4 graduations de l'axe Y. #}
+            <div style="display:flex; gap:.5rem; align-items:stretch">
+                <div style="display:flex; flex-direction:column; justify-content:space-between; height:{{ chartH }}px; font-size:.7rem; color:#9ca3af; text-align:right; min-width:42px">
+                    {% for i in 4..0 %}<span>{{ (maxPub * i / 4)|round|number_format(0,',',' ') }}</span>{% endfor %}
+                </div>
+                {# Zone traçante : grille + barres finies (32px) ferrées à droite. #}
+                <div style="position:relative; flex:1; height:{{ chartH }}px; border-left:1px solid var(--line); border-bottom:1px solid var(--line); overflow-x:auto">
+                    {% for i in 1..4 %}<div style="position:absolute; left:0; right:0; bottom:{{ (chartH * i / 4)|round }}px; border-top:1px dashed #eef2f7"></div>{% endfor %}
+                    <div style="position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:flex-end; gap:6px; padding:0 6px">
+                        {% for h in hist %}
+                            <div title="{{ h.day }} : {{ h.publications|number_format(0,',',' ') }} publications, {{ h.answers }} réponses"
+                                 style="width:32px; flex:0 0 32px; background:linear-gradient(180deg,var(--accent),#0b7a45); border-radius:4px 4px 0 0; height:{{ (h.publications / maxPub * 100)|round }}%; min-height:2px"></div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
-            <p class="muted" style="font-size:.8rem">{{ hist|first.day }} → {{ hist|last.day }} ({{ hist|length }} jour(s)). Snapshot enregistré à chaque visite.</p>
+            <p class="muted" style="font-size:.8rem; margin-top:.3rem">{{ hist|first.day }} → {{ hist|last.day }} ({{ hist|length }} jour(s)) · publications cumulées. Snapshot à chaque visite.</p>
         {% endif %}
     </section>
 
