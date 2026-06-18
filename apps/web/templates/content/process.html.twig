@@ -1,0 +1,116 @@
+{% extends 'base.html.twig' %}
+{% block title %}Process de publication — SciencesWiki{% endblock %}
+{% block description %}Comment SciencesWiki produit une réponse vulgarisée et sourcée : de la moisson des publications scientifiques à la validation par le comité, étape par étape.{% endblock %}
+
+{% block body %}
+    <p class="crumbs"><a href="{{ path('home') }}">Accueil</a> › Process de publication</p>
+    <h1>Process de publication</h1>
+    <p class="muted">De la collecte des publications scientifiques jusqu'à la réponse vulgarisée et relue : voici, étape par étape, comment SciencesWiki fabrique un contenu fiable, libre et sourcé.</p>
+
+    <h2>Vue d'ensemble</h2>
+    <div style="overflow-x:auto; margin:1rem 0">
+    <svg viewBox="0 0 760 560" width="100%" style="max-width:760px; font-family:system-ui,sans-serif" role="img" aria-label="Diagramme du process de publication">
+        <defs>
+            <marker id="arw" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#64748b"/></marker>
+            <style>
+                .b{rx:10;stroke-width:1.5}
+                .t{font-size:13px;fill:#0f172a}
+                .s{font-size:11px;fill:#475569}
+                .ph{font-size:11px;font-weight:700;letter-spacing:.04em}
+                .ln{stroke:#64748b;stroke-width:1.5;marker-end:url(#arw)}
+            </style>
+        </defs>
+
+        <text x="12" y="20" class="ph" fill="#1a5">① COLLECTE</text>
+        <rect x="12" y="28" width="220" height="54" class="b" fill="#ecfdf5" stroke="#1a5"/>
+        <text x="24" y="50" class="t">Moisson OpenAlex (par rubrique)</text>
+        <text x="24" y="68" class="s">concept primaire → publications</text>
+
+        <rect x="12" y="98" width="220" height="54" class="b" fill="#ecfdf5" stroke="#1a5"/>
+        <text x="24" y="120" class="t">Import + dédoublonnage (DOI)</text>
+        <text x="24" y="138" class="s">une publication = une entrée unique</text>
+
+        <rect x="12" y="168" width="220" height="66" class="b" fill="#ecfdf5" stroke="#1a5"/>
+        <text x="24" y="190" class="t">Accès ouvert ?</text>
+        <text x="24" y="208" class="s">libre → PDF + texte intégral</text>
+        <text x="24" y="224" class="s">payant → résumé seul (+ invitation auteurs)</text>
+
+        <line x1="122" y1="82" x2="122" y2="98" class="ln"/>
+        <line x1="122" y1="152" x2="122" y2="168" class="ln"/>
+
+        <text x="270" y="20" class="ph" fill="#2563eb">② INDEXATION</text>
+        <rect x="270" y="28" width="220" height="54" class="b" fill="#eff6ff" stroke="#2563eb"/>
+        <text x="282" y="50" class="t">Vectorisation (embeddings)</text>
+        <text x="282" y="68" class="s">résumé + fragments du texte intégral</text>
+
+        <rect x="270" y="98" width="220" height="54" class="b" fill="#eff6ff" stroke="#2563eb"/>
+        <text x="282" y="120" class="t">Placement dans l'arbre</text>
+        <text x="282" y="138" class="s">rattachement automatique aux rubriques</text>
+
+        <line x1="232" y1="55" x2="270" y2="55" class="ln"/>
+        <line x1="380" y1="82" x2="380" y2="98" class="ln"/>
+
+        <text x="528" y="20" class="ph" fill="#b45309">③ QUESTION → RÉPONSE</text>
+        <rect x="528" y="28" width="220" height="54" class="b" fill="#fffbeb" stroke="#b45309"/>
+        <text x="540" y="50" class="t">Question posée</text>
+        <text x="540" y="68" class="s">par un visiteur OU proposée par l'IA</text>
+
+        <rect x="528" y="98" width="220" height="66" class="b" fill="#fffbeb" stroke="#b45309"/>
+        <text x="540" y="120" class="t">Recherche RAG (kNN)</text>
+        <text x="540" y="138" class="s">résumé + texte intégral</text>
+        <text x="540" y="154" class="s">garde-fou : pas de source → pas de réponse</text>
+
+        <rect x="528" y="180" width="220" height="54" class="b" fill="#fffbeb" stroke="#b45309"/>
+        <text x="540" y="202" class="t">Rédaction par l'IA (gemma4)</text>
+        <text x="540" y="220" class="s">vulgarisation + académique, sources citées</text>
+
+        <line x1="490" y1="125" x2="528" y2="120" class="ln"/>
+        <line x1="638" y1="82" x2="638" y2="98" class="ln"/>
+        <line x1="638" y1="164" x2="638" y2="180" class="ln"/>
+
+        <text x="270" y="300" class="ph" fill="#7c3aed">④ PUBLICATION &amp; CONTRÔLE</text>
+        <rect x="270" y="308" width="220" height="54" class="b" fill="#f5f3ff" stroke="#7c3aed"/>
+        <text x="282" y="330" class="t">Publication « non relu »</text>
+        <text x="282" y="348" class="s">streaming, cartouche IA + précaution</text>
+
+        <rect x="270" y="378" width="220" height="54" class="b" fill="#f5f3ff" stroke="#7c3aed"/>
+        <text x="282" y="400" class="t">Relecture du comité</text>
+        <text x="282" y="418" class="s">validation / correction par des humains</text>
+
+        <rect x="270" y="448" width="220" height="66" class="b" fill="#f5f3ff" stroke="#7c3aed"/>
+        <text x="282" y="470" class="t">Veille des sources</text>
+        <text x="282" y="488" class="s">rétractations / mises en garde (EoC)</text>
+        <text x="282" y="504" class="s">→ réévaluation de la réponse</text>
+
+        <line x1="638" y1="234" x2="638" y2="335" class="ln"/>
+        <line x1="528" y1="335" x2="490" y2="335" class="ln"/>
+        <line x1="380" y1="362" x2="380" y2="378" class="ln"/>
+        <line x1="380" y1="432" x2="380" y2="448" class="ln"/>
+    </svg>
+    </div>
+
+    <h2>Étape par étape</h2>
+    <ol style="line-height:1.7">
+        <li><strong>Moisson des publications.</strong> Pour chaque rubrique (un concept de la taxonomie <a href="https://openalex.org" target="_blank" rel="noopener">OpenAlex</a>), nous collectons les publications scientifiques correspondantes. La collecte est incrémentale (reprise du curseur) et respecte les limites de l'API (polite pool, sans clé).</li>
+        <li><strong>Import et dédoublonnage.</strong> Chaque publication est normalisée et dédupliquée par DOI : jamais de doublon, même si elle est moissonnée plusieurs fois.</li>
+        <li><strong>Accès ouvert.</strong> Nous vérifions si une version en accès libre et légal existe (OpenAlex / Unpaywall / dépôts d'auteurs). <em>Si oui</em>, nous téléchargeons le PDF chez l'éditeur ou le dépôt, en extrayons le texte et le découpons en fragments. <em>Si non</em>, seul le résumé est indexé — et nous proposons d'<strong>inviter poliment les auteurs</strong> à partager une version ouverte.</li>
+        <li><strong>Vectorisation.</strong> Le résumé et, le cas échéant, les fragments du texte intégral sont transformés en vecteurs (embeddings) par un modèle auto-hébergé. C'est ce qui permet la recherche par sens, et non par simples mots-clés.</li>
+        <li><strong>Classement.</strong> Chaque publication est rattachée automatiquement à la ou aux rubriques les plus proches de l'arbre des savoirs.</li>
+        <li><strong>Question.</strong> N'importe qui peut poser une question sous une rubrique. L'IA peut aussi proposer elle-même une question pertinente.</li>
+        <li><strong>Recherche des sources (RAG).</strong> On recherche les passages les plus pertinents (résumés <em>et</em> texte intégral). <strong>Garde-fou :</strong> sans source pertinente, aucune réponse n'est publiée — pas de réponse « hors-sol ».</li>
+        <li><strong>Rédaction.</strong> Le modèle d'IA open source (gemma4, auto-hébergé) rédige une réponse en deux niveaux — vulgarisation (niveau collège) et académique — en <strong>citant ses sources</strong>, affichée en direct (machine à écrire).</li>
+        <li><strong>Publication.</strong> La réponse paraît avec la mention « non relu » et un cartouche rappelant qu'elle est générée par IA et peut comporter des imprécisions.</li>
+        <li><strong>Relecture humaine.</strong> Le comité scientifique relit, valide ou corrige. <em>(À venir : sollicitation des auteurs des publications citées pour valider/préciser la réponse, avec leur badge d'auteur.)</em></li>
+        <li><strong>Veille des sources.</strong> <em>(À venir)</em> Une vérification régulière repère les études <strong>rétractées</strong> ou faisant l'objet d'une <strong>mise en garde (Expression of Concern)</strong> : elles sont signalées par un badge, exclues des futures réponses, et les réponses concernées sont réévaluées.</li>
+    </ol>
+
+    <h2>Nos garde-fous</h2>
+    <ul style="line-height:1.7">
+        <li><strong>Pas de source, pas de réponse.</strong> Une question sans publication pertinente n'est jamais « inventée ».</li>
+        <li><strong>Sources toujours citées</strong> et liées (DOI, accès libre quand il existe).</li>
+        <li><strong>Accès ouvert et légal uniquement</strong> — jamais de copie illicite.</li>
+        <li><strong>Transparence</strong> : la réponse indique clairement qu'elle est générée par IA tant qu'un humain ne l'a pas relue.</li>
+    </ul>
+
+    <p style="margin-top:1.5rem"><a href="{{ path('project') }}">← En savoir plus sur le projet</a></p>
+{% endblock %}

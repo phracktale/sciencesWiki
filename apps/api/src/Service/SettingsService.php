@@ -35,7 +35,7 @@ final class SettingsService
         - Cite tes sources par leur NUMÉRO entre crochets dans le texte, ex.
           [1] ou [2][3]. Le numéro est celui de la SOURCE fournie.
         - La VULGARISATION doit être compréhensible par un ÉLÈVE DE COLLÈGE
-          (13-15 ans) : phrases courtes, vocabulaire simple, analogies concrètes,
+          (12-15 ans) : phrases courtes, vocabulaire simple, analogies concrètes,
           tout terme technique expliqué avec des mots simples.
         - La section ACADEMIQUE peut être plus précise/technique : faits établis,
           chacun suivi de sa ou ses citations [n]. Reste neutre et rigoureux.
@@ -46,7 +46,7 @@ final class SettingsService
         ## VULGARISATION
         <l'explication accessible niveau collège>
         ## ACADEMIQUE
-        <les faits établis sourcés ; laisse vide si aucune source pertinente>
+        <les faits établis sourcés avec des notes de bas de page qui renvoient aux sources et à la page ou trouver l'info ; laisse vide si aucune source pertinente>
         TXT;
 
     private const DEFAULTS = [

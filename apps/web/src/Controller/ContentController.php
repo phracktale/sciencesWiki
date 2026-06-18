@@ -19,4 +19,10 @@ final class ContentController extends AbstractController
     {
         return $this->render('content/project.html.twig');
     }
+
+    #[Route('/process-de-publication', name: 'process', methods: ['GET'])]
+    public function process(): Response
+    {
+        return $this->render('content/process.html.twig');
+    }
 }
