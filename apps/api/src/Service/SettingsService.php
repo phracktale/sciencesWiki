@@ -131,13 +131,15 @@ final class SettingsService
             self::RAG_MAX_TOKENS => (string) $this->maxTokens(),
             self::RAG_NEIGHBORS => (string) $this->neighbors(),
             self::RAG_MODEL => (string) ($this->model() ?? ''),
+            self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
+            self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
         ];
     }
 
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

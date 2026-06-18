@@ -94,8 +94,11 @@
                     <li>OS : <strong>{{ sys.os ?? '—' }}</strong></li>
                     <li>PHP : <strong>{{ sys.php ?? '—' }}</strong></li>
                     <li>Serveur web : <strong>{{ sys.webServer ?? '—' }}</strong></li>
-                    <li>Disque (conteneur) : <strong>{{ ((sys.diskUsedBytes ?? 0)/1073741824)|round(1) }} Go</strong> utilisés / {{ ((sys.diskTotalBytes ?? 0)/1073741824)|round(1) }} Go</li>
+                    <li>Disque hôte Thor (partagé par tous les services) : <strong>{{ ((sys.diskUsedBytes ?? 0)/1073741824)|round(1) }} Go</strong> utilisés / {{ ((sys.diskTotalBytes ?? 0)/1073741824)|round(1) }} Go</li>
+                    <li>Données SciencesWiki (base PostgreSQL : articles + embeddings) :
+                        <strong>{% if (db.sizeBytes ?? 0) > 1073741824 %}{{ ((db.sizeBytes)/1073741824)|round(2) }} Go{% else %}{{ ((db.sizeBytes ?? 0)/1048576)|round(1) }} Mo{% endif %}</strong></li>
                 </ul>
+                <p class="muted" style="font-size:.8rem">Le disque hôte regroupe tous les conteneurs de Thor. SciencesWiki proprement dit ≈ la taille de sa base ci-dessus (+ ~quelques centaines de Mo d'images conteneurs).</p>
             </div>
             <div>
                 <h2 style="margin-top:0">Base de données</h2>

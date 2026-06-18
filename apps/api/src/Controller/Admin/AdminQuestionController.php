@@ -50,4 +50,23 @@ final class AdminQuestionController
 
         return new JsonResponse(['id' => $id, 'node' => ['slug' => $node->getSlug(), 'label' => $node->getLabel()]]);
     }
+
+    #[Route('/api/admin/questions/{id}', name: 'admin_question_delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]
+    public function delete(int $id): JsonResponse
+    {
+        $question = $this->questions->find($id);
+        if (null === $question) {
+            return new JsonResponse(['error' => 'Question introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        // Suppression des réponses (cascade : révisions via orphanRemoval, notes de
+        // bas de page en CASCADE base), puis de la question elle-même.
+        foreach ($this->answers->findBy(['question' => $question]) as $answer) {
+            $this->em->remove($answer);
+        }
+        $this->em->remove($question);
+        $this->em->flush();
+
+        return new JsonResponse(['id' => $id, 'message' => 'Question et réponses supprimées.']);
+    }
 }

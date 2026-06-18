@@ -88,13 +88,18 @@ final class AdminController extends AbstractController
                 'rag.max_tokens' => (string) $request->request->get('max_tokens'),
                 'rag.neighbors' => (string) $request->request->get('neighbors'),
                 'rag.model' => (string) $request->request->get('model'),
+                'openalex.per_minute' => (string) $request->request->get('openalex_per_minute'),
+                'openalex.per_day' => (string) $request->request->get('openalex_per_day'),
             ]);
             $this->addFlash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Paramètres IA enregistrés.' : 'Échec de l\'enregistrement.');
 
             return $this->redirectToRoute('admin_settings');
         }
 
-        return $this->render('admin/settings.html.twig', ['settings' => $this->admin->getSettings()]);
+        return $this->render('admin/settings.html.twig', [
+            'settings' => $this->admin->getSettings(),
+            'models' => $this->admin->models(),
+        ]);
     }
 
     #[Route('/admin/articles', name: 'admin_articles', methods: ['GET'])]
@@ -251,6 +256,7 @@ final class AdminController extends AbstractController
                 (int) $request->request->get('questionId'),
                 trim((string) $request->request->get('targetSlug')),
             ),
+            'delete-question' => $this->admin->deleteQuestion((int) $request->request->get('questionId')),
             'graft' => $this->admin->graftChildren((int) $request->request->get('id')),
             'harvest' => $this->admin->harvestNode((int) $request->request->get('id')),
             default => ['ok' => false, 'status' => 400, 'data' => ['error' => 'Action inconnue.']],

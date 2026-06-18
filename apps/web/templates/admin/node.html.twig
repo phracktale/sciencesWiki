@@ -118,15 +118,24 @@
             {% for a in answers %}
                 <li>
                     <strong>{{ a.title }}</strong>
-                    <form method="post" action="{{ path('admin_action') }}" style="margin-top:.4rem; display:flex; gap:.4rem; align-items:center; flex-wrap:wrap">
-                        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-                        <input type="hidden" name="action" value="move-question">
-                        <input type="hidden" name="questionId" value="{{ a.questionId }}">
-                        <input type="hidden" name="back" value="{{ node.slug }}">
-                        <input type="text" name="targetSlug" placeholder="slug rubrique cible" required
-                               style="padding:.3rem .5rem; border:1px solid #d1d5db; border-radius:6px">
-                        <button type="submit" style="padding:.3rem .7rem">Déplacer</button>
-                    </form>
+                    <div style="margin-top:.4rem; display:flex; gap:.4rem; align-items:center; flex-wrap:wrap">
+                        <form method="post" action="{{ path('admin_action') }}" style="display:flex; gap:.4rem; align-items:center">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="action" value="move-question">
+                            <input type="hidden" name="questionId" value="{{ a.questionId }}">
+                            <input type="hidden" name="back" value="{{ node.slug }}">
+                            <input type="text" name="targetSlug" placeholder="slug rubrique cible" required
+                                   style="padding:.3rem .5rem; border:1px solid #d1d5db; border-radius:6px">
+                            <button type="submit" style="padding:.3rem .7rem">Déplacer</button>
+                        </form>
+                        <form method="post" action="{{ path('admin_action') }}" onsubmit="return confirm('Supprimer définitivement cette question et ses réponses ?')" style="display:inline">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="action" value="delete-question">
+                            <input type="hidden" name="questionId" value="{{ a.questionId }}">
+                            <input type="hidden" name="back" value="{{ node.slug }}">
+                            <button type="submit" style="padding:.3rem .7rem; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:6px">🗑 Supprimer</button>
+                        </form>
+                    </div>
                 </li>
             {% endfor %}
         </ul>

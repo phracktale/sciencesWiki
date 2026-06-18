@@ -25,12 +25,35 @@
                 <input type="text" name="neighbors" value="{{ settings['rag.neighbors'] }}">
             </div>
             <div>
-                <label>Modèle (vide = défaut serveur)</label>
-                <input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">
+                <label>Modèle {% if models.error %}<span class="muted">(serveur injoignable)</span>{% endif %}</label>
+                {% if models.models is not empty %}
+                    {% set current = settings['rag.model'] %}
+                    <select name="model">
+                        <option value="">Défaut serveur{% if models.default %} ({{ models.default }}){% endif %}</option>
+                        {% for m in models.models %}
+                            <option value="{{ m }}" {{ current == m ? 'selected' : '' }}>{{ m }}</option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">
+                {% endif %}
             </div>
         </div>
 
-        <button type="submit">Enregistrer les paramètres</button>
+        <h2 style="margin-top:1.4rem">Cadence d'interrogation OpenAlex</h2>
+        <p class="muted" style="font-size:.85rem">Garde-fou interne pour rester sous les limites d'OpenAlex (polite pool : ~10 req/s, ~10000 req/jour sans clé). La vraie limite restante du jour est visible dans le <a href="{{ path('admin_harvest') }}">suivi de la moisson</a>.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem">
+            <div>
+                <label>Requêtes par minute (max)</label>
+                <input type="text" name="openalex_per_minute" value="{{ settings['openalex.per_minute'] }}" placeholder="540">
+            </div>
+            <div>
+                <label>Requêtes par jour (plafond)</label>
+                <input type="text" name="openalex_per_day" value="{{ settings['openalex.per_day'] }}" placeholder="100000">
+            </div>
+        </div>
+
+        <button type="submit" style="margin-top:1rem">Enregistrer les paramètres</button>
     </form>
-    <p class="muted" style="font-size:.85rem">Ces réglages s'appliquent immédiatement à la rédaction des réponses (sans redéploiement).</p>
+    <p class="muted" style="font-size:.85rem">Ces réglages s'appliquent immédiatement (sans redéploiement).</p>
 {% endblock %}

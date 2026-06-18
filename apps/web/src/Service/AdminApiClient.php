@@ -80,6 +80,12 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/questions/'.$id.'/move', ['nodeId' => $nodeId]);
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function deleteQuestion(int $id): array
+    {
+        return $this->send('DELETE', '/api/admin/questions/'.$id, null);
+    }
+
     /** @return array<string,mixed> réglages courants */
     public function getSettings(): array
     {
@@ -100,6 +106,14 @@ final class AdminApiClient
         $res = $this->send('GET', '/api/admin/dashboard', null);
 
         return $res['ok'] ? $res['data'] : [];
+    }
+
+    /** @return array<string,mixed> modèles disponibles sur le serveur d'inférence */
+    public function models(): array
+    {
+        $res = $this->send('GET', '/api/admin/models', null);
+
+        return $res['ok'] ? $res['data'] : ['models' => [], 'default' => '', 'error' => 'Indisponible.'];
     }
 
     /** @return array<string,mixed> liste paginée d'articles */
