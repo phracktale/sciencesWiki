@@ -132,6 +132,14 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : null;
     }
 
+    /** @return array<string,mixed> liste paginée d'auteurs */
+    public function authorsList(string $q, int $page): array
+    {
+        $res = $this->send('GET', '/api/admin/authors?'.http_build_query(['q' => $q, 'page' => $page]), null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0, 'query' => $q];
+    }
+
     /** @return array<string,mixed> liste paginée d'articles */
     public function articles(string $q, int $page): array
     {

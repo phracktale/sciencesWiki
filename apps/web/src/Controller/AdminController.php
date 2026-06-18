@@ -122,6 +122,21 @@ final class AdminController extends AbstractController
         ]);
     }
 
+    #[Route('/admin/authors', name: 'admin_authors', methods: ['GET'])]
+    public function authors(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/authors.html.twig', [
+            'data' => $this->admin->authorsList(
+                trim((string) $request->query->get('q', '')),
+                max(1, (int) $request->query->get('page', '1')),
+            ),
+        ]);
+    }
+
     #[Route('/admin/articles/{id}', name: 'admin_article', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function article(int $id): Response
     {
