@@ -404,6 +404,49 @@ final class AdminController extends AbstractController
         ]);
     }
 
+    /** Upload d'une image de couverture pour une rubrique (stockée + servie par le web). */
+    #[Route('/admin/r/{slug}/cover', name: 'admin_node_cover', methods: ['POST'])]
+    public function uploadCover(string $slug, Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_node', ['slug' => $slug]);
+        }
+        $node = $this->api->node($slug);
+        $file = $request->files->get('cover');
+        if (null === $node || !isset($node['id']) || null === $file) {
+            $this->addFlash('error', 'Rubrique ou fichier manquant.');
+
+            return $this->redirectToRoute('admin_node', ['slug' => $slug]);
+        }
+
+        $ext = strtolower($file->guessExtension() ?: $file->getClientOriginalExtension());
+        if (!\in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) || $file->getSize() > 5 * 1024 * 1024) {
+            $this->addFlash('error', 'Image invalide (JPG/PNG/WebP, 5 Mo max).');
+
+            return $this->redirectToRoute('admin_node', ['slug' => $slug]);
+        }
+
+        $dir = $this->getParameter('kernel.project_dir').'/public/uploads/domains';
+        $name = $node['id'].'.'.$ext;
+        try {
+            $file->move($dir, $name);
+        } catch (\Throwable $e) {
+            $this->addFlash('error', 'Échec de l\'enregistrement : '.$e->getMessage());
+
+            return $this->redirectToRoute('admin_node', ['slug' => $slug]);
+        }
+        // URL servie par le web, horodatée pour casser le cache navigateur.
+        $this->admin->setNodeImage((int) $node['id'], '/uploads/domains/'.$name.'?v='.time());
+        $this->addFlash('success', 'Image de couverture mise à jour.');
+
+        return $this->redirectToRoute('admin_node', ['slug' => $slug]);
+    }
+
     #[Route('/admin/action', name: 'admin_action', methods: ['POST'])]
     public function action(Request $request): Response
     {

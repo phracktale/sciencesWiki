@@ -63,6 +63,12 @@ final class AdminApiClient
     }
 
     /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function setNodeImage(int $id, ?string $imageUrl): array
+    {
+        return $this->send('PATCH', '/api/admin/nodes/'.$id, ['imageUrl' => $imageUrl]);
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
     public function createNode(string $label, ?int $parentId, ?string $description): array
     {
         return $this->send('POST', '/api/admin/nodes', ['label' => $label, 'parentId' => $parentId, 'description' => $description]);

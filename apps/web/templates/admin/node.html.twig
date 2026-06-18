@@ -27,6 +27,14 @@
         <button type="submit">Enregistrer</button>
     </form>
 
+    <h2>…ou téléverser une image de couverture</h2>
+    <form class="ask" method="post" action="{{ path('admin_node_cover', { slug: node.slug }) }}" enctype="multipart/form-data">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+        <label>Fichier (JPG / PNG / WebP, 5 Mo max)</label>
+        <input type="file" name="cover" accept="image/jpeg,image/png,image/webp" required>
+        <button type="submit">Téléverser</button>
+    </form>
+
     <h2>Déplacer cette rubrique</h2>
     <form class="ask" method="post" action="{{ path('admin_action') }}">
         <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
