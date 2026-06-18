@@ -1,10 +1,10 @@
 {% extends 'base.html.twig' %}
 {% block title %}Admin — {{ node.label }}{% endblock %}
 {% block body %}
+    {% include 'admin/_nav.html.twig' %}
     <p class="crumbs">
-        <a href="{{ path('admin_dashboard') }}">Administration</a> ·
         {% for c in node.breadcrumb ?? [] %}{% if not loop.first %} › {% endif %}{{ c.label }}{% endfor %}
-        · <a href="/{{ node.slug }}" target="_blank">voir public ↗</a> · <a href="{{ path('admin_logout') }}">déconnexion</a>
+        · <a href="/fr/{{ node.slug }}" target="_blank">voir public ↗</a>
     </p>
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}

@@ -1,13 +1,7 @@
 {% extends 'base.html.twig' %}
 {% block title %}Admin — Suivi de la moisson{% endblock %}
 {% block body %}
-    <p class="crumbs"><strong><a href="{{ path('admin_dashboard') }}">Administration</a></strong> ·
-        <a href="{{ path('admin_articles') }}">Articles</a> ·
-        <a href="{{ path('admin_harvest') }}">Moisson</a> ·
-        <a href="{{ path('admin_activity') }}">Journal</a> ·
-        <a href="{{ path('admin_users') }}">Utilisateurs</a> ·
-        <a href="{{ path('admin_settings') }}">Paramètres IA</a> ·
-        <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    {% include 'admin/_nav.html.twig' %}
 
     <h1>Suivi de la moisson <span id="live" class="pill" style="font-size:.7rem; vertical-align:middle">● en direct</span></h1>
     <p class="muted">État de chaque moisson lancée depuis le back-office : en attente, en cours, terminée ou en erreur. Volume, durée et modèle d'embeddings indiqués. Les dépassements des limites OpenAlex sont signalés en rouge.</p>

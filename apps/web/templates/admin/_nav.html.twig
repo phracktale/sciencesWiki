@@ -1,0 +1,18 @@
+{# Menu principal du back-office, identique sur toutes les pages (état actif/hover). #}
+{% set r = app.request.attributes.get('_route') %}
+{% set items = [
+    { label: 'Tableau de bord', route: 'admin_dashboard', match: ['admin_dashboard'] },
+    { label: 'Articles', route: 'admin_articles', match: ['admin_articles', 'admin_article'] },
+    { label: 'Auteurs', route: 'admin_authors', match: ['admin_authors'] },
+    { label: 'Moisson', route: 'admin_harvest', match: ['admin_harvest'] },
+    { label: 'Journal', route: 'admin_activity', match: ['admin_activity'] },
+    { label: 'Utilisateurs', route: 'admin_users', match: ['admin_users'] },
+    { label: 'Paramètres IA', route: 'admin_settings', match: ['admin_settings'] },
+] %}
+<nav class="admin-nav">
+    <span class="admin-nav-brand">⚙️ Administration</span>
+    {% for it in items %}
+        <a href="{{ path(it.route) }}"{{ r in it.match ? ' class="active"' : '' }}>{{ it.label }}</a>
+    {% endfor %}
+    <a href="{{ path('admin_logout') }}" class="admin-nav-logout">déconnexion</a>
+</nav>

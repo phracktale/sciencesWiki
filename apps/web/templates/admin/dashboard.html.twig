@@ -1,13 +1,7 @@
 {% extends 'base.html.twig' %}
 {% block title %}Admin — Tableau de bord{% endblock %}
 {% block body %}
-    <p class="crumbs"><strong>Administration</strong> ·
-        <a href="{{ path('admin_articles') }}">Articles</a> ·
-        <a href="{{ path('admin_harvest') }}">Moisson</a> ·
-        <a href="{{ path('admin_activity') }}">Journal</a> ·
-        <a href="{{ path('admin_users') }}">Utilisateurs</a> ·
-        <a href="{{ path('admin_settings') }}">Paramètres IA</a> ·
-        <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    {% include 'admin/_nav.html.twig' %}
     <h1>Tableau de bord</h1>
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}

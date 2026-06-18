@@ -1,7 +1,7 @@
 {% extends 'base.html.twig' %}
 {% block title %}Admin — Paramètres IA{% endblock %}
 {% block body %}
-    <p class="crumbs"><a href="{{ path('admin_dashboard') }}">Administration</a> · Paramètres IA · <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+    {% include 'admin/_nav.html.twig' %}
     <h1>Paramètres IA</h1>
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
