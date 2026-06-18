@@ -27,11 +27,35 @@
         {% set c = stats.corpus ?? {} %}
         <h2 style="margin-top:0">Corpus</h2>
         <div class="grid">
-            <div class="card"><strong style="font-size:1.6rem">{{ (c.publications ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">publications moissonnées</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (c.publications ?? 0)|number_format(0,',',' ') }}</strong>{% if (stats.metrics.openAlexTotal ?? 0) > 0 %} <span class="muted">/ ≈ {{ stats.metrics.openAlexTotal|number_format(0,',',' ') }}</span>{% endif %}<br><span class="muted">publications moissonnées{% if (stats.metrics.openAlexTotal ?? 0) > 0 %} / dispo. OpenAlex{% endif %}</span></div>
             <div class="card"><strong style="font-size:1.6rem">{{ c.answers ?? 0 }}</strong><br><span class="muted">réponses publiées</span></div>
             <div class="card"><strong style="font-size:1.6rem">{{ c.questions ?? 0 }}</strong><br><span class="muted">questions</span></div>
             <div class="card"><strong style="font-size:1.6rem">{{ (c.treeNodes ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">rubriques</span></div>
         </div>
+
+        {% set m = stats.metrics ?? {} %}
+        <h3>Indicateurs</h3>
+        <div class="grid">
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.freeFullArticles ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles en accès libre</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.pdfConsultables ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">PDF consultables (texte intégral)</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.authors ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">auteurs référencés</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.journals ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">revues</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.publishers ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">éditeurs</span></div>
+            <div class="card"><strong style="font-size:1.3rem">{{ (m.answersValidated ?? 0)|number_format(0,',',' ') }} <span class="muted">validées</span> / {{ (m.answersAi ?? 0)|number_format(0,',',' ') }} <span class="muted">IA</span></strong><br><span class="muted">réponses (humain / IA seule)</span></div>
+            <div class="card"><strong style="font-size:1.3rem">{{ (m.questionsHuman ?? 0)|number_format(0,',',' ') }} <span class="muted">humain</span> / {{ (m.questionsAi ?? 0)|number_format(0,',',' ') }} <span class="muted">IA</span></strong><br><span class="muted">questions (humain / IA)</span></div>
+        </div>
+
+        {% if (m.topPublishers ?? [])|length > 0 %}
+            <h3>Éditeurs — nombre de revues référencées</h3>
+            <table style="width:100%; border-collapse:collapse">
+                <thead><tr><th style="text-align:left; padding:.3rem 0; border-bottom:1px solid var(--line)">Éditeur</th><th style="text-align:right; border-bottom:1px solid var(--line)">Revues</th></tr></thead>
+                <tbody>
+                {% for p in m.topPublishers %}
+                    <tr><td style="padding:.3rem 0">{{ p.name }}</td><td style="text-align:right">{{ p.journals|number_format(0,',',' ') }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
 
         <h3>Publications par domaine</h3>
         <div class="grid">
@@ -56,7 +80,7 @@
                     <div style="position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:flex-end; gap:6px; padding:0 6px">
                         {% for h in hist %}
                             <div title="{{ h.day }} : {{ h.publications|number_format(0,',',' ') }} publications, {{ h.answers }} réponses"
-                                 style="width:32px; flex:0 0 32px; background:linear-gradient(180deg,var(--accent),#0b7a45); border-radius:4px 4px 0 0; height:{{ (h.publications / maxPub * 100)|round }}%; min-height:2px"></div>
+                                 style="width:32px; flex:0 0 32px; background:linear-gradient(180deg,var(--accent),var(--accent-dark)); border-radius:4px 4px 0 0; height:{{ (h.publications / maxPub * 100)|round }}%; min-height:2px"></div>
                         {% endfor %}
                     </div>
                 </div>

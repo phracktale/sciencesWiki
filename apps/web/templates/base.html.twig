@@ -8,7 +8,7 @@
     {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}
     <script src="/js/turbo.min.js" defer></script>
     <style>
-        :root { --accent:#1a5; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937; }
+        :root { --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937; }
         * { box-sizing: border-box; }
         body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
         /* Accueil : 2 colonnes (principal + barre latérale). */
@@ -37,8 +37,9 @@
         .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
         .stat-grid .s { border:1px solid var(--line); border-radius:10px; padding:.6rem .7rem; }
         .stat-grid .s strong { font-size:1.3rem; display:block; }
-        header { display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:.8rem; margin-bottom:1.2rem; }
-        header .brand { color: var(--accent); text-decoration: none; font-weight: 800; font-size:1.2rem; }
+        header { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:.8rem; margin-bottom:1.2rem; }
+        header .brand { color: var(--accent); text-decoration: none; font-weight: 800; font-size:1.2rem; display:inline-flex; align-items:center; }
+        header .brand img { height:38px; width:auto; display:block; }
         header nav { margin-left:auto; display:flex; gap:1rem; font-size:.9rem; }
         h1 { margin: .3rem 0; font-size:1.7rem; }
         h2 { margin-top:1.6rem; }
@@ -76,7 +77,7 @@
         #stream-out { white-space:pre-wrap; margin-top:1rem; padding:1rem; border:1px dashed #cbd5e1; border-radius:10px; min-height:2rem; }
         #stream-out h4 { color:var(--vul); margin:.6rem 0 .2rem; font-size:.95rem; text-transform:uppercase; letter-spacing:.04em; }
         .cartouche { display:flex; gap:.8rem; align-items:flex-start; border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fbfdff; margin:1rem 0; }
-        .cartouche .avatar { width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg,#1a5,#2563eb); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex:0 0 auto; }
+        .cartouche .avatar { width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg,var(--accent),var(--accent-dark)); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex:0 0 auto; }
         .cartouche .who { font-weight:700; }
         .cartouche .note { font-size:.85rem; color:#6b7280; }
         footer { margin-top:3rem; border-top:1px solid var(--line); padding-top:1rem; font-size:.8rem; color:#9ca3af; }
@@ -94,7 +95,7 @@
 </head>
 <body>
     <header>
-        <a class="brand" href="{{ path('home') }}">SciencesWiki</a>
+        <a class="brand" href="{{ path('home') }}"><img src="/logo.svg" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
         <nav>
             <a href="{{ path('home') }}">Accueil</a>
@@ -111,7 +112,7 @@
     {% if admin_session.logged %}
         <div style="height:46px"></div>{# espace pour ne pas masquer le footer #}
         <div id="admin-bar" style="position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#0f172a; color:#e2e8f0; font:13px/1.4 system-ui,sans-serif; display:flex; align-items:center; gap:.5rem; padding:.35rem .7rem; box-shadow:0 -2px 8px rgba(0,0,0,.2)">
-            <strong style="background:#1a5; color:#fff; padding:.1rem .5rem; border-radius:5px">ADMIN</strong>
+            <strong style="background:var(--accent); color:#fff; padding:.1rem .5rem; border-radius:5px">ADMIN</strong>
             <a href="{{ path('admin_dashboard') }}" style="color:#93c5fd">Tableau de bord</a>
             <a href="{{ path('admin_harvest') }}" style="color:#93c5fd">Moisson</a>
             <a href="{{ path('admin_activity') }}" style="color:#93c5fd">Journal</a>
@@ -121,7 +122,7 @@
             <span id="ab-harvest" style="margin-left:auto; display:flex; align-items:center; gap:.5rem">
                 <span class="muted" style="color:#94a3b8">moisson :</span>
                 <span id="ab-text" style="color:#cbd5e1">—</span>
-                <span style="width:90px; height:7px; background:#334155; border-radius:4px; overflow:hidden"><span id="ab-bar" style="display:block; height:100%; width:0; background:#1a5"></span></span>
+                <span style="width:90px; height:7px; background:#334155; border-radius:4px; overflow:hidden"><span id="ab-bar" style="display:block; height:100%; width:0; background:var(--accent)"></span></span>
             </span>
             <a href="{{ path('admin_logout') }}" style="color:#fca5a5; margin-left:.4rem">quitter</a>
         </div>

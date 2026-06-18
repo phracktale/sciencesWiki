@@ -54,6 +54,28 @@ final class AdminDashboardController
             $roots[] = ['slug' => $root['slug'], 'label' => $root['label'], 'publications' => $count];
         }
 
+        // --- Indicateurs détaillés demandés ---
+        $freeFullArticles = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status NOT IN ('closed','unknown')")->fetchOne();
+        $pdfConsultables = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
+        $authorsCount = (int) $conn->executeQuery('SELECT count(*) FROM author')->fetchOne();
+        $publishersCount = (int) $conn->executeQuery('SELECT count(*) FROM publisher')->fetchOne();
+        $journalsCount = (int) $conn->executeQuery('SELECT count(*) FROM journal')->fetchOne();
+        $topPublishers = $conn->executeQuery(
+            'SELECT p.name, count(j.id) AS journals
+               FROM publisher p JOIN journal j ON j.publisher_id = p.id
+              GROUP BY p.id, p.name ORDER BY journals DESC, p.name LIMIT 10'
+        )->fetchAllAssociative();
+
+        // Réponses : validées humain vs encore « IA seule » (non relues).
+        $answersValidated = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'valide'")->fetchOne();
+        $answersAi = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'non_relu'")->fetchOne();
+        // Questions : proposées par l'IA vs posées par un humain.
+        $questionsAi = (int) $conn->executeQuery("SELECT count(*) FROM question WHERE origin = 'suggeree_ia'")->fetchOne();
+        $questionsHuman = (int) $conn->executeQuery("SELECT count(*) FROM question WHERE origin = 'libre_utilisateur'")->fetchOne();
+        // Total ≈ disponible chez OpenAlex (somme des meta.count par rubrique moissonnée ;
+        // surcompte les articles présents dans plusieurs rubriques → indicatif).
+        $openAlexTotal = (int) $conn->executeQuery("SELECT COALESCE(SUM(value::bigint),0) FROM setting WHERE name LIKE 'openalex.total.%' AND value ~ '^[0-9]+$'")->fetchOne();
+
         // --- Base de données ---
         $dbVersion = (string) $conn->executeQuery('SHOW server_version')->fetchOne();
         $dbSize = (int) $conn->executeQuery('SELECT pg_database_size(current_database())')->fetchOne();
@@ -93,6 +115,19 @@ final class AdminDashboardController
                 'diskUsedBytes' => (int) ($diskTotal - $diskFree),
             ],
             'history' => $history,
+            'metrics' => [
+                'freeFullArticles' => $freeFullArticles,
+                'pdfConsultables' => $pdfConsultables,
+                'authors' => $authorsCount,
+                'publishers' => $publishersCount,
+                'journals' => $journalsCount,
+                'topPublishers' => $topPublishers,
+                'answersValidated' => $answersValidated,
+                'answersAi' => $answersAi,
+                'questionsAi' => $questionsAi,
+                'questionsHuman' => $questionsHuman,
+                'openAlexTotal' => $openAlexTotal,
+            ],
         ]);
     }
 }
