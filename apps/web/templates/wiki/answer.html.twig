@@ -55,8 +55,31 @@
                             <span class="muted">— {% if s.venue %}{{ s.venue }}{% endif %}{% if s.year %}{% if s.venue %}, {% endif %}{{ s.year }}{% endif %}</span>
                         {% endif %}
                         <br>
-                        {% if s.oaUrl %}<a href="{{ s.oaUrl }}" rel="noopener" target="_blank">🔓 Lire en accès libre</a>{% endif %}
-                        {% if s.doi %}{% if s.oaUrl %} · {% endif %}<a href="https://doi.org/{{ s.doi }}" rel="noopener" target="_blank">doi:{{ s.doi }}</a>{% endif %}
+                        {% if s.oaUrl %}
+                            <a href="{{ s.oaUrl }}" rel="noopener" target="_blank">🔓 Lire en accès libre</a>
+                            {% if s.doi %} · <a href="https://doi.org/{{ s.doi }}" rel="noopener" target="_blank">doi:{{ s.doi }}</a>{% endif %}
+                        {% else %}
+                            <span class="badge warn">🔒 Accès payant — seul le résumé est indexé</span>
+                            {% if s.doi %} · <a href="https://doi.org/{{ s.doi }}" rel="noopener" target="_blank">doi:{{ s.doi }}</a>{% endif %}
+                            {# Invitation très polie aux auteurs à partager une version en accès ouvert. #}
+                            {% set invite_subject = 'Partage de votre article sur SciencesWiki (encyclopédie libre)' %}
+                            {%- set invite_body -%}
+Bonjour,
+
+Nous animons SciencesWiki (https://scienceswiki.eu), une encyclopédie scientifique libre, gratuite et open source, animée par des bénévoles, qui vulgarise la recherche pour le grand public — dans le strict respect du droit d'auteur et de l'accès ouvert.
+
+Votre article « {{ s.title }} » nous semble précieux pour expliquer ce sujet au public. Il n'est hélas disponible qu'en accès payant : nous ne pouvons en indexer que le résumé, ce qui limite la portée de votre travail auprès des lecteurs.
+
+Si vos droits le permettent et si vous le souhaitez, accepteriez-vous de partager une version en accès ouvert (post-print ou version auteur) ? Vous pouvez simplement répondre à ce courriel. Cela permettrait à un très large public de bénéficier de vos recherches, gratuitement et durablement.
+
+Nous mesurons la valeur de votre temps et de votre travail, et vous remercions très sincèrement, quelle que soit votre réponse. Nous œuvrons pour le bien commun et la libre diffusion du savoir.
+
+Avec toute notre considération,
+L'équipe SciencesWiki
+{% if s.doi %}Référence : https://doi.org/{{ s.doi }}{% endif %}
+                            {%- endset -%}
+                            · <a href="mailto:?subject={{ invite_subject|url_encode }}&body={{ invite_body|url_encode }}" title="Ouvre un e-mail pré-rédigé ; ajoutez l'adresse de l'auteur correspondant (visible sur la page de l'éditeur via le DOI).">✉️ Inviter les auteurs à le partager</a>
+                        {% endif %}
                     </li>
                 {% endfor %}
             </ol>
