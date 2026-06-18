@@ -7,7 +7,7 @@ FROM dunglas/frankenphp:1-php8.4 AS base
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        file gettext git \
+        file gettext git curl unzip \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
@@ -36,6 +36,18 @@ RUN set -eux; \
     composer install --no-cache --prefer-dist --no-dev --no-scripts --no-autoloader --no-progress
 
 COPY . ./
+
+# Visualiseur PDF.js auto-hébergé (souverain, pas de CDN) : prébuilt épinglé,
+# extrait dans public/pdfjs → /pdfjs/web/viewer.html. Non-fatal si le réseau
+# manque au build (la fiche article reste accessible, repli sur ouverture native).
+ARG PDFJS_VERSION=4.7.76
+RUN set -eux; \
+    mkdir -p public/pdfjs; \
+    if curl -fsSL -o /tmp/pdfjs.zip "https://github.com/mozilla/pdf.js/releases/download/v${PDFJS_VERSION}/pdfjs-${PDFJS_VERSION}-legacy-dist.zip"; then \
+        unzip -q /tmp/pdfjs.zip -d public/pdfjs && rm -f /tmp/pdfjs.zip && echo "PDF.js ${PDFJS_VERSION} vendoré"; \
+    else \
+        echo "AVERTISSEMENT : téléchargement PDF.js échoué — repli visualiseur natif"; \
+    fi
 
 RUN set -eux; \
     rm -rf frankenphp/ ; \

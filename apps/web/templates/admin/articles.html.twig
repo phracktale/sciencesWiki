@@ -22,7 +22,10 @@
             <tbody>
                 {% for a in data.items %}
                     <tr style="border-bottom:1px solid var(--line)">
-                        <td style="padding:.4rem">{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener">{{ a.title|slice(0,90) }}</a>{% else %}{{ a.title|slice(0,90) }}{% endif %}</td>
+                        <td style="padding:.4rem">
+                            <a class="q-title" href="{{ path('admin_article', { id: a.id }) }}" style="font-size:.92rem">{{ a.title|slice(0,90) }}</a>
+                            {% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener" title="Source externe" style="font-size:.75rem"> ↗</a>{% endif %}
+                        </td>
                         <td class="muted">{{ a.authors|slice(0,60) }}</td>
                         <td class="muted">{{ a.date }}</td>
                         <td class="muted">{{ a.venue|slice(0,30) }}</td>

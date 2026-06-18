@@ -23,6 +23,7 @@ final class AdminController extends AbstractController
         private readonly ApiClient $api,
         private readonly AdminApiClient $admin,
         private readonly \App\Service\AdminCsrf $csrf,
+        private readonly \Symfony\Contracts\HttpClient\HttpClientInterface $httpClient,
     ) {
     }
 
@@ -119,6 +120,92 @@ final class AdminController extends AbstractController
                 max(1, (int) $request->query->get('page', '1')),
             ),
         ]);
+    }
+
+    #[Route('/admin/articles/{id}', name: 'admin_article', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function article(int $id): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        $pub = $this->admin->publication($id);
+        if (null === $pub) {
+            throw $this->createNotFoundException('Article introuvable.');
+        }
+
+        return $this->render('admin/article.html.twig', ['pub' => $pub]);
+    }
+
+    /** Proxy du PDF en accès libre (même origine → visualiseur natif + impression). Anti-SSRF. */
+    #[Route('/admin/articles/{id}/pdf', name: 'admin_article_pdf', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function articlePdf(int $id, Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return new Response('', 401);
+        }
+        $pub = $this->admin->publication($id);
+        $url = \is_array($pub) ? ($pub['oaUrl'] ?? null) : null;
+        if (!\is_string($url) || '' === $url) {
+            return new Response('Aucun PDF en accès libre pour cet article.', 404);
+        }
+
+        // Suivi manuel des redirections avec validation anti-SSRF à chaque saut.
+        $current = $url;
+        $response = null;
+        for ($hop = 0; $hop < 5; ++$hop) {
+            if (!$this->isPublicHttpUrl($current)) {
+                return new Response('URL non autorisée.', 422);
+            }
+            $response = $this->httpClient->request('GET', $current, ['timeout' => 30, 'max_redirects' => 0]);
+            $status = $response->getStatusCode();
+            if ($status >= 300 && $status < 400) {
+                $loc = $response->getHeaders(false)['location'][0] ?? null;
+                if (null === $loc) {
+                    break;
+                }
+                $current = str_starts_with($loc, 'http') ? $loc : rtrim($url, '/').'/'.ltrim($loc, '/');
+                continue;
+            }
+            break;
+        }
+        if (null === $response || 200 !== $response->getStatusCode()) {
+            return new Response('PDF inaccessible.', 502);
+        }
+        $type = strtolower($response->getHeaders(false)['content-type'][0] ?? '');
+        $content = $response->getContent();
+        if (!str_contains($type, 'pdf') && !str_starts_with($content, '%PDF')) {
+            return new Response('La source n\'est pas un PDF direct (page éditeur).', 415);
+        }
+
+        $disposition = $request->query->getBoolean('dl') ? 'attachment' : 'inline';
+
+        return new Response($content, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => $disposition.'; filename="article-'.$id.'.pdf"',
+            'X-Content-Type-Options' => 'nosniff',
+        ]);
+    }
+
+    /** Vrai si http(s) et toutes les IP résolues sont publiques (anti-SSRF). */
+    private function isPublicHttpUrl(string $url): bool
+    {
+        $p = parse_url($url);
+        $scheme = strtolower($p['scheme'] ?? '');
+        $host = trim((string) ($p['host'] ?? ''), '[]');
+        if (!\in_array($scheme, ['http', 'https'], true) || '' === $host) {
+            return false;
+        }
+        $ips = filter_var($host, \FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
+        if ([] === $ips) {
+            return false;
+        }
+        foreach ($ips as $ip) {
+            if (false === filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     #[Route('/admin/users', name: 'admin_users', methods: ['GET', 'POST'])]

@@ -80,4 +80,52 @@ final class AdminArticlesController
             'query' => $q,
         ]);
     }
+
+    #[Route('/api/admin/publications/{id}', name: 'admin_publication_detail', methods: ['GET'], requirements: ['id' => '\d+'])]
+    public function detail(int $id): JsonResponse
+    {
+        $conn = $this->em->getConnection();
+        $r = $conn->executeQuery(
+            "SELECT p.id, p.title, p.abstract, p.doi, p.venue, p.oa_status, p.oa_url, p.language, p.type,
+                    p.retraction_status,
+                    to_char(p.publication_date, 'YYYY-MM-DD') AS date,
+                    (SELECT string_agg(a.name, '|' ORDER BY au.position)
+                       FROM authorship au JOIN author a ON a.id = au.author_id
+                      WHERE au.publication_id = p.id) AS authors
+             FROM publication p WHERE p.id = :id",
+            ['id' => $id],
+        )->fetchAssociative();
+
+        if (false === $r) {
+            return new JsonResponse(['error' => 'Publication introuvable.'], 404);
+        }
+
+        // Texte intégral reconstitué (fragments dans l'ordre) le cas échéant.
+        $chunks = $conn->executeQuery(
+            'SELECT content FROM publication_chunk WHERE publication_id = :id ORDER BY ord',
+            ['id' => $id],
+        )->fetchFirstColumn();
+
+        $status = (string) $r['oa_status'];
+        $access = \in_array($status, self::OPEN, true) ? 'libre' : ('closed' === $status ? 'payant' : 'inconnu');
+
+        return new JsonResponse([
+            'id' => (int) $r['id'],
+            'title' => $r['title'],
+            'abstract' => $r['abstract'],
+            'authors' => null !== $r['authors'] ? explode('|', (string) $r['authors']) : [],
+            'date' => $r['date'],
+            'venue' => $r['venue'],
+            'doi' => $r['doi'],
+            'language' => $r['language'],
+            'type' => $r['type'],
+            'oaStatus' => $status,
+            'access' => $access,
+            'oaUrl' => $r['oa_url'] ?: null,
+            'doiUrl' => $r['doi'] ? 'https://doi.org/'.$r['doi'] : null,
+            'retractionStatus' => $r['retraction_status'] ?? 'none',
+            'fulltext' => [] !== $chunks ? implode("\n\n", array_map('strval', $chunks)) : null,
+            'fulltextChunks' => \count($chunks),
+        ]);
+    }
 }
