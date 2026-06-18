@@ -107,6 +107,20 @@ final class ApiClient
     }
 
     /**
+     * Stats par sous-rubrique directe : { slug: {publications, questions} }.
+     *
+     * @return array<string,array{publications:int,questions:int}>
+     */
+    public function nodeChildrenStats(string $slug): array
+    {
+        try {
+            return $this->get('/api/tree_nodes/'.rawurlencode($slug).'/children-stats')['children'] ?? [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
      * @param array<string,mixed> $query
      *
      * @return array<string,mixed>

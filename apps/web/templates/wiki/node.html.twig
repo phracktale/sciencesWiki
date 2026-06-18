@@ -31,7 +31,14 @@
         <h2>Sous-rubriques</h2>
         <div class="grid">
             {% for child in node.children %}
-                <a class="card" href="/{{ path }}/{{ child.slug }}">{{ child.label }}</a>
+                {% set cs = (childrenStats[child.slug] ?? {}) %}
+                <a class="card" href="/{{ path }}/{{ child.slug }}">
+                    {{ child.label }}
+                    <span style="display:block; margin-top:.45rem">
+                        <span class="pill node" title="Publications référencées (cette sous-rubrique et ses descendantes)">📚 {{ (cs.publications ?? 0)|number_format(0, ',', ' ') }}</span>
+                        <span class="pill author" title="Questions posées dans cette sous-rubrique">❓ {{ (cs.questions ?? 0)|number_format(0, ',', ' ') }}</span>
+                    </span>
+                </a>
             {% endfor %}
         </div>
     {% endif %}

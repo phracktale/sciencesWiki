@@ -73,6 +73,7 @@ final class WikiController extends AbstractController
             'path' => $canonical,
             'answers' => $this->api->answers($slug),
             'corpusCount' => $this->api->nodeCorpus($slug),
+            'childrenStats' => $this->api->nodeChildrenStats($slug),
         ]);
     }
 }

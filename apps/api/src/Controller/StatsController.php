@@ -65,4 +65,52 @@ final class StatsController
 
         return new JsonResponse(['slug' => $slug, 'publications' => $count]);
     }
+
+    /**
+     * Pour chaque sous-rubrique directe d'un nœud : nombre de publications
+     * référencées et de questions, comptés sur la sous-rubrique ET ses descendants.
+     * Sert à afficher des pastilles sur les cartouches du front.
+     */
+    #[Route('/api/tree_nodes/{slug}/children-stats', name: 'api_node_children_stats', methods: ['GET'])]
+    public function childrenStats(string $slug): JsonResponse
+    {
+        $conn = $this->em->getConnection();
+
+        // branch(root_id, node_id) : chaque descendant rattaché à la sous-rubrique
+        // directe (root_id) dont il dépend. On agrège ensuite par root_id.
+        $sql = "WITH RECURSIVE branch AS (
+                    SELECT e.child_id AS root_id, e.child_id AS node_id
+                    FROM tree_edge e JOIN tree_node p ON p.id = e.parent_id
+                    WHERE p.slug = :slug
+                    UNION
+                    SELECT b.root_id, e2.child_id
+                    FROM tree_edge e2 JOIN branch b ON e2.parent_id = b.node_id
+                )
+                SELECT tn.slug AS slug,
+                       COALESCE(pub.cnt, 0) AS publications,
+                       COALESCE(q.cnt, 0) AS questions
+                FROM tree_node tn
+                JOIN tree_edge pe ON pe.child_id = tn.id
+                JOIN tree_node pp ON pp.id = pe.parent_id AND pp.slug = :slug
+                LEFT JOIN (
+                    SELECT b.root_id, count(DISTINCT ps.publication_id) AS cnt
+                    FROM branch b JOIN placement_suggestion ps ON ps.tree_node_id = b.node_id
+                    GROUP BY b.root_id
+                ) pub ON pub.root_id = tn.id
+                LEFT JOIN (
+                    SELECT b.root_id, count(*) AS cnt
+                    FROM branch b JOIN question q ON q.tree_node_id = b.node_id
+                    GROUP BY b.root_id
+                ) q ON q.root_id = tn.id";
+
+        $stats = [];
+        foreach ($conn->executeQuery($sql, ['slug' => $slug])->fetchAllAssociative() as $row) {
+            $stats[(string) $row['slug']] = [
+                'publications' => (int) $row['publications'],
+                'questions' => (int) $row['questions'],
+            ];
+        }
+
+        return new JsonResponse(['slug' => $slug, 'children' => $stats]);
+    }
 }
