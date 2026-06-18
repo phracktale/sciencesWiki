@@ -50,6 +50,8 @@ services:
       JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
       JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      # Clé de déchiffrage du coffre de secrets (OPENALEX_API_KEY, BREVO_*, MAILER…).
+      SYMFONY_DECRYPTION_SECRET: ${SYMFONY_DECRYPTION_SECRET:-}
       # Moisson + IA (Marvin)
       HARVESTER_CONTACT_EMAIL: ${HARVESTER_CONTACT_EMAIL}
       EMBEDDING_DRIVER: http
@@ -82,6 +84,7 @@ services:
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
       MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=1"
       JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      SYMFONY_DECRYPTION_SECRET: ${SYMFONY_DECRYPTION_SECRET:-}
       HARVESTER_CONTACT_EMAIL: ${HARVESTER_CONTACT_EMAIL}
       EMBEDDING_DRIVER: http
       ML_EMBED_URL: ${ML_EMBED_URL}

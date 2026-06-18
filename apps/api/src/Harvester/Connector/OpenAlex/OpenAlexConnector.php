@@ -34,6 +34,8 @@ final class OpenAlexConnector implements SourceConnector
         private readonly string $contactEmail,
         #[Autowire(env: 'OPENALEX_BASE_URL')]
         private readonly string $baseUrl = 'https://api.openalex.org',
+        #[Autowire(env: 'OPENALEX_API_KEY')]
+        private readonly string $apiKey = '',
     ) {
     }
 
@@ -149,6 +151,11 @@ final class OpenAlexConnector implements SourceConnector
      */
     private function getJson(string $url, array $query): array
     {
+        // Clé API premium (le cas échéant) : authentifie toutes les requêtes /works.
+        if ('' !== $this->apiKey && !isset($query['api_key'])) {
+            $query['api_key'] = $this->apiKey;
+        }
+
         for ($attempt = 1; ; ++$attempt) {
             $this->throttle->tick();
 

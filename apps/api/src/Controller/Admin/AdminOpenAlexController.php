@@ -43,6 +43,8 @@ final class AdminOpenAlexController
         private readonly string $contactEmail,
         #[Autowire(env: 'OPENALEX_BASE_URL')]
         private readonly string $baseUrl = 'https://api.openalex.org',
+        #[Autowire(env: 'OPENALEX_API_KEY')]
+        private readonly string $apiKey = '',
     ) {
         $this->embeddingFactory = $embeddingFactory;
     }
@@ -93,12 +95,13 @@ final class AdminOpenAlexController
         while (null !== $cursor) {
             $this->throttle->tick();
             $data = $this->httpClient->request('GET', $this->baseUrl.'/'.$endpoint, [
-                'query' => [
+                'query' => array_filter([
                     'filter' => $filterKey.':https://openalex.org/'.$concept,
                     'per-page' => 200,
                     'cursor' => $cursor,
                     'mailto' => $this->contactEmail,
-                ],
+                    'api_key' => '' !== $this->apiKey ? $this->apiKey : null,
+                ], static fn ($v): bool => null !== $v),
                 'timeout' => 30,
             ])->toArray(false);
 
