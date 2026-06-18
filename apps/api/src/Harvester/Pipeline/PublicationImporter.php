@@ -33,6 +33,7 @@ final class PublicationImporter
         private readonly Deduplicator $deduplicator,
         private readonly AuthorRepository $authors,
         private readonly LicenseGate $licenseGate,
+        private readonly \Doctrine\DBAL\Connection $conn,
     ) {
     }
 
@@ -168,10 +169,35 @@ final class PublicationImporter
             return $this->authorCache[$cacheKey];
         }
 
-        $author = $this->authors->findOneByOrcidOrName($rawAuthor->orcid, $rawAuthor->name);
+        $orcid = $rawAuthor->orcid;
+
+        // Concurrence (plusieurs workers en parallèle) : deux workers peuvent
+        // rencontrer le MÊME auteur identifié par ORCID et tenter de l'insérer en
+        // même temps → violation de la contrainte unique → EntityManager fermé →
+        // job de moisson échoué. On rend l'insertion atomique côté base via un
+        // upsert (ON CONFLICT DO NOTHING), puis on recharge l'entité gérée. Postgres
+        // sérialise le conflit au niveau de l'index : aucune exception ne remonte.
+        if (null !== $orcid && '' !== $orcid) {
+            $this->conn->executeStatement(
+                'INSERT INTO author (name, orcid, affiliation) VALUES (:n, :o, :a) ON CONFLICT (orcid) DO NOTHING',
+                [
+                    'n' => mb_substr($rawAuthor->name, 0, 500),
+                    'o' => $orcid,
+                    'a' => null !== $rawAuthor->affiliation ? mb_substr($rawAuthor->affiliation, 0, 500) : null,
+                ],
+            );
+            $author = $this->authors->findOneBy(['orcid' => $orcid]);
+            if (null !== $author) {
+                return $this->authorCache[$cacheKey] = $author;
+            }
+        }
+
+        // Sans ORCID : pas de contrainte unique (les homonymes restent distincts) ;
+        // résolution ORM classique par nom.
+        $author = $this->authors->findOneByOrcidOrName(null, $rawAuthor->name);
         if (null === $author) {
             $author = new Author($rawAuthor->name);
-            $author->setOrcid($rawAuthor->orcid);
+            $author->setOrcid(null);
             $author->setAffiliation($rawAuthor->affiliation);
             $this->em->persist($author);
         }
