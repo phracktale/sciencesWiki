@@ -19,7 +19,7 @@ final class WikiController extends AbstractController
     {
     }
 
-    #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], defaults: ['_locale' => 'fr'], methods: ['GET'])]
+    #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function home(): Response
     {
         return $this->render('wiki/home.html.twig', [
@@ -29,7 +29,7 @@ final class WikiController extends AbstractController
         ]);
     }
 
-    #[Route('/{_locale}/q/{id}', name: 'answer', requirements: ['id' => '\d+', '_locale' => 'fr'], defaults: ['_locale' => 'fr'], methods: ['GET'])]
+    #[Route('/{_locale}/q/{id}', name: 'answer', requirements: ['id' => '\d+', '_locale' => 'fr'], methods: ['GET'])]
     public function answer(int $id): Response
     {
         $answer = $this->api->answer($id);
@@ -50,7 +50,7 @@ final class WikiController extends AbstractController
      * Rubrique par chemin arborescent. Le dernier segment est le slug (unique) ;
      * si le chemin ne correspond pas au chemin canonique, redirection 301 (SEO).
      */
-    #[Route('/{_locale}/{path}', name: 'node', requirements: ['path' => '.+', '_locale' => 'fr'], defaults: ['_locale' => 'fr'], priority: -10, methods: ['GET'])]
+    #[Route('/{_locale}/{path}', name: 'node', requirements: ['path' => '.+', '_locale' => 'fr'], priority: -10, methods: ['GET'])]
     public function node(string $path, string $_locale): Response
     {
         $path = trim($path, '/');

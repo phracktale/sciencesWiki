@@ -14,13 +14,13 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class ContentController extends AbstractController
 {
-    #[Route('/{_locale}/le-projet', name: 'project', requirements: ['_locale' => 'fr'], defaults: ['_locale' => 'fr'], methods: ['GET'])]
+    #[Route('/{_locale}/le-projet', name: 'project', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function project(): Response
     {
         return $this->render('content/project.html.twig');
     }
 
-    #[Route('/{_locale}/process-de-publication', name: 'process', requirements: ['_locale' => 'fr'], defaults: ['_locale' => 'fr'], methods: ['GET'])]
+    #[Route('/{_locale}/process-de-publication', name: 'process', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function process(): Response
     {
         return $this->render('content/process.html.twig');
