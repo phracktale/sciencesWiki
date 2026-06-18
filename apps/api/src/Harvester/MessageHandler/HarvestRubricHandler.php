@@ -29,6 +29,9 @@ final class HarvestRubricHandler
     /** Articles OA dont on tente le texte intégral par exécution (borne la charge). */
     private const MAX_FULLTEXT_PER_RUN = 20;
 
+    /** Plafond d'enrichissement (embeddings/placement) par exécution, pour la mémoire. */
+    private const MAX_ENRICH_PER_RUN = 3000;
+
     /** Niveau du nœud → segment de filtre OpenAlex « primary_topic.X.id ». */
     private const FILTER_KEY = [0 => 'domain', 1 => 'field', 2 => 'subfield'];
 
@@ -113,7 +116,9 @@ final class HarvestRubricHandler
 
         // Enrichissement des nouvelles publications : embeddings PAR LOTS (un seul
         // appel au service ml/ pour ~64 publications → bien plus rapide qu'unitaire).
-        $needing = $this->publications->findNeedingEmbedding($maxPerRun * 2);
+        // Borné pour maîtriser la mémoire ; le reliquat est repris au prochain run.
+        $enrichLimit = min(max(1, $maxPerRun) * 2, self::MAX_ENRICH_PER_RUN);
+        $needing = $this->publications->findNeedingEmbedding($enrichLimit);
         foreach (array_chunk($needing, 64) as $batch) {
             try {
                 $this->embedder->embedMany($batch);
@@ -123,7 +128,7 @@ final class HarvestRubricHandler
             }
         }
 
-        foreach ($this->publications->findNeedingPlacement($maxPerRun * 2) as $publication) {
+        foreach ($this->publications->findNeedingPlacement($enrichLimit) as $publication) {
             $this->suggester->suggest($publication, 3);
         }
         $this->em->flush();

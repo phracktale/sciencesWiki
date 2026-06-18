@@ -96,7 +96,9 @@ services:
       LLM_MODEL: ${LLM_MODEL}
       LLM_API_TOKEN: ${LLM_API_TOKEN}
       # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
-    command: ["php", "bin/console", "messenger:consume", "harvester", "failed", "-v", "--time-limit=3600", "--memory-limit=256M"]
+    # memory_limit PHP relevé (embeddings par lots + gros lots de moisson) ; le
+    # --memory-limit Messenger (RSS) redémarre proprement avant tout dépassement.
+    command: ["php", "-d", "memory_limit=1024M", "bin/console", "messenger:consume", "harvester", "failed", "-v", "--time-limit=3600", "--memory-limit=1500M"]
     # Même coffre de secrets que l'api (le worker déchiffre OPENALEX_API_KEY pour la moisson).
     volumes:
       - secrets_vault:/app/config/secrets:rw
