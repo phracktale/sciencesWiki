@@ -71,5 +71,51 @@
         Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique ·
         projet libre, gratuit et open source. <a href="/le-projet">En savoir plus</a>
     </footer>
+
+    {% if admin_session.logged %}
+        <div style="height:46px"></div>{# espace pour ne pas masquer le footer #}
+        <div id="admin-bar" style="position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#0f172a; color:#e2e8f0; font:13px/1.4 system-ui,sans-serif; display:flex; align-items:center; gap:.5rem; padding:.35rem .7rem; box-shadow:0 -2px 8px rgba(0,0,0,.2)">
+            <strong style="background:#1a5; color:#fff; padding:.1rem .5rem; border-radius:5px">ADMIN</strong>
+            <a href="{{ path('admin_dashboard') }}" style="color:#93c5fd">Tableau de bord</a>
+            <a href="{{ path('admin_harvest') }}" style="color:#93c5fd">Moisson</a>
+            <a href="{{ path('admin_activity') }}" style="color:#93c5fd">Journal</a>
+            <a href="{{ path('admin_articles') }}" style="color:#93c5fd">Articles</a>
+            <a href="{{ path('admin_settings') }}" style="color:#93c5fd">Paramètres</a>
+            {% block admin_context %}{% endblock %}
+            <span id="ab-harvest" style="margin-left:auto; display:flex; align-items:center; gap:.5rem">
+                <span class="muted" style="color:#94a3b8">moisson :</span>
+                <span id="ab-text" style="color:#cbd5e1">—</span>
+                <span style="width:90px; height:7px; background:#334155; border-radius:4px; overflow:hidden"><span id="ab-bar" style="display:block; height:100%; width:0; background:#1a5"></span></span>
+            </span>
+            <a href="{{ path('admin_logout') }}" style="color:#fca5a5; margin-left:.4rem">quitter</a>
+        </div>
+        <script>
+        (function () {
+            var txt = document.getElementById('ab-text'), bar = document.getElementById('ab-bar');
+            if (!txt) return;
+            function poll() {
+                fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (!d) return;
+                        var running = (d.running || []).length, queued = d.queued || 0;
+                        var run = (d.jobs || []).filter(function (j) { return j.status === 'running' && !j.stale; })[0];
+                        if (run) {
+                            txt.textContent = '⏳ ' + (run.label || run.rubric) + ' — ' + run.processed + ' traité(s)' + (queued ? ' · ' + queued + ' en file' : '');
+                            bar.style.width = Math.min(100, Math.round(run.processed / 500 * 100)) + '%';
+                        } else if (queued) {
+                            txt.textContent = '⏳ ' + queued + ' moisson(s) en file';
+                            bar.style.width = '5%';
+                        } else {
+                            txt.textContent = 'au repos'; bar.style.width = '0';
+                        }
+                    }).catch(function () {});
+            }
+            poll();
+            var t = setInterval(poll, 5000);
+            document.addEventListener('turbo:before-cache', function () { clearInterval(t); }, { once: true });
+        })();
+        </script>
+    {% endif %}
 </body>
 </html>

@@ -2,6 +2,10 @@
 
 {% block title %}{{ node.label }} — SciencesWiki{% endblock %}
 
+{% block admin_context %}
+    <a href="{{ path('admin_node', { slug: node.slug }) }}" style="color:#fcd34d">✏️ éditer / moissonner cette rubrique</a>
+{% endblock %}
+
 {% block body %}
     {% set crumbs = node.breadcrumb ?? [] %}
     {% if crumbs|length > 1 %}

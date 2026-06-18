@@ -2,6 +2,7 @@ twig:
     file_name_pattern: '*.twig'
     globals:
         admin_csrf: '@App\Service\AdminCsrf'
+        admin_session: '@App\Service\AdminApiClient'
 
 when@test:
     twig:
