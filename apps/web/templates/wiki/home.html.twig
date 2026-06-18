@@ -103,9 +103,7 @@
             {# --- Dernières questions (Turbo, paginé par 5) --- #}
             <section class="side-block">
                 <h2>Dernières questions</h2>
-                <turbo-frame id="latest-q">
-                    {% include 'wiki/_latest_frame.html.twig' with { latest: latestFrame } %}
-                </turbo-frame>
+                {% include 'wiki/_latest_frame.html.twig' with { latest: latestFrame } %}
             </section>
 
             {# --- Statistiques --- #}

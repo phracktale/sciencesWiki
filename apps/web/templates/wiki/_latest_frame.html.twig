@@ -1,4 +1,4 @@
-<turbo-frame id="latest-q">
+<turbo-frame id="latest-q" target="_top">
     {% if latest.items is empty %}
         <p class="muted">Aucune question{% if latest.page > 1 %} supplémentaire{% endif %} pour l'instant.</p>
     {% else %}
@@ -17,8 +17,8 @@
         </ul>
     {% endif %}
     <div style="display:flex; gap:1rem; align-items:center; justify-content:space-between; font-size:.85rem; margin-top:.4rem">
-        <span>{% if latest.page > 1 %}<a href="{{ path('latest_frame', { page: latest.page - 1 }) }}">← précédentes</a>{% endif %}</span>
+        <span>{% if latest.page > 1 %}<a href="{{ path('latest_frame', { page: latest.page - 1 }) }}" data-turbo-frame="latest-q">← précédentes</a>{% endif %}</span>
         <span class="muted">page {{ latest.page }}</span>
-        <span>{% if latest.hasMore %}<a href="{{ path('latest_frame', { page: latest.page + 1 }) }}">suivantes →</a>{% endif %}</span>
+        <span>{% if latest.hasMore %}<a href="{{ path('latest_frame', { page: latest.page + 1 }) }}" data-turbo-frame="latest-q">suivantes →</a>{% endif %}</span>
     </div>
 </turbo-frame>
