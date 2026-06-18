@@ -11,8 +11,13 @@ framework:
     trusted_proxies: '%env(TRUSTED_PROXIES)%'
     trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
 
-    # Note that the session will be started ONLY if you read or write from it.
-    session: true
+    # Session du back-office : 8 h (journée de travail) pour ne pas redemander le
+    # login toutes les ~20 min (défaut PHP gc_maxlifetime), sans session interminable.
+    session:
+        cookie_lifetime: 28800
+        gc_maxlifetime: 28800
+        cookie_secure: auto
+        cookie_samesite: lax
 
     #esi: true
     #fragments: true

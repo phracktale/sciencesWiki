@@ -2,3 +2,6 @@ lexik_jwt_authentication:
     secret_key: '%env(resolve:JWT_SECRET_KEY)%'
     public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
     pass_phrase: '%env(JWT_PASSPHRASE)%'
+    # Aligné sur la session du BO (8 h) : le JWT stocké en session ne doit pas
+    # expirer avant elle, sinon les appels /api/admin tombent en 401.
+    token_ttl: 28800

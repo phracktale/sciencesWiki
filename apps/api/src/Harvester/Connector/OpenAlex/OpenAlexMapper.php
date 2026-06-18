@@ -89,13 +89,18 @@ final class OpenAlexMapper
             if ('' === $name) {
                 continue;
             }
+            // Bornage aux longueurs de colonnes (author.name / affiliation = varchar 512).
+            $name = self::clip($name, 500);
 
-            $orcid = isset($author['orcid']) ? self::shortId((string) $author['orcid']) : null;
+            $orcid = isset($author['orcid']) ? strtoupper(trim(self::shortId((string) $author['orcid']))) : null;
+            if (null !== $orcid && ('' === $orcid || mb_strlen($orcid) > 32)) {
+                $orcid = null; // ORCID invalide/aberrant : on ignore plutôt que de violer la contrainte
+            }
 
             $affiliation = null;
             $rawAffiliations = $authorship['raw_affiliation_strings'] ?? null;
             if (\is_array($rawAffiliations) && isset($rawAffiliations[0])) {
-                $affiliation = (string) $rawAffiliations[0];
+                $affiliation = self::clip((string) $rawAffiliations[0], 500);
             }
 
             $authors[] = new RawAuthor($name, $orcid, $affiliation, $position);
@@ -113,7 +118,13 @@ final class OpenAlexMapper
         $source = \is_array($primaryLocation['source'] ?? null) ? $primaryLocation['source'] : [];
         $name = $source['display_name'] ?? null;
 
-        return null !== $name ? (string) $name : null;
+        return null !== $name ? self::clip((string) $name, 500) : null;
+    }
+
+    /** Tronque une chaîne à une longueur max (sécurité contre les colonnes varchar). */
+    private static function clip(string $value, int $max): string
+    {
+        return mb_strlen($value) > $max ? mb_substr($value, 0, $max) : $value;
     }
 
     private static function parseDate(mixed $value): ?\DateTimeImmutable

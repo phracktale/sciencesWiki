@@ -36,6 +36,17 @@ final class PublicationImporter
     ) {
     }
 
+    /**
+     * Réinitialise le cache d'auteurs. À appeler au début de chaque exécution :
+     * dans un worker long-running, l'EntityManager est réinitialisé entre messages,
+     * donc les entités mises en cache deviennent détachées — les réutiliser
+     * provoquerait des ré-insertions (ex. violation de contrainte unique ORCID).
+     */
+    public function reset(): void
+    {
+        $this->authorCache = [];
+    }
+
     public function import(RawPublication $raw, Source $source): ImportResult
     {
         $existing = $this->deduplicator->findExisting($raw);
