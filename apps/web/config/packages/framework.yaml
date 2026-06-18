@@ -19,6 +19,10 @@ framework:
     # Session du back-office : 8 h (journée de travail) pour ne pas redemander le
     # login toutes les ~20 min (défaut PHP gc_maxlifetime), sans session interminable.
     session:
+        # Stockage des sessions dans un répertoire dédié (monté en volume Docker)
+        # pour qu'elles SURVIVENT aux rebuilds du conteneur (sinon /tmp éphémère →
+        # déconnexion à chaque déploiement).
+        save_path: '%kernel.project_dir%/var/sessions'
         cookie_lifetime: 28800
         gc_maxlifetime: 28800
         cookie_secure: auto

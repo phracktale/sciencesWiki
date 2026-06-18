@@ -51,7 +51,7 @@ RUN set -eux; \
 
 RUN set -eux; \
     rm -rf frankenphp/ ; \
-    mkdir -p var/cache var/log; \
+    mkdir -p var/cache var/log var/sessions; \
     composer dump-autoload --classmap-authoritative --no-dev; \
     composer dump-env prod; \
     composer run-script --no-dev post-install-cmd; \

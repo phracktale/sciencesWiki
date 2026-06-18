@@ -123,6 +123,9 @@ services:
       DEFAULT_URI: ${PUBLIC_URL}
       # Appel server-side de l'API via le réseau interne du compose.
       API_BASE_URL: "http://api"
+    # Sessions persistantes (survivent aux rebuilds → plus de déconnexion à chaque déploiement).
+    volumes:
+      - web_sessions:/app/var/sessions:rw
     ports:
       - "${WEB_PORT:-8080}:80"
     restart: unless-stopped
@@ -131,3 +134,4 @@ volumes:
   database_data:
   jwt_keys:
   secrets_vault:
+  web_sessions:
