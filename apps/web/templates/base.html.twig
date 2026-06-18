@@ -39,8 +39,12 @@
         .stat-grid .s strong { font-size:1.3rem; display:block; }
         header { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:.8rem; margin-bottom:1.2rem; }
         header .brand { color: var(--accent); text-decoration: none; font-weight: 800; font-size:1.2rem; display:inline-flex; align-items:center; }
-        header .brand img { height:38px; width:auto; display:block; }
-        header nav { margin-left:auto; display:flex; gap:1rem; font-size:.9rem; }
+        header .brand img { height:64px; width:auto; display:block; }
+        header nav { margin-left:auto; display:flex; gap:.25rem; font-size:.92rem; align-items:center; }
+        header nav a { color:var(--ink); text-decoration:none; font-weight:600; padding:.5rem .9rem; border-radius:9px; position:relative; transition:background .15s, color .15s; }
+        header nav a:hover { background:rgba(1,159,185,.12); color:var(--accent-dark); }
+        header nav a.is-active { color:var(--accent-dark); }
+        header nav a.is-active::after { content:''; position:absolute; left:.9rem; right:.9rem; bottom:.28rem; height:2px; background:var(--accent); border-radius:2px; }
         h1 { margin: .3rem 0; font-size:1.7rem; }
         h2 { margin-top:1.6rem; }
         a { color: var(--aca); }
@@ -97,10 +101,11 @@
     <header>
         <a class="brand" href="{{ path('home') }}"><img src="/logo.svg" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
+        {% set route = app.request.attributes.get('_route') %}
         <nav>
-            <a href="{{ path('home') }}">Accueil</a>
-            <a href="{{ path('project') }}">Le projet</a>
-            <a href="{{ path('process') }}">Process</a>
+            <a href="{{ path('home') }}"{{ route in ['home','node'] ? ' class="is-active"' : '' }}>Accueil</a>
+            <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
+            <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
         </nav>
     </header>
     <main>{% block body %}{% endblock %}</main>
