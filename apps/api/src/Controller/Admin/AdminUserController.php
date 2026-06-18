@@ -25,7 +25,14 @@ final class AdminUserController
         private readonly UserRepository $users,
         private readonly UserPasswordHasherInterface $hasher,
         private readonly EntityManagerInterface $em,
+        private readonly \App\Service\ActivityLogger $activity,
+        private readonly \Symfony\Bundle\SecurityBundle\Security $security,
     ) {
+    }
+
+    private function actor(): string
+    {
+        return $this->security->getUser()?->getUserIdentifier() ?? 'admin';
     }
 
     #[Route('/api/admin/users', name: 'admin_users_list', methods: ['GET'])]
@@ -66,6 +73,8 @@ final class AdminUserController
         $this->em->persist($user);
         $this->em->flush();
 
+        $this->activity->log('user', 'create', $this->actor(), \sprintf('Utilisateur créé : %s (%s)', $email, implode(', ', $user->getRoles())), ['email' => $email]);
+
         return new JsonResponse([
             'id' => $user->getId(),
             'email' => $email,
@@ -88,6 +97,8 @@ final class AdminUserController
             $user->setRoles($roles ?: [UserRole::User->value]);
         }
         $this->em->flush();
+
+        $this->activity->log('user', 'roles', $this->actor(), \sprintf('Rôles de %s mis à jour : %s', $user->getEmail(), implode(', ', $user->getRoles())), ['email' => $user->getEmail()]);
 
         return new JsonResponse(['id' => $user->getId(), 'email' => $user->getEmail(), 'roles' => $user->getRoles()]);
     }

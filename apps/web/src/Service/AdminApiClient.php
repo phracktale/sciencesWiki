@@ -116,6 +116,14 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : ['models' => [], 'default' => '', 'error' => 'Indisponible.'];
     }
 
+    /** @return array<string,mixed> journal d'audit paginé */
+    public function activity(string $category, int $page): array
+    {
+        $res = $this->send('GET', '/api/admin/activity?'.http_build_query(['category' => $category, 'page' => $page]), null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0, 'category' => $category, 'categories' => []];
+    }
+
     /** @return array<string,mixed> liste paginée d'articles */
     public function articles(string $q, int $page): array
     {

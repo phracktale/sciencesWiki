@@ -24,7 +24,14 @@ final class AdminQuestionController
         private readonly AnswerRepository $answers,
         private readonly TreeNodeRepository $nodes,
         private readonly EntityManagerInterface $em,
+        private readonly \App\Service\ActivityLogger $activity,
+        private readonly \Symfony\Bundle\SecurityBundle\Security $security,
     ) {
+    }
+
+    private function actor(): string
+    {
+        return $this->security->getUser()?->getUserIdentifier() ?? 'admin';
     }
 
     #[Route('/api/admin/questions/{id}/move', name: 'admin_question_move', methods: ['POST'], requirements: ['id' => '\d+'])]
@@ -48,6 +55,8 @@ final class AdminQuestionController
         }
         $this->em->flush();
 
+        $this->activity->log('question', 'move', $this->actor(), \sprintf('Question #%d déplacée vers « %s »', $id, $node->getLabel()), ['questionId' => $id, 'node' => $node->getSlug()]);
+
         return new JsonResponse(['id' => $id, 'node' => ['slug' => $node->getSlug(), 'label' => $node->getLabel()]]);
     }
 
@@ -59,6 +68,8 @@ final class AdminQuestionController
             return new JsonResponse(['error' => 'Question introuvable.'], Response::HTTP_NOT_FOUND);
         }
 
+        $text = mb_substr($question->getText(), 0, 120);
+
         // Suppression des réponses (cascade : révisions via orphanRemoval, notes de
         // bas de page en CASCADE base), puis de la question elle-même.
         foreach ($this->answers->findBy(['question' => $question]) as $answer) {
@@ -66,6 +77,8 @@ final class AdminQuestionController
         }
         $this->em->remove($question);
         $this->em->flush();
+
+        $this->activity->log('question', 'delete', $this->actor(), \sprintf('Question #%d supprimée : %s', $id, $text), ['questionId' => $id]);
 
         return new JsonResponse(['id' => $id, 'message' => 'Question et réponses supprimées.']);
     }

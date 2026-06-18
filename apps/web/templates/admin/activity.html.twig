@@ -1,0 +1,53 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Journal d'activité{% endblock %}
+{% block body %}
+    <p class="crumbs"><strong><a href="{{ path('admin_dashboard') }}">Administration</a></strong> ·
+        <a href="{{ path('admin_articles') }}">Articles</a> ·
+        <a href="{{ path('admin_harvest') }}">Moisson</a> ·
+        <a href="{{ path('admin_activity') }}">Journal</a> ·
+        <a href="{{ path('admin_users') }}">Utilisateurs</a> ·
+        <a href="{{ path('admin_settings') }}">Paramètres IA</a> ·
+        <a href="{{ path('admin_logout') }}">déconnexion</a></p>
+
+    <h1>Journal d'activité</h1>
+    <p class="muted">Historique des moissons, des questions posées (humain ou IA), des réponses, des modifications de la taxonomie, des utilisateurs et des réglages.</p>
+
+    {% set cats = {'': 'Tout', 'harvest': 'Moissons', 'question': 'Questions', 'answer': 'Réponses', 'node': 'Rubriques', 'user': 'Utilisateurs', 'settings': 'Réglages'} %}
+    <p>
+        {% for key, lbl in cats %}
+            {% set active = (data.category ?? '') == key %}
+            <a href="{{ path('admin_activity', { category: key }) }}" class="pill" style="{{ active ? 'background:var(--accent); color:#fff' : '' }}; text-decoration:none; margin-right:.25rem">{{ lbl }}</a>
+        {% endfor %}
+    </p>
+
+    <table style="width:100%; border-collapse:collapse; font-size:.9rem">
+        <thead>
+            <tr style="text-align:left; border-bottom:2px solid var(--line)">
+                <th style="padding:.45rem .4rem">Date</th>
+                <th style="padding:.45rem .4rem">Catégorie</th>
+                <th style="padding:.45rem .4rem">Acteur</th>
+                <th style="padding:.45rem .4rem">Événement</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for it in data.items %}
+                <tr style="border-bottom:1px solid var(--line)">
+                    <td style="padding:.45rem .4rem; white-space:nowrap" class="muted">{{ it.occurredAt }}</td>
+                    <td style="padding:.45rem .4rem"><span class="pill">{{ it.category }}</span> <span class="muted" style="font-size:.78rem">{{ it.action }}</span></td>
+                    <td style="padding:.45rem .4rem">{{ it.actor }}{% if it.ip %}<br><span class="muted" style="font-size:.72rem">{{ it.ip }}</span>{% endif %}</td>
+                    <td style="padding:.45rem .4rem">{{ it.summary }}</td>
+                </tr>
+            {% else %}
+                <tr><td colspan="4" class="muted" style="padding:.7rem .4rem">Aucun événement enregistré pour ce filtre.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    {% if data.pages > 1 %}
+        <p style="margin-top:.8rem">
+            {% if data.page > 1 %}<a href="{{ path('admin_activity', { category: data.category, page: data.page - 1 }) }}">← précédent</a>{% endif %}
+            <span class="muted">page {{ data.page }} / {{ data.pages }} ({{ data.total }} événements)</span>
+            {% if data.page < data.pages %}<a href="{{ path('admin_activity', { category: data.category, page: data.page + 1 }) }}">suivant →</a>{% endif %}
+        </p>
+    {% endif %}
+{% endblock %}

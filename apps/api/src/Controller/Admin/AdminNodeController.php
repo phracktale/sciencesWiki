@@ -23,7 +23,14 @@ final class AdminNodeController
     public function __construct(
         private readonly TreeNodeRepository $nodes,
         private readonly EntityManagerInterface $em,
+        private readonly \App\Service\ActivityLogger $activity,
+        private readonly \Symfony\Bundle\SecurityBundle\Security $security,
     ) {
+    }
+
+    private function actor(): string
+    {
+        return $this->security->getUser()?->getUserIdentifier() ?? 'admin';
     }
 
     #[Route('/api/admin/nodes', name: 'admin_node_create', methods: ['POST'])]
@@ -53,6 +60,8 @@ final class AdminNodeController
         }
         $this->em->flush();
 
+        $this->activity->log('node', 'create', $this->actor(), \sprintf('Rubrique créée : « %s »%s', $label, null !== $parent ? ' sous « '.$parent->getLabel().' »' : ' (domaine racine)'), ['slug' => $node->getSlug()]);
+
         return new JsonResponse($this->view($node), Response::HTTP_CREATED);
     }
 
@@ -73,6 +82,8 @@ final class AdminNodeController
             $node->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
         }
         $this->em->flush();
+
+        $this->activity->log('node', 'rename', $this->actor(), \sprintf('Rubrique modifiée : « %s »', $node->getLabel()), ['slug' => $node->getSlug()]);
 
         return new JsonResponse($this->view($node));
     }
@@ -104,6 +115,8 @@ final class AdminNodeController
         $this->em->persist(new TreeEdge($parent, $node, true));
         $node->setLevel($parent->getLevel() + 1);
         $this->em->flush();
+
+        $this->activity->log('node', 'move', $this->actor(), \sprintf('Rubrique « %s » déplacée sous « %s »', $node->getLabel(), $parent->getLabel()), ['slug' => $node->getSlug(), 'parent' => $parent->getSlug()]);
 
         return new JsonResponse($this->view($node));
     }

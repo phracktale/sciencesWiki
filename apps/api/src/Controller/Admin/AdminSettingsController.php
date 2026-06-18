@@ -15,8 +15,11 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class AdminSettingsController
 {
-    public function __construct(private readonly SettingsService $settings)
-    {
+    public function __construct(
+        private readonly SettingsService $settings,
+        private readonly \App\Service\ActivityLogger $activity,
+        private readonly \Symfony\Bundle\SecurityBundle\Security $security,
+    ) {
     }
 
     #[Route('/api/admin/settings', name: 'admin_settings_get', methods: ['GET'])]
@@ -35,6 +38,8 @@ final class AdminSettingsController
             $values[(string) $k] = (string) $v;
         }
         $this->settings->setMany($values);
+
+        $this->activity->log('settings', 'update', $this->security->getUser()?->getUserIdentifier() ?? 'admin', 'Paramètres modifiés : '.implode(', ', array_keys($values)), ['keys' => array_keys($values)]);
 
         return new JsonResponse($this->settings->editable());
     }

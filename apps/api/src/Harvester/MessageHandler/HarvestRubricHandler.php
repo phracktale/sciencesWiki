@@ -41,6 +41,7 @@ final class HarvestRubricHandler
         private readonly IngestionJobRepository $jobs,
         private readonly \App\Harvester\Connector\OpenAlex\OpenAlexConnector $openalex,
         private readonly \App\Harvester\OpenAlexThrottle $throttle,
+        private readonly \App\Service\ActivityLogger $activity,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {
@@ -107,5 +108,22 @@ final class HarvestRubricHandler
 
         $node->markHarvested();
         $this->em->flush();
+
+        // Journal d'audit : historique des moissons (volume, durée, statut).
+        $duration = $job->getFinishedAt()?->getTimestamp() - $job->getStartedAt()->getTimestamp();
+        $this->activity->log(
+            'harvest',
+            'harvest_run',
+            'worker',
+            \sprintf('Moisson « %s » : %d nouveaux / %d traités (%s), %d s.', $node->getLabel(), $job->getCreated(), $job->getProcessed(), $job->getStatus()->value, (int) $duration),
+            [
+                'rubric' => $node->getSlug(),
+                'created' => $job->getCreated(),
+                'processed' => $job->getProcessed(),
+                'errors' => $job->getErrors(),
+                'status' => $job->getStatus()->value,
+                'durationSeconds' => (int) $duration,
+            ],
+        );
     }
 }

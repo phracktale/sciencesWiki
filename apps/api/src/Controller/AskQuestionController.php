@@ -27,6 +27,7 @@ final class AskQuestionController
         private readonly TreeNodeRepository $nodes,
         private readonly QuestionRepository $questions,
         private readonly \App\Rag\QuestionSuggester $suggester,
+        private readonly \App\Service\ActivityLogger $activity,
         private readonly EntityManagerInterface $em,
     ) {
     }
@@ -62,6 +63,8 @@ final class AskQuestionController
         $question = $created[0];
         $question->setAskerName('IA — SciencesWiki')->setAskerIp($ip);
         $this->em->flush();
+
+        $this->activity->log('question', 'suggest', 'IA', \sprintf('Question proposée par l\'IA sous « %s » : %s', $node->getLabel(), $question->getText()), ['node' => $node->getSlug(), 'questionId' => $question->getId()], $ip);
 
         return new JsonResponse([
             'id' => $question->getId(),
@@ -108,6 +111,8 @@ final class AskQuestionController
 
         $this->em->persist($question);
         $this->em->flush();
+
+        $this->activity->log('question', 'ask', $name, \sprintf('Question posée sous « %s » : %s', $node->getLabel(), $text), ['node' => $node->getSlug(), 'questionId' => $question->getId()], $ip);
 
         return new JsonResponse([
             'id' => $question->getId(),

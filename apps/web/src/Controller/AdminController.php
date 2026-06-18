@@ -153,6 +153,21 @@ final class AdminController extends AbstractController
         return $this->render('admin/users.html.twig', ['data' => $this->admin->users()]);
     }
 
+    #[Route('/admin/activity', name: 'admin_activity', methods: ['GET'])]
+    public function activity(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/activity.html.twig', [
+            'data' => $this->admin->activity(
+                trim((string) $request->query->get('category', '')),
+                max(1, (int) $request->query->get('page', '1')),
+            ),
+        ]);
+    }
+
     #[Route('/admin/harvest', name: 'admin_harvest', methods: ['GET'])]
     public function harvest(): Response
     {
