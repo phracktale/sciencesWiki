@@ -7,6 +7,11 @@ parameters:
 framework:
     secret: '%env(APP_SECRET)%'
 
+    # Multilingue : seul le français a du contenu pour l'instant ; la structure
+    # d'URL /{_locale} est prête pour ajouter d'autres langues (ajouter ici + traductions).
+    default_locale: fr
+    enabled_locales: ['fr']
+
     # Derrière le reverse-proxy nginx (Heimdall) qui termine le TLS.
     trusted_proxies: '%env(TRUSTED_PROXIES)%'
     trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']

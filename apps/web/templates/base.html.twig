@@ -63,14 +63,14 @@
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
         <nav>
             <a href="{{ path('home') }}">Accueil</a>
-            <a href="/le-projet">Le projet</a>
-            <a href="/process-de-publication">Process</a>
+            <a href="{{ path('project') }}">Le projet</a>
+            <a href="{{ path('process') }}">Process</a>
         </nav>
     </header>
     <main>{% block body %}{% endblock %}</main>
     <footer>
         Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique ·
-        projet libre, gratuit et open source. <a href="/le-projet">En savoir plus</a>
+        projet libre, gratuit et open source. <a href="{{ path('project') }}">En savoir plus</a>
     </footer>
 
     {% if admin_session.logged %}

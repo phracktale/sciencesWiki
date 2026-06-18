@@ -19,7 +19,7 @@ final class WikiController extends AbstractController
     {
     }
 
-    #[Route('/', name: 'home', methods: ['GET'])]
+    #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], defaults: ['_locale' => 'fr'], methods: ['GET'])]
     public function home(): Response
     {
         return $this->render('wiki/home.html.twig', [
@@ -29,7 +29,7 @@ final class WikiController extends AbstractController
         ]);
     }
 
-    #[Route('/q/{id}', name: 'answer', requirements: ['id' => '\d+'], methods: ['GET'])]
+    #[Route('/{_locale}/q/{id}', name: 'answer', requirements: ['id' => '\d+', '_locale' => 'fr'], defaults: ['_locale' => 'fr'], methods: ['GET'])]
     public function answer(int $id): Response
     {
         $answer = $this->api->answer($id);
@@ -50,8 +50,8 @@ final class WikiController extends AbstractController
      * Rubrique par chemin arborescent. Le dernier segment est le slug (unique) ;
      * si le chemin ne correspond pas au chemin canonique, redirection 301 (SEO).
      */
-    #[Route('/{path}', name: 'node', requirements: ['path' => '.+'], priority: -10, methods: ['GET'])]
-    public function node(string $path): Response
+    #[Route('/{_locale}/{path}', name: 'node', requirements: ['path' => '.+', '_locale' => 'fr'], defaults: ['_locale' => 'fr'], priority: -10, methods: ['GET'])]
+    public function node(string $path, string $_locale): Response
     {
         $path = trim($path, '/');
         $segments = explode('/', $path);
@@ -65,7 +65,7 @@ final class WikiController extends AbstractController
         $crumbs = $node['breadcrumb'] ?? [];
         $canonical = implode('/', array_map(static fn (array $c): string => (string) $c['slug'], $crumbs));
         if ('' !== $canonical && $canonical !== $path) {
-            return $this->redirect('/'.$canonical, Response::HTTP_MOVED_PERMANENTLY);
+            return $this->redirectToRoute('node', ['_locale' => $_locale, 'path' => $canonical], Response::HTTP_MOVED_PERMANENTLY);
         }
 
         return $this->render('wiki/node.html.twig', [

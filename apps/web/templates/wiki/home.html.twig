@@ -7,7 +7,7 @@
     <p class="muted">
         Posez une question sur une notion scientifique : une réponse vous est rédigée,
         <strong>sourcée sur des publications de recherche</strong> et expliquée simplement.
-        Projet libre, gratuit et open source. <a href="/le-projet">Découvrir le projet →</a>
+        Projet libre, gratuit et open source. <a href="{{ path('project') }}">Découvrir le projet →</a>
     </p>
 
     {% if stats.publications is defined and stats.publications > 0 %}
@@ -28,7 +28,7 @@
                     <a class="q-title" href="{{ path('answer', { id: q.answerId }) }}">{{ q.title }}</a>
                     <div class="qmeta">
                         <span class="pill author">✍️ {{ q.author }}</span>
-                        <a class="pill node" href="/{{ q.node.slug }}">{{ q.node.label }}</a>
+                        <a class="pill node" href="/{{ app.request.locale }}/{{ q.node.slug }}">{{ q.node.label }}</a>
                         {% if q.status == 'valide' %}
                             <span class="badge ok">✅ validé</span>
                         {% else %}
@@ -44,7 +44,7 @@
     <h2>Explorer par domaine</h2>
     <div class="grid">
         {% for domain in domains %}
-            <a class="card" href="/{{ domain.slug }}">
+            <a class="card" href="/{{ app.request.locale }}/{{ domain.slug }}">
                 <strong>{{ domain.label }}</strong><br>
                 <span class="muted">{{ domain.childrenCount }} champ(s)</span>
             </a>

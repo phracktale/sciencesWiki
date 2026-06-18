@@ -10,7 +10,7 @@
             {% set acc = '' %}
             {% for c in crumbs %}
                 {% set acc = (acc == '') ? c.slug : acc ~ '/' ~ c.slug %}
-                <a href="/{{ acc }}">{{ c.label }}</a>{% if not loop.last %} › {% endif %}
+                <a href="/{{ app.request.locale }}/{{ acc }}">{{ c.label }}</a>{% if not loop.last %} › {% endif %}
             {% endfor %}
         </p>
     {% endif %}
@@ -108,6 +108,6 @@ L'équipe SciencesWiki
     </div>
 
     {% if answer.node.slug is defined %}
-        <p class="muted">↩ Retour à la rubrique <a href="/{{ answer.node.slug }}">{{ answer.node.label }}</a></p>
+        <p class="muted">↩ Retour à la rubrique <a href="/{{ app.request.locale }}/{{ answer.node.slug }}">{{ answer.node.label }}</a></p>
     {% endif %}
 {% endblock %}

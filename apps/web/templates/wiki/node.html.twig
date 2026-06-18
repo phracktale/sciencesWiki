@@ -13,7 +13,7 @@
             {% set acc = '' %}
             {% for c in crumbs %}
                 {% set acc = (acc == '' ) ? c.slug : acc ~ '/' ~ c.slug %}
-                {% if not loop.last %}<a href="/{{ acc }}">{{ c.label }}</a> › {% else %}<span class="muted">{{ c.label }}</span>{% endif %}
+                {% if not loop.last %}<a href="/{{ app.request.locale }}/{{ acc }}">{{ c.label }}</a> › {% else %}<span class="muted">{{ c.label }}</span>{% endif %}
             {% endfor %}
         </p>
     {% endif %}
@@ -32,7 +32,7 @@
         <div class="grid">
             {% for child in node.children %}
                 {% set cs = (childrenStats[child.slug] ?? {}) %}
-                <a class="card" href="/{{ path }}/{{ child.slug }}">
+                <a class="card" href="/{{ app.request.locale }}/{{ path }}/{{ child.slug }}">
                     {{ child.label }}
                     <span style="display:block; margin-top:.45rem">
                         <span class="pill node" title="Publications référencées (cette sous-rubrique et ses descendantes)">📚 {{ (cs.publications ?? 0)|number_format(0, ',', ' ') }}</span>
