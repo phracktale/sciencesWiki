@@ -64,6 +64,9 @@ services:
       RUN_INIT: "1"
     volumes:
       - jwt_keys:/app/config/jwt:rw
+      # Coffre de secrets persistant (survit aux rebuilds) : clés + secrets chiffrés
+      # (OPENALEX_API_KEY, BREVO_*…). Généré une fois via secrets:generate-keys.
+      - secrets_vault:/app/config/secrets:rw
     ports:
       - "${API_PORT:-8000}:80"
     restart: unless-stopped
@@ -94,6 +97,9 @@ services:
       LLM_API_TOKEN: ${LLM_API_TOKEN}
       # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
     command: ["php", "bin/console", "messenger:consume", "harvester", "failed", "-v", "--time-limit=3600", "--memory-limit=256M"]
+    # Même coffre de secrets que l'api (le worker déchiffre OPENALEX_API_KEY pour la moisson).
+    volumes:
+      - secrets_vault:/app/config/secrets:rw
     # Le worker ne sert pas de HTTP : on neutralise le healthcheck HTTP hérité
     # de l'image FrankenPHP (sinon faux « unhealthy »).
     healthcheck:
@@ -122,3 +128,4 @@ services:
 volumes:
   database_data:
   jwt_keys:
+  secrets_vault:
