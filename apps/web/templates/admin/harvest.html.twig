@@ -94,9 +94,9 @@
             // Progression = cumul moissonné pour la rubrique / cible. Cible = plafond
             // configuré, sinon total dispo chez OpenAlex, sinon la taille de lot.
             var cumulative = job.cumulativeProcessed != null ? job.cumulativeProcessed : job.processed;
-            var target = HARVEST.capPerRubric > 0 ? HARVEST.capPerRubric
-                       : (job.available != null && job.available > 0 ? job.available : HARVEST.maxPerRun);
-            if (job.available != null && job.available > 0 && target > job.available) target = job.available;
+            // Cible = OBJECTIF DE MOISSON configuré (plafond/rubrique, sinon taille de
+            // lot). Le total OpenAlex n'est PAS la cible : il s'affiche à part (≈ N).
+            var target = HARVEST.capPerRubric > 0 ? HARVEST.capPerRubric : HARVEST.maxPerRun;
             var pct = target > 0 ? Math.min(100, Math.round((cumulative / target) * 100)) : 0;
             var running = job.status === 'running' && !job.stale;
             var color = job.stale ? '#9ca3af' : (running ? 'var(--accent)' : (job.errors > 0 || job.status === 'failed' ? '#dc2626' : '#16a34a'));
