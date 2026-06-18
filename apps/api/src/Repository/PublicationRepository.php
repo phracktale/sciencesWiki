@@ -70,7 +70,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             \sprintf(
                 "SELECT id FROM publication
                  WHERE oa_url IS NOT NULL AND oa_url <> '' AND fulltext_fetched_at IS NULL
-                 ORDER BY id DESC LIMIT %d",
+                 ORDER BY (oa_url ILIKE '%%.pdf%%') DESC, id DESC LIMIT %d",
                 max(1, $limit),
             ),
         )->fetchFirstColumn();

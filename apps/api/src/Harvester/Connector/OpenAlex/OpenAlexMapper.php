@@ -29,7 +29,12 @@ final class OpenAlexMapper
         $primaryLocation = \is_array($work['primary_location'] ?? null) ? $work['primary_location'] : [];
         $bestOaLocation = \is_array($work['best_oa_location'] ?? null) ? $work['best_oa_location'] : [];
 
-        $oaUrl = $openAccess['oa_url'] ?? ($bestOaLocation['pdf_url'] ?? null);
+        // On privilégie le PDF DIRECT (téléchargeable + vectorisable) à la page
+        // d'atterrissage HTML (open_access.oa_url) — sinon on ne récupère pas le texte.
+        $oaUrl = $bestOaLocation['pdf_url']
+            ?? ($primaryLocation['pdf_url'] ?? null)
+            ?? ($openAccess['oa_url'] ?? null)
+            ?? ($bestOaLocation['landing_page_url'] ?? null);
         $isOa = (bool) ($openAccess['is_oa'] ?? false);
 
         return new RawPublication(
