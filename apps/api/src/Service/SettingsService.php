@@ -20,6 +20,10 @@ final class SettingsService
     public const RAG_MODEL = 'rag.model';
     public const RAG_NEIGHBORS = 'rag.neighbors';
 
+    // Limites d'interrogation de l'API OpenAlex (adaptables au plan/au polite pool).
+    public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
+    public const OPENALEX_PER_DAY = 'openalex.per_day';
+
     public const DEFAULT_SYSTEM_PROMPT = <<<'TXT'
         Tu es un rédacteur de vulgarisation scientifique pour SciencesWiki, une
         encyclopédie libre d'éducation populaire en français.
@@ -50,6 +54,10 @@ final class SettingsService
         self::RAG_MAX_TOKENS => '1200',
         self::RAG_MODEL => '',
         self::RAG_NEIGHBORS => '6',
+        // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
+        // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
+        self::OPENALEX_PER_MINUTE => '540',
+        self::OPENALEX_PER_DAY => '100000',
     ];
 
     /** @var array<string,string>|null */
@@ -89,6 +97,18 @@ final class SettingsService
         $v = $this->get(self::RAG_MODEL);
 
         return null !== $v && '' !== trim($v) ? trim($v) : null;
+    }
+
+    /** Nombre maximal de requêtes OpenAlex par minute (≥ 1). */
+    public function openalexPerMinute(): int
+    {
+        return max(1, (int) ($this->get(self::OPENALEX_PER_MINUTE) ?? self::DEFAULTS[self::OPENALEX_PER_MINUTE]));
+    }
+
+    /** Plafond quotidien de requêtes OpenAlex (≥ 1). */
+    public function openalexPerDay(): int
+    {
+        return max(1, (int) ($this->get(self::OPENALEX_PER_DAY) ?? self::DEFAULTS[self::OPENALEX_PER_DAY]));
     }
 
     public function get(string $name): ?string

@@ -94,6 +94,23 @@ final class OpenAlexConnector implements SourceConnector
     }
 
     /**
+     * Nombre total de travaux OpenAlex correspondant à un filtre (meta.count),
+     * via une requête légère (1 résultat). Sert à connaître le volume disponible
+     * et ce qu'il reste à moissonner. Renvoie null si indéterminé.
+     */
+    public function countWorks(string $filter): ?int
+    {
+        $data = $this->getJson($this->baseUrl.'/works', [
+            'per-page' => 1,
+            'filter' => $filter,
+            'mailto' => $this->contactEmail,
+        ]);
+        $count = $data['meta']['count'] ?? null;
+
+        return is_numeric($count) ? (int) $count : null;
+    }
+
+    /**
      * @return array<string,mixed>
      */
     private function request(string $cursor, ?\DateTimeImmutable $since, ?string $extraFilter = null): array
@@ -142,6 +159,8 @@ final class OpenAlexConnector implements SourceConnector
 
             $status = $response->getStatusCode();
             if (429 !== $status && 503 !== $status) {
+                $this->recordCreditHeaders($response->getHeaders(false));
+
                 return $response->toArray(); // 2xx attendu ; sinon lève une exception explicite
             }
 
@@ -160,6 +179,35 @@ final class OpenAlexConnector implements SourceConnector
             $delay = $retryAfter > 0 ? min($retryAfter, 30) : min(2 ** $attempt, 30);
             sleep($delay);
         }
+    }
+
+    /**
+     * Mémorise l'état de limite/crédit OpenAlex annoncé par les en-têtes
+     * X-RateLimit-* (limite quotidienne réelle, restant, crédit USD, coût, reset).
+     * On n'utilise pas de clé API (polite pool via mailto), mais OpenAlex renvoie
+     * tout de même ces valeurs.
+     *
+     * @param array<string,list<string>> $headers (clés en minuscules)
+     */
+    private function recordCreditHeaders(array $headers): void
+    {
+        $num = static function (string $name) use ($headers) {
+            $v = $headers[$name][0] ?? null;
+
+            return is_numeric($v) ? $v + 0 : null;
+        };
+
+        $this->throttle->recordCredits([
+            // Limite quotidienne RÉELLE d'OpenAlex (nombre de requêtes) et restant.
+            'openalex.rl.limit' => $num('x-ratelimit-limit'),
+            'openalex.rl.remaining' => $num('x-ratelimit-remaining'),
+            'openalex.rl.credits_used' => $num('x-ratelimit-credits-used') ?? $num('x-ratelimit-cost-usd'),
+            'openalex.rl.reset' => $num('x-ratelimit-reset'),
+            // Budget de crédits USD (le cas échéant).
+            'openalex.credit.limit_usd' => $num('x-ratelimit-limit-usd'),
+            'openalex.credit.remaining_usd' => $num('x-ratelimit-remaining-usd'),
+            'openalex.credit.cost_usd' => $num('x-ratelimit-cost-usd'),
+        ]);
     }
 
     private function userAgent(): string

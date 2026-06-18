@@ -169,6 +169,27 @@ final class AdminController extends AbstractController
         return new JsonResponse($this->admin->harvestStatus());
     }
 
+    /** Relance/annule une moisson depuis le suivi (fetch JSON ; CSRF dans le corps). */
+    #[Route('/admin/harvest/{op}', name: 'admin_harvest_op', methods: ['POST'], requirements: ['op' => 'relaunch|cancel'])]
+    public function harvestOp(string $op, Request $request): JsonResponse
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+        $payload = json_decode($request->getContent() ?: '[]', true) ?: [];
+        if (!\is_array($payload) || !$this->csrf->isValidToken((string) ($payload['_csrf'] ?? ''))) {
+            return new JsonResponse(['error' => 'Jeton de sécurité invalide.'], 419);
+        }
+        $nodeId = (int) ($payload['nodeId'] ?? 0);
+        if ($nodeId <= 0) {
+            return new JsonResponse(['error' => 'Rubrique inconnue.'], 422);
+        }
+
+        $result = 'relaunch' === $op ? $this->admin->harvestNode($nodeId) : $this->admin->cancelHarvest($nodeId);
+
+        return new JsonResponse($result['data'], $result['ok'] ? 200 : ($result['status'] ?: 500));
+    }
+
     #[Route('/admin/openalex-search', name: 'admin_openalex_search', methods: ['GET'])]
     public function openalexSearch(Request $request): Response
     {

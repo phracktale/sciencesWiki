@@ -9,21 +9,27 @@
         <a href="{{ path('admin_logout') }}">déconnexion</a></p>
 
     <h1>Suivi de la moisson <span id="live" class="pill" style="font-size:.7rem; vertical-align:middle">● en direct</span></h1>
-    <p class="muted">État de chaque moisson lancée depuis le back-office : en attente, en cours, terminée ou en erreur. Les dépassements des limites de l'API OpenAlex (quota quotidien) sont signalés en rouge. Rafraîchi automatiquement.</p>
+    <p class="muted">État de chaque moisson lancée depuis le back-office : en attente, en cours, terminée ou en erreur. Volume, durée et modèle d'embeddings indiqués. Les dépassements des limites OpenAlex sont signalés en rouge.</p>
 
     <div class="grid">
         <div class="card">
             <span class="muted">File d'attente (workers)</span><br>
             <strong id="queued" style="font-size:1.6rem">{{ status.queued ?? 0 }}</strong> moisson(s) en attente
         </div>
-        <div class="card" id="oa-card">
-            <span class="muted">Quota OpenAlex aujourd'hui ({{ status.openalex.date ?? '' }})</span><br>
+        <div class="card">
+            <span class="muted">Requêtes OpenAlex aujourd'hui ({{ status.openalex.date ?? '' }})</span><br>
             <strong id="oa-used" style="font-size:1.6rem">{{ (status.openalex.used ?? 0)|number_format(0,',',' ') }}</strong>
-            <span class="muted">/ {{ (status.openalex.cap ?? 100000)|number_format(0,',',' ') }} requêtes</span>
+            <span class="muted">/ <span id="oa-cap">{{ (status.openalex.perDay ?? 0)|number_format(0,',',' ') }}</span> (plafond interne) · <span id="oa-min">{{ status.openalex.perMinute ?? 0 }}</span>/min</span>
             <div style="margin-top:.4rem; height:8px; background:var(--line); border-radius:4px; overflow:hidden">
                 <div id="oa-bar" style="height:100%; width:0%; background:var(--accent)"></div>
             </div>
-            <p id="oa-warn" class="badge warn" hidden style="margin-top:.4rem">⛔ Quota quotidien OpenAlex atteint — les moissons échoueront jusqu'à demain.</p>
+            <p id="oa-warn" class="badge warn" hidden style="margin-top:.4rem">⛔ Plafond interne quotidien atteint — augmentez-le dans les Paramètres.</p>
+        </div>
+        <div class="card">
+            <span class="muted">Crédit OpenAlex <span id="oa-key" class="pill" style="font-size:.65rem">sans clé API</span></span><br>
+            <strong id="oa-credit-spent" style="font-size:1.6rem">—</strong>
+            <span class="muted">$ dépensés / <span id="oa-credit-limit">—</span> $ accordés</span>
+            <p class="muted" style="font-size:.78rem; margin:.3rem 0 0">Limite OpenAlex du jour : <strong id="oa-api-remaining">—</strong> / <span id="oa-api-limit">—</span> requêtes restantes. Polite pool gratuit (mailto), en-têtes lus <span id="oa-credit-at"></span>.</p>
         </div>
     </div>
 
@@ -33,21 +39,23 @@
             <tr style="text-align:left; border-bottom:2px solid var(--line)">
                 <th style="padding:.5rem .4rem">Rubrique</th>
                 <th style="padding:.5rem .4rem">État</th>
-                <th style="padding:.5rem .4rem; width:28%">Progression</th>
+                <th style="padding:.5rem .4rem; width:22%">Progression</th>
                 <th style="padding:.5rem .4rem; text-align:right">Nouveaux</th>
-                <th style="padding:.5rem .4rem; text-align:right">Erreurs</th>
-                <th style="padding:.5rem .4rem">Démarrée</th>
+                <th style="padding:.5rem .4rem; text-align:right">Durée</th>
+                <th style="padding:.5rem .4rem">Actions</th>
             </tr>
         </thead>
         <tbody id="jobs"><tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Chargement…</td></tr></tbody>
     </table>
+    <p class="muted" style="font-size:.82rem; margin-top:.6rem">Modèle d'embeddings utilisé : <strong id="emb-model">{{ status.embeddingModel ?? '—' }}</strong>.</p>
 
     <script type="application/json" id="bootstrap">{{ status|json_encode|raw }}</script>
     <script>
     (function () {
         var tbody = document.getElementById('jobs');
         if (!tbody) return;
-        var MAX_PER_RUN = 500; // borne par exécution côté worker (proxy de progression)
+        var MAX_PER_RUN = 500;
+        var CSRF = {{ admin_csrf.token|json_encode|raw }};
 
         function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
@@ -55,6 +63,14 @@
             if (!s) return '—';
             var d = new Date(s.replace(' ', 'T'));
             return isNaN(d) ? esc(s) : d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function fmtDuration(sec) {
+            if (sec == null) return '—';
+            if (sec < 60) return sec + ' s';
+            var m = Math.floor(sec / 60), s = sec % 60;
+            if (m < 60) return m + ' min ' + (s < 10 ? '0' : '') + s + ' s';
+            return Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
         }
 
         function badge(job) {
@@ -79,45 +95,84 @@
                    '<span class="muted" style="font-size:.78rem">' + job.processed + ' traité(s)</span>';
         }
 
+        function actions(job) {
+            if (!job.nodeId) return '<span class="muted">—</span>';
+            var pending = job.status === 'running' && !job.stale;
+            return '<button type="button" class="js-relaunch" data-node="' + job.nodeId + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid var(--accent); background:#fff; color:var(--accent); border-radius:6px">↻ Relancer</button> ' +
+                   '<button type="button" class="js-cancel" data-node="' + job.nodeId + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid #d1d5db; background:#fff; color:#6b7280; border-radius:6px"' + (pending ? '' : ' title="Annule seulement les moissons en attente"') + '>✕ Annuler</button>';
+        }
+
         function row(job) {
             var label = esc(job.label || job.rubric || '—');
             var name = job.rubric ? '<a class="q-title" href="/admin/r/' + esc(job.rubric) + '">' + label + '</a>' : label;
+            if (job.available != null) name += '<div class="muted" style="font-size:.74rem">≈ ' + job.available.toLocaleString('fr-FR') + ' articles chez OpenAlex</div>';
             var errLine = job.log ? '<div class="muted" style="font-size:.78rem; color:#b91c1c; margin-top:.2rem">' + esc(job.log) + '</div>' : '';
+            var started = '<div class="muted" style="font-size:.74rem">' + fmtDate(job.startedAt) + '</div>';
             return '<tr style="border-bottom:1px solid var(--line)">' +
                 '<td style="padding:.5rem .4rem">' + name + errLine + '</td>' +
                 '<td style="padding:.5rem .4rem">' + badge(job) + '</td>' +
                 '<td style="padding:.5rem .4rem">' + bar(job) + '</td>' +
                 '<td style="padding:.5rem .4rem; text-align:right"><strong>' + job.created + '</strong></td>' +
-                '<td style="padding:.5rem .4rem; text-align:right">' + (job.errors > 0 ? '<span style="color:#b91c1c">' + job.errors + '</span>' : '0') + '</td>' +
-                '<td style="padding:.5rem .4rem">' + fmtDate(job.startedAt) + '</td>' +
+                '<td style="padding:.5rem .4rem; text-align:right">' + fmtDuration(job.durationSeconds) + started + '</td>' +
+                '<td style="padding:.5rem .4rem; white-space:nowrap">' + actions(job) + '</td>' +
                 '</tr>';
         }
 
         function render(data) {
             var jobs = data.jobs || [];
             tbody.innerHTML = jobs.length ? jobs.map(row).join('') :
-                '<tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Aucune moisson lancée pour le moment. Utilisez « Moissonner cette rubrique » depuis une rubrique.</td></tr>';
+                '<tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Aucune moisson lancée. Utilisez « Moissonner cette rubrique » depuis une rubrique.</td></tr>';
 
             document.getElementById('queued').textContent = data.queued || 0;
+            if (data.embeddingModel) document.getElementById('emb-model').textContent = data.embeddingModel;
+
             var oa = data.openalex || {};
             document.getElementById('oa-used').textContent = (oa.used || 0).toLocaleString('fr-FR');
-            var pct = oa.cap ? Math.min(100, (oa.used / oa.cap) * 100) : 0;
+            document.getElementById('oa-cap').textContent = (oa.perDay || 0).toLocaleString('fr-FR');
+            document.getElementById('oa-min').textContent = oa.perMinute || 0;
+            var pct = oa.perDay ? Math.min(100, (oa.used / oa.perDay) * 100) : 0;
             var oaBar = document.getElementById('oa-bar');
             oaBar.style.width = pct + '%';
             oaBar.style.background = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : 'var(--accent)');
             document.getElementById('oa-warn').hidden = !oa.exhausted;
+
+            document.getElementById('oa-credit-spent').textContent = oa.creditSpentUsd != null ? oa.creditSpentUsd.toFixed(4) : '—';
+            document.getElementById('oa-credit-limit').textContent = oa.creditLimitUsd != null ? oa.creditLimitUsd.toFixed(2) : '—';
+            document.getElementById('oa-api-remaining').textContent = oa.apiDailyRemaining != null ? oa.apiDailyRemaining.toLocaleString('fr-FR') : '—';
+            document.getElementById('oa-api-limit').textContent = oa.apiDailyLimit != null ? oa.apiDailyLimit.toLocaleString('fr-FR') : '—';
+            document.getElementById('oa-credit-at').textContent = oa.creditUpdatedAt ? '(' + fmtDate(oa.creditUpdatedAt) + ')' : '(jamais)';
         }
 
-        try { render(JSON.parse(document.getElementById('bootstrap').textContent)); } catch (e) {}
+        function op(kind, nodeId, btn) {
+            btn.disabled = true;
+            fetch('/admin/harvest/' + kind, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nodeId: nodeId, _csrf: CSRF })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+                btn.disabled = false;
+                if (window.alert) alert(res.d.message || res.d.error || (res.ok ? 'OK' : 'Erreur'));
+                poll();
+            })
+            .catch(function () { btn.disabled = false; });
+        }
 
-        var timer = setInterval(function () {
+        tbody.addEventListener('click', function (e) {
+            var r = e.target.closest('.js-relaunch'), c = e.target.closest('.js-cancel');
+            if (r) op('relaunch', +r.dataset.node, r);
+            else if (c) op('cancel', +c.dataset.node, c);
+        });
+
+        function poll() {
             fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (d) { if (d) render(d); })
                 .catch(function () {});
-        }, 4000);
+        }
 
-        // Arrête le polling quand on quitte la page (navigation Turbo).
+        try { render(JSON.parse(document.getElementById('bootstrap').textContent)); } catch (e) {}
+        var timer = setInterval(poll, 4000);
         document.addEventListener('turbo:before-cache', function () { clearInterval(timer); }, { once: true });
     })();
     </script>

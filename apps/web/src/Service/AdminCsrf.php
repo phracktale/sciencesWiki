@@ -33,8 +33,12 @@ final class AdminCsrf
 
     public function isValid(Request $request): bool
     {
-        $submitted = (string) $request->request->get('_csrf', '');
+        return $this->isValidToken((string) $request->request->get('_csrf', ''));
+    }
 
+    /** Valide un jeton transmis hors formulaire (ex. fetch JSON). */
+    public function isValidToken(string $submitted): bool
+    {
         return '' !== $submitted && hash_equals($this->getToken(), $submitted);
     }
 }

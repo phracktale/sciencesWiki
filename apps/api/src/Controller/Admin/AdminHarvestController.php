@@ -4,22 +4,24 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Service\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Suivi de la moisson (ROLE_ADMIN) : état de chaque worker/rubrique (en attente,
- * en cours, terminé, en erreur), nombre de publications moissonnées, et remontée
- * explicite des erreurs — notamment le dépassement des limites de l'API OpenAlex
- * (quota quotidien), qui est journalisé dans IngestionJob.log par HarvestRunner.
+ * en cours, terminé, en erreur), volume + durée, et remontée explicite des
+ * erreurs (dépassement des limites OpenAlex). Affiche aussi la transparence
+ * OpenAlex : on n'utilise PAS de clé API (polite pool via mailto) ; le crédit
+ * accordé et le coût dépensé du jour proviennent des en-têtes x-ratelimit-*-usd.
  */
 final class AdminHarvestController
 {
-    private const DAILY_CAP = 100000;
-
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly SettingsService $settings,
+    ) {
     }
 
     #[Route('/api/admin/harvest/status', name: 'admin_harvest_status', methods: ['GET'])]
@@ -28,12 +30,11 @@ final class AdminHarvestController
         $conn = $this->em->getConnection();
 
         // --- Travaux de moisson par rubrique (40 plus récents) ---
-        // La requête JSON de l'IngestionJob porte 'rubric' => slug pour les
-        // moissons ciblées lancées depuis le back-office.
         $rows = $conn->executeQuery(
-            "SELECT j.id, j.query->>'rubric' AS rubric, tn.label AS label,
+            "SELECT j.id, j.query->>'rubric' AS rubric, tn.id AS node_id, tn.label AS label,
                     j.started_at, j.finished_at, j.processed, j.created, j.errors,
                     j.status, j.log,
+                    EXTRACT(EPOCH FROM (COALESCE(j.finished_at, now()) - j.started_at)) AS duration_s,
                     (j.status = 'running' AND j.started_at < now() - interval '10 minutes') AS stale
              FROM ingestion_job j
              LEFT JOIN tree_node tn ON tn.slug = (j.query->>'rubric')
@@ -44,24 +45,24 @@ final class AdminHarvestController
 
         $jobs = array_map(static function (array $r): array {
             $log = $r['log'] ?? null;
-            // Dépassement des limites OpenAlex : quota quotidien interne, ou
-            // réponse HTTP 429 / rate limit renvoyée par l'API.
-            $isQuota = null !== $log && preg_match('/quota|rate ?limit|429|too many/i', (string) $log) === 1;
+            // Dépassement des limites OpenAlex : plafond interne, réponse 429,
+            // ou filtre payant (« plan upgrade required »).
+            $isQuota = null !== $log && preg_match('/quota|rate ?limit|429|too many|plan upgrade|plafond/i', (string) $log) === 1;
 
             return [
                 'id' => (int) $r['id'],
                 'rubric' => $r['rubric'],
+                'nodeId' => null !== $r['node_id'] ? (int) $r['node_id'] : null,
                 'label' => $r['label'] ?? $r['rubric'],
                 'startedAt' => $r['started_at'],
                 'finishedAt' => $r['finished_at'],
+                'durationSeconds' => null !== $r['duration_s'] ? (int) round((float) $r['duration_s']) : null,
                 'processed' => (int) $r['processed'],
                 'created' => (int) $r['created'],
                 'errors' => (int) $r['errors'],
                 'status' => $r['status'],
                 'log' => $log,
                 'rateLimited' => $isQuota,
-                // Job « en cours » mais sans activité depuis longtemps : worker
-                // arrêté en plein traitement (ex. redémarrage), job orphelin.
                 'stale' => (bool) $r['stale'],
             ];
         }, $rows);
@@ -77,23 +78,74 @@ final class AdminHarvestController
             // Table absente (autre transport) : on laisse 0.
         }
 
-        // --- Quota quotidien OpenAlex (compteur partagé géré par OpenAlexThrottle) ---
+        // --- Total disponible chez OpenAlex par rubrique (meta.count mémorisé) ---
+        $totals = [];
+        foreach ($conn->executeQuery("SELECT name, value FROM setting WHERE name LIKE 'openalex.total.%'")->fetchAllAssociative() as $row) {
+            $totals[substr((string) $row['name'], \strlen('openalex.total.'))] = (int) $row['value'];
+        }
+        foreach ($jobs as &$job) {
+            $job['available'] = $job['rubric'] !== null && isset($totals[$job['rubric']]) ? $totals[$job['rubric']] : null;
+        }
+        unset($job);
+
+        // --- Limites & crédits OpenAlex (valeurs RÉELLES lues sur les en-têtes) ---
         $today = date('Y-m-d');
-        $used = (int) ($conn->executeQuery(
-            "SELECT value FROM setting WHERE name = :n",
-            ['n' => 'openalex.count.'.$today],
-        )->fetchOne() ?: 0);
+        $s = $this->readSettings([
+            'openalex.count.'.$today,
+            'openalex.rl.limit', 'openalex.rl.remaining', 'openalex.rl.reset', 'openalex.rl.credits_used',
+            'openalex.credit.limit_usd', 'openalex.credit.remaining_usd', 'openalex.credit.cost_usd', 'openalex.credit.updated_at',
+        ]);
+        $num = static fn (string $k): ?float => isset($s[$k]) && is_numeric($s[$k]) ? (float) $s[$k] : null;
+
+        $used = (int) ($s['openalex.count.'.$today] ?? 0);
+        $perDay = $this->settings->openalexPerDay();
+        $apiLimit = $num('openalex.rl.limit');       // limite quotidienne réelle d'OpenAlex (nb requêtes)
+        $apiRemaining = $num('openalex.rl.remaining');
+        $limitUsd = $num('openalex.credit.limit_usd');
+        $remainingUsd = $num('openalex.credit.remaining_usd');
 
         return new JsonResponse([
             'jobs' => $jobs,
             'queued' => $queued,
-            'running' => array_values(array_filter($jobs, static fn (array $j): bool => 'running' === $j['status'])),
+            'embeddingModel' => $_SERVER['EMBEDDING_MODEL'] ?? $_ENV['EMBEDDING_MODEL'] ?? 'sentence-transformers (Marvin)',
             'openalex' => [
                 'date' => $today,
+                'usesApiKey' => false,
+                // Garde-fou interne (cadence configurable en back-office).
                 'used' => $used,
-                'cap' => self::DAILY_CAP,
-                'exhausted' => $used >= self::DAILY_CAP,
+                'perDay' => $perDay,
+                'perMinute' => $this->settings->openalexPerMinute(),
+                'exhausted' => $used >= $perDay,
+                // Valeurs RÉELLES annoncées par OpenAlex (en-têtes X-RateLimit-*).
+                'apiDailyLimit' => null !== $apiLimit ? (int) $apiLimit : null,
+                'apiDailyRemaining' => null !== $apiRemaining ? (int) $apiRemaining : null,
+                'creditLimitUsd' => $limitUsd,
+                'creditRemainingUsd' => $remainingUsd,
+                'creditSpentUsd' => (null !== $limitUsd && null !== $remainingUsd) ? round($limitUsd - $remainingUsd, 4) : null,
+                'creditCostUsd' => $num('openalex.credit.cost_usd'),
+                'creditUpdatedAt' => $s['openalex.credit.updated_at'] ?? null,
             ],
         ]);
+    }
+
+    /**
+     * @param list<string> $names
+     *
+     * @return array<string,string>
+     */
+    private function readSettings(array $names): array
+    {
+        $rows = $this->em->getConnection()->executeQuery(
+            'SELECT name, value FROM setting WHERE name IN (:names)',
+            ['names' => $names],
+            ['names' => \Doctrine\DBAL\ArrayParameterType::STRING],
+        )->fetchAllAssociative();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[(string) $row['name']] = (string) $row['value'];
+        }
+
+        return $out;
     }
 }

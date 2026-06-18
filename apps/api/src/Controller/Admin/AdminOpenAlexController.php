@@ -142,6 +142,31 @@ final class AdminOpenAlexController
         return new JsonResponse(['message' => 'Moisson de la rubrique lancée en arrière-plan (le worker traite la file).']);
     }
 
+    #[\Symfony\Component\Routing\Attribute\Route('/api/admin/nodes/{id}/harvest/cancel', name: 'admin_node_harvest_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function cancelHarvest(int $id): JsonResponse
+    {
+        // Annule les moissons EN ATTENTE pour ce nœud (messages non encore pris par
+        // un worker). Le message HarvestRubric ne contient que le nodeId (sérialisé
+        // « i:<id>; »), borné au type de message pour éviter les faux positifs.
+        // Une moisson déjà EN COURS n'est pas interrompue (bornée à 500, elle finit).
+        try {
+            $cancelled = $this->em->getConnection()->executeStatement(
+                "DELETE FROM messenger_messages
+                 WHERE delivered_at IS NULL AND body LIKE '%HarvestRubric%' AND body LIKE :idpat",
+                ['idpat' => '%i:'.$id.';%'],
+            );
+        } catch (\Throwable) {
+            $cancelled = 0;
+        }
+
+        return new JsonResponse([
+            'cancelled' => $cancelled,
+            'message' => $cancelled > 0
+                ? \sprintf('%d moisson(s) en attente annulée(s).', $cancelled)
+                : 'Aucune moisson en attente à annuler (une moisson déjà en cours se termine d\'elle-même).',
+        ]);
+    }
+
     /** @return array<string,true> */
     private function existingConceptIds(): array
     {

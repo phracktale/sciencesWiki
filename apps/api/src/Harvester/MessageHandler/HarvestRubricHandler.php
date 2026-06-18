@@ -39,6 +39,8 @@ final class HarvestRubricHandler
         private readonly PublicationEmbedder $embedder,
         private readonly PlacementSuggester $suggester,
         private readonly IngestionJobRepository $jobs,
+        private readonly \App\Harvester\Connector\OpenAlex\OpenAlexConnector $openalex,
+        private readonly \App\Harvester\OpenAlexThrottle $throttle,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {
@@ -67,6 +69,17 @@ final class HarvestRubricHandler
         // pagination de la dernière exécution réussie (gratuit). Le dédoublonnage
         // par DOI garantit l'absence de doublons en cas de recouvrement.
         $resume = $this->jobs->findResumeCursorForRubric($node->getSlug());
+
+        // Volume total disponible chez OpenAlex (meta.count) → permet de savoir ce
+        // qu'il reste à moissonner. Non bloquant si la requête échoue.
+        try {
+            $total = $this->openalex->countWorks($filter);
+            if (null !== $total) {
+                $this->throttle->recordRubricTotal($node->getSlug(), $total);
+            }
+        } catch (\Throwable) {
+            // ignore : le comptage est purement informatif
+        }
 
         $cursor = new DiscoveryCursor(
             cursor: $resume,
