@@ -117,32 +117,13 @@ final class HarvestRubricHandler
         $job = $this->runner->run($source, $cursor, false, ['rubric' => $node->getSlug(), 'filter' => $filter]);
         $this->logger->info('Moisson rubrique', ['rubric' => $node->getSlug(), 'created' => $job->getCreated(), 'processed' => $job->getProcessed()]);
 
-        // Enrichissement des nouvelles publications : embeddings PAR LOTS (un seul
-        // appel au service ml/ pour ~64 publications → bien plus rapide qu'unitaire).
-        // Borné pour maîtriser la mémoire ; le reliquat est repris au prochain run.
-        $enrichLimit = min(max(1, $maxPerRun) * 2, self::MAX_ENRICH_PER_RUN);
-        $needing = $this->publications->findNeedingEmbedding($enrichLimit);
-        foreach (array_chunk($needing, 64) as $batch) {
-            try {
-                $this->embedder->embedMany($batch);
-                $this->em->flush();
-            } catch (\Throwable $e) {
-                $this->logger->warning('Lot d\'embeddings échoué : '.$e->getMessage());
-            }
-        }
-
-        foreach ($this->publications->findNeedingPlacement($enrichLimit) as $publication) {
-            $this->suggester->suggest($publication, 3);
-        }
-        $this->em->flush();
-
-        // Texte intégral des publications en accès libre : téléchargement du PDF
-        // sur le site de l'éditeur/dépôt, extraction et vectorisation par fragments
-        // (borné par exécution pour ne pas surcharger l'inférence d'embeddings).
+        // IMPORTANT : le message de moisson ne fait QUE fetch + import (rapide), pour
+        // que la file s'enchaîne vite et que plusieurs workers traitent des rubriques
+        // en parallèle. L'enrichissement coûteux (embeddings, placement, texte
+        // intégral) est DÉCOUPLÉ et assuré par des crons dédiés (embed-drain */10,
+        // fulltext-drain */15). Le faire inline rendait chaque job 10–20× plus long
+        // (jusqu'à 19 min) et provoquait des « timeouts » au recyclage du worker.
         $fulltextChunks = 0;
-        foreach ($this->publications->findNeedingFulltext(self::MAX_FULLTEXT_PER_RUN) as $publication) {
-            $fulltextChunks += $this->fulltext->ingest($publication);
-        }
 
         $node->markHarvested();
         $this->em->flush();
