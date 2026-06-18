@@ -16,7 +16,7 @@
         <table style="width:100%; border-collapse:collapse; font-size:.9rem">
             <thead>
                 <tr style="text-align:left; border-bottom:2px solid var(--line)">
-                    <th style="padding:.4rem">Titre</th><th>Auteurs</th><th>Date</th><th>Revue</th><th>Accès</th>
+                    <th style="padding:.4rem">Titre</th><th>Auteurs</th><th>Date</th><th>Revue</th><th>Accès</th><th>Indexation</th><th>PDF</th>
                 </tr>
             </thead>
             <tbody>
@@ -33,6 +33,15 @@
                             {% if a.access == 'libre' %}<span class="badge ok">libre</span>
                             {% elseif a.access == 'payant' %}<span class="badge warn">payant</span>
                             {% else %}<span class="pill">inconnu</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if a.indexation == 'fulltext' %}<span class="badge ok" title="{{ a.chunks }} fragment(s) vectorisé(s)">texte intégral</span>
+                            {% else %}<span class="pill">résumé seul</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if a.pdf == 'vectorise' %}<span class="badge ok" title="PDF téléchargé et vectorisé">📄 PDF</span>
+                            {% elseif a.pdf == 'lien' %}<span class="pill" title="Lien d'accès libre (PDF ou page éditeur)">🔗 lien</span>
+                            {% else %}<span class="muted">—</span>{% endif %}
                         </td>
                     </tr>
                 {% endfor %}

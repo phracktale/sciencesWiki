@@ -45,6 +45,7 @@ final class AdminArticlesController
         $rows = $conn->executeQuery(
             "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url,
                     to_char(p.publication_date, 'YYYY-MM-DD') AS date,
+                    (SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) AS chunks,
                     (SELECT string_agg(a.name, ', ' ORDER BY au.position)
                        FROM authorship au JOIN author a ON a.id = au.author_id
                       WHERE au.publication_id = p.id) AS authors
@@ -58,6 +59,8 @@ final class AdminArticlesController
         $items = array_map(function (array $r): array {
             $status = (string) $r['oa_status'];
             $access = \in_array($status, self::OPEN, true) ? 'libre' : ('closed' === $status ? 'payant' : 'inconnu');
+            $chunks = (int) $r['chunks'];
+            $oaUrl = (string) ($r['oa_url'] ?? '');
 
             return [
                 'id' => (int) $r['id'],
@@ -68,7 +71,12 @@ final class AdminArticlesController
                 'doi' => $r['doi'],
                 'oaStatus' => $status,
                 'access' => $access,
-                'url' => $r['oa_url'] ?: ($r['doi'] ? 'https://doi.org/'.$r['doi'] : null),
+                'url' => $oaUrl ?: ($r['doi'] ? 'https://doi.org/'.$r['doi'] : null),
+                // Indexation RAG : texte intégral (fragments présents) ou résumé seul.
+                'indexation' => $chunks > 0 ? 'fulltext' : 'abstract',
+                'chunks' => $chunks,
+                // PDF : vectorisé (fragments) > lien OA présent > aucun.
+                'pdf' => $chunks > 0 ? 'vectorise' : ('' !== $oaUrl ? 'lien' : 'aucun'),
             ];
         }, $rows);
 
