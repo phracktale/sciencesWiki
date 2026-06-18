@@ -111,15 +111,28 @@ final class AdminHarvestController
         }, $rows);
 
         // --- File d'attente Messenger (moissons pas encore prises par un worker) ---
+        // On récupère aussi les nodeId en attente (sérialisés « i:<id>; ») pour
+        // marquer précisément quelles rubriques sont en file.
         $queued = 0;
+        $queuedNodeIds = [];
         try {
-            $queued = (int) $conn->executeQuery(
-                "SELECT count(*) FROM messenger_messages
+            $bodies = $conn->executeQuery(
+                "SELECT body FROM messenger_messages
                  WHERE delivered_at IS NULL AND body LIKE '%HarvestRubric%'"
-            )->fetchOne();
+            )->fetchFirstColumn();
+            $queued = \count($bodies);
+            foreach ($bodies as $body) {
+                if (preg_match('/i:(\d+);/', (string) $body, $m)) {
+                    $queuedNodeIds[(int) $m[1]] = true;
+                }
+            }
         } catch (\Throwable) {
             // Table absente (autre transport) : on laisse 0.
         }
+        foreach ($jobs as &$jb) {
+            $jb['queued'] = null !== $jb['nodeId'] && isset($queuedNodeIds[$jb['nodeId']]);
+        }
+        unset($jb);
 
         // --- Total disponible chez OpenAlex par rubrique (meta.count mémorisé) ---
         $totals = [];

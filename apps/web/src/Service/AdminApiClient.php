@@ -187,6 +187,12 @@ final class AdminApiClient
     }
 
     /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function deleteHarvestLine(int $nodeId): array
+    {
+        return $this->send('POST', '/api/admin/nodes/'.$nodeId.'/harvest/delete', []);
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
     public function cleanupHarvest(string $mode): array
     {
         return $this->send('POST', '/api/admin/harvest/cleanup', ['mode' => $mode]);

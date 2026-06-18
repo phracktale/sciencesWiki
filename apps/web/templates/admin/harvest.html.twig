@@ -41,6 +41,7 @@
         <button type="button" class="js-cleanup" data-mode="all" style="font:inherit; cursor:pointer; padding:.3rem .7rem; border:1px solid #fca5a5; background:#fee2e2; color:#b91c1c; border-radius:6px">🗑 Tout réinitialiser</button>
         <span class="muted" style="font-size:.8rem; align-self:center">(n'affecte pas le corpus moissonné — uniquement le journal des moissons)</span>
     </p>
+    <div id="action-status" hidden style="margin:.4rem 0; padding:.5rem .8rem; border-radius:8px; font-size:.9rem"></div>
     <table style="width:100%; border-collapse:collapse; font-size:.92rem">
         <thead>
             <tr style="text-align:left; border-bottom:2px solid var(--line)">
@@ -80,11 +81,14 @@
             return Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
         }
 
+        function isActive(job) { return (job.status === 'running' && !job.stale) || job.queued; }
+
         function badge(job) {
+            if (job.stale) return '<span class="badge warn">⛔ interrompue (timeout)</span>';
             if (job.rateLimited) return '<span class="badge warn">⛔ limite OpenAlex</span>';
-            if (job.stale) return '<span class="badge warn">⚠️ interrompue</span>';
+            if (job.queued && job.status !== 'running') return '<span class="badge warn"><span class="loader"></span> en file d\'attente</span>';
             switch (job.status) {
-                case 'running': return '<span class="badge warn">⏳ en cours</span>';
+                case 'running': return '<span class="badge warn"><span class="loader"></span> en cours…</span>';
                 case 'ok': return '<span class="badge ok">✅ terminée</span>';
                 case 'partial': return '<span class="badge warn">⚠️ terminée (erreurs)</span>';
                 case 'failed': return '<span class="badge warn">⛔ échec</span>';
@@ -104,9 +108,16 @@
 
         function actions(job) {
             if (!job.nodeId) return '<span class="muted">—</span>';
-            var pending = job.status === 'running' && !job.stale;
-            return '<button type="button" class="js-relaunch" data-node="' + job.nodeId + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid var(--accent); background:#fff; color:var(--accent); border-radius:6px">↻ Relancer</button> ' +
-                   '<button type="button" class="js-cancel" data-node="' + job.nodeId + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid #d1d5db; background:#fff; color:#6b7280; border-radius:6px"' + (pending ? '' : ' title="Annule seulement les moissons en attente"') + '>✕ Annuler</button>';
+            var active = isActive(job);
+            // Relancer désactivé tant que la moisson est active (en cours / en file).
+            var relaunch = '<button type="button" class="js-relaunch" data-node="' + job.nodeId + '"' +
+                (active ? ' disabled title="Déjà en cours ou en file"' : '') +
+                ' style="font:inherit; cursor:' + (active ? 'not-allowed' : 'pointer') + '; padding:.25rem .55rem; border:1px solid var(--accent); background:#fff; color:var(--accent); border-radius:6px; opacity:' + (active ? '.45' : '1') + '">↻ Relancer</button>';
+            // Annuler : pertinent si en file/en cours.
+            var cancel = active ? ' <button type="button" class="js-cancel" data-node="' + job.nodeId + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid #d1d5db; background:#fff; color:#6b7280; border-radius:6px">✕ Annuler</button>' : '';
+            // Supprimer la ligne : toujours dispo (utile sur timeout/orpheline).
+            var del = ' <button type="button" class="js-delete" data-node="' + job.nodeId + '" data-label="' + esc(job.label || job.rubric) + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid #fca5a5; background:#fff; color:#b91c1c; border-radius:6px">🗑</button>';
+            return relaunch + cancel + del;
         }
 
         function row(job) {
@@ -156,25 +167,39 @@
             document.getElementById('oa-credit-at').textContent = oa.creditUpdatedAt ? '(' + fmtDate(oa.creditUpdatedAt) + ')' : '(jamais)';
         }
 
-        function op(kind, nodeId, btn) {
+        var statusBox = document.getElementById('action-status');
+        function showStatus(msg, ok) {
+            statusBox.hidden = false;
+            statusBox.textContent = msg;
+            statusBox.style.background = ok ? '#dcfce7' : '#fee2e2';
+            statusBox.style.color = ok ? '#166534' : '#b91c1c';
+        }
+
+        function op(kind, nodeId, btn, label) {
             btn.disabled = true;
+            var prev = btn.innerHTML;
+            btn.innerHTML = '<span class="loader"></span>';
+            showStatus('Requête en cours…', true);
             fetch('/admin/harvest/' + kind, {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ nodeId: nodeId, _csrf: CSRF })
             })
-            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
             .then(function (res) {
-                btn.disabled = false;
-                if (window.alert) alert(res.d.message || res.d.error || (res.ok ? 'OK' : 'Erreur'));
+                btn.innerHTML = prev; btn.disabled = false;
+                // Un 409 (déjà en cours / en file) est informatif, pas une erreur bloquante.
+                var ok = res.ok || res.status === 409;
+                showStatus((label ? label + ' : ' : '') + (res.d.message || res.d.error || (res.ok ? 'OK' : 'Erreur ' + res.status)), ok);
                 poll();
             })
-            .catch(function () { btn.disabled = false; });
+            .catch(function (err) { btn.innerHTML = prev; btn.disabled = false; showStatus('Échec réseau : ' + err, false); });
         }
 
         tbody.addEventListener('click', function (e) {
-            var r = e.target.closest('.js-relaunch'), c = e.target.closest('.js-cancel');
-            if (r) op('relaunch', +r.dataset.node, r);
-            else if (c) op('cancel', +c.dataset.node, c);
+            var r = e.target.closest('.js-relaunch'), c = e.target.closest('.js-cancel'), d = e.target.closest('.js-delete');
+            if (r && !r.disabled) op('relaunch', +r.dataset.node, r, r.closest('tr').querySelector('.q-title') ? r.closest('tr').querySelector('.q-title').textContent : '');
+            else if (c) op('cancel', +c.dataset.node, c, '');
+            else if (d) { if (confirm('Supprimer la ligne « ' + d.dataset.label + ' » du suivi ? (le corpus n\'est pas touché)')) op('delete', +d.dataset.node, d, d.dataset.label); }
         });
 
         var confirmMsg = {

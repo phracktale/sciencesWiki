@@ -140,9 +140,56 @@ final class AdminOpenAlexController
             return new JsonResponse(['error' => 'Cette rubrique n\'est pas mappée à un concept OpenAlex.'], 422);
         }
 
+        // Anti-doublon : on ne relance pas si une moisson est déjà EN COURS (récente,
+        // non orpheline) ou DÉJÀ EN FILE pour cette rubrique.
+        $conn = $this->em->getConnection();
+        $running = (int) $conn->executeQuery(
+            "SELECT count(*) FROM ingestion_job
+             WHERE query->>'rubric' = :slug AND status = 'running' AND started_at > now() - interval '10 minutes'",
+            ['slug' => $node->getSlug()],
+        )->fetchOne();
+        if ($running > 0) {
+            return new JsonResponse(['message' => 'Moisson déjà en cours pour cette rubrique.', 'state' => 'running'], 409);
+        }
+        try {
+            $pending = $conn->executeQuery(
+                "SELECT count(*) FROM messenger_messages WHERE delivered_at IS NULL AND body LIKE '%HarvestRubric%' AND body LIKE :p",
+                ['p' => '%i:'.$id.';%'],
+            )->fetchOne();
+            if ((int) $pending > 0) {
+                return new JsonResponse(['message' => 'Moisson déjà en file d\'attente pour cette rubrique.', 'state' => 'queued'], 409);
+            }
+        } catch (\Throwable) {
+            // pas de table messenger : on continue
+        }
+
         $this->bus->dispatch(new \App\Harvester\Message\HarvestRubric($id));
 
-        return new JsonResponse(['message' => 'Moisson de la rubrique lancée en arrière-plan (le worker traite la file).']);
+        return new JsonResponse(['message' => 'Moisson mise en file ; le worker va la traiter.', 'state' => 'queued']);
+    }
+
+    #[\Symfony\Component\Routing\Attribute\Route('/api/admin/nodes/{id}/harvest/delete', name: 'admin_node_harvest_delete', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function deleteHarvestLine(int $id): JsonResponse
+    {
+        $node = $this->nodes->find($id);
+        if (null === $node) {
+            return new JsonResponse(['error' => 'Rubrique introuvable.'], 404);
+        }
+        $conn = $this->em->getConnection();
+        // Supprime aussi les messages en file pour cette rubrique (sinon la ligne réapparaît).
+        try {
+            $conn->executeStatement(
+                "DELETE FROM messenger_messages WHERE delivered_at IS NULL AND body LIKE '%HarvestRubric%' AND body LIKE :p",
+                ['p' => '%i:'.$id.';%'],
+            );
+        } catch (\Throwable) {
+        }
+        $deleted = (int) $conn->executeStatement(
+            "DELETE FROM ingestion_job WHERE query->>'rubric' = :slug",
+            ['slug' => $node->getSlug()],
+        );
+
+        return new JsonResponse(['deleted' => $deleted, 'message' => \sprintf('Ligne supprimée (%d exécution(s)).', $deleted)]);
     }
 
     #[\Symfony\Component\Routing\Attribute\Route('/api/admin/nodes/{id}/harvest/cancel', name: 'admin_node_harvest_cancel', methods: ['POST'], requirements: ['id' => '\d+'])]

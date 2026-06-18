@@ -190,7 +190,7 @@ final class AdminController extends AbstractController
     }
 
     /** Relance/annule une moisson depuis le suivi (fetch JSON ; CSRF dans le corps). */
-    #[Route('/admin/harvest/{op}', name: 'admin_harvest_op', methods: ['POST'], requirements: ['op' => 'relaunch|cancel'])]
+    #[Route('/admin/harvest/{op}', name: 'admin_harvest_op', methods: ['POST'], requirements: ['op' => 'relaunch|cancel|delete'])]
     public function harvestOp(string $op, Request $request): JsonResponse
     {
         if (!$this->admin->isLogged()) {
@@ -205,7 +205,12 @@ final class AdminController extends AbstractController
             return new JsonResponse(['error' => 'Rubrique inconnue.'], 422);
         }
 
-        $result = 'relaunch' === $op ? $this->admin->harvestNode($nodeId) : $this->admin->cancelHarvest($nodeId);
+        $result = match ($op) {
+            'relaunch' => $this->admin->harvestNode($nodeId),
+            'cancel' => $this->admin->cancelHarvest($nodeId),
+            'delete' => $this->admin->deleteHarvestLine($nodeId),
+            default => ['ok' => false, 'status' => 400, 'data' => ['error' => 'Action inconnue.']],
+        };
 
         return new JsonResponse($result['data'], $result['ok'] ? 200 : ($result['status'] ?: 500));
     }
