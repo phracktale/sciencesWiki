@@ -210,6 +210,22 @@ final class AdminController extends AbstractController
         return new JsonResponse($result['data'], $result['ok'] ? 200 : ($result['status'] ?: 500));
     }
 
+    /** Nettoyage du journal des moissons (doublons / terminées / tout). */
+    #[Route('/admin/harvest/cleanup', name: 'admin_harvest_cleanup', methods: ['POST'])]
+    public function harvestCleanup(Request $request): JsonResponse
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+        $payload = json_decode($request->getContent() ?: '[]', true) ?: [];
+        if (!\is_array($payload) || !$this->csrf->isValidToken((string) ($payload['_csrf'] ?? ''))) {
+            return new JsonResponse(['error' => 'Jeton de sécurité invalide.'], 419);
+        }
+        $result = $this->admin->cleanupHarvest((string) ($payload['mode'] ?? ''));
+
+        return new JsonResponse($result['data'], $result['ok'] ? 200 : ($result['status'] ?: 500));
+    }
+
     #[Route('/admin/openalex-search', name: 'admin_openalex_search', methods: ['GET'])]
     public function openalexSearch(Request $request): Response
     {

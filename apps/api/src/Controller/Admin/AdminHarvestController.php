@@ -21,7 +21,44 @@ final class AdminHarvestController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SettingsService $settings,
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire(env: 'OPENALEX_API_KEY')]
+        private readonly string $openalexApiKey = '',
     ) {
+    }
+
+    /**
+     * Nettoyage du journal des moissons (lignes ingestion_job des rubriques) :
+     *  - duplicates : ne garde que la plus récente par rubrique (préserve le curseur de reprise) ;
+     *  - finished   : supprime les moissons non actives (terminées, en erreur, ou « en cours » orphelines >10 min) ;
+     *  - all        : supprime toutes les lignes de moisson par rubrique.
+     * N'affecte JAMAIS le corpus (publications, embeddings, placements).
+     */
+    #[Route('/api/admin/harvest/cleanup', name: 'admin_harvest_cleanup', methods: ['POST'])]
+    public function cleanup(\Symfony\Component\HttpFoundation\Request $request): JsonResponse
+    {
+        $mode = (string) (json_decode($request->getContent() ?: '[]', true)['mode'] ?? '');
+        $conn = $this->em->getConnection();
+
+        $sql = match ($mode) {
+            'duplicates' => "DELETE FROM ingestion_job
+                WHERE query->>'rubric' IS NOT NULL
+                  AND id NOT IN (SELECT max(id) FROM ingestion_job WHERE query->>'rubric' IS NOT NULL GROUP BY query->>'rubric')",
+            'finished' => "DELETE FROM ingestion_job
+                WHERE query->>'rubric' IS NOT NULL
+                  AND (status <> 'running' OR started_at < now() - interval '10 minutes')",
+            'all' => "DELETE FROM ingestion_job WHERE query->>'rubric' IS NOT NULL",
+            default => null,
+        };
+        if (null === $sql) {
+            return new JsonResponse(['error' => 'Mode inconnu (duplicates|finished|all).'], 422);
+        }
+
+        $deleted = (int) $conn->executeStatement($sql);
+
+        return new JsonResponse([
+            'deleted' => $deleted,
+            'message' => \sprintf('%d ligne(s) de moisson supprimée(s).', $deleted),
+        ]);
     }
 
     #[Route('/api/admin/harvest/status', name: 'admin_harvest_status', methods: ['GET'])]
@@ -110,7 +147,7 @@ final class AdminHarvestController
             'embeddingModel' => $_SERVER['EMBEDDING_MODEL'] ?? $_ENV['EMBEDDING_MODEL'] ?? 'sentence-transformers (Marvin)',
             'openalex' => [
                 'date' => $today,
-                'usesApiKey' => false,
+                'usesApiKey' => '' !== $this->openalexApiKey,
                 // Garde-fou interne (cadence configurable en back-office).
                 'used' => $used,
                 'perDay' => $perDay,

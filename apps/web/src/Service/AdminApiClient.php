@@ -186,6 +186,12 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/nodes/'.$nodeId.'/harvest/cancel', []);
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function cleanupHarvest(string $mode): array
+    {
+        return $this->send('POST', '/api/admin/harvest/cleanup', ['mode' => $mode]);
+    }
+
     /** @return array<string,mixed> état des moissons (workers, progression, quota OpenAlex) */
     public function harvestStatus(): array
     {

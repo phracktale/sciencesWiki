@@ -35,6 +35,12 @@
     </div>
 
     <h2>Moissons par rubrique</h2>
+    <p style="display:flex; gap:.5rem; flex-wrap:wrap; margin:.2rem 0 .8rem">
+        <button type="button" class="js-cleanup" data-mode="duplicates" style="font:inherit; cursor:pointer; padding:.3rem .7rem; border:1px solid #d1d5db; background:#fff; border-radius:6px">🧹 Purger les doublons</button>
+        <button type="button" class="js-cleanup" data-mode="finished" style="font:inherit; cursor:pointer; padding:.3rem .7rem; border:1px solid #d1d5db; background:#fff; border-radius:6px">✅ Supprimer les terminées</button>
+        <button type="button" class="js-cleanup" data-mode="all" style="font:inherit; cursor:pointer; padding:.3rem .7rem; border:1px solid #fca5a5; background:#fee2e2; color:#b91c1c; border-radius:6px">🗑 Tout réinitialiser</button>
+        <span class="muted" style="font-size:.8rem; align-self:center">(n'affecte pas le corpus moissonné — uniquement le journal des moissons)</span>
+    </p>
     <table style="width:100%; border-collapse:collapse; font-size:.92rem">
         <thead>
             <tr style="text-align:left; border-bottom:2px solid var(--line)">
@@ -137,6 +143,12 @@
             oaBar.style.background = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : 'var(--accent)');
             document.getElementById('oa-warn').hidden = !oa.exhausted;
 
+            var keyBadge = document.getElementById('oa-key');
+            if (keyBadge) {
+                keyBadge.textContent = oa.usesApiKey ? 'avec clé API' : 'sans clé API';
+                keyBadge.style.background = oa.usesApiKey ? '#dcfce7' : '#f1f5f9';
+                keyBadge.style.color = oa.usesApiKey ? '#166534' : '#475569';
+            }
             document.getElementById('oa-credit-spent').textContent = oa.creditSpentUsd != null ? oa.creditSpentUsd.toFixed(4) : '—';
             document.getElementById('oa-credit-limit').textContent = oa.creditLimitUsd != null ? oa.creditLimitUsd.toFixed(2) : '—';
             document.getElementById('oa-api-remaining').textContent = oa.apiDailyRemaining != null ? oa.apiDailyRemaining.toLocaleString('fr-FR') : '—';
@@ -163,6 +175,26 @@
             var r = e.target.closest('.js-relaunch'), c = e.target.closest('.js-cancel');
             if (r) op('relaunch', +r.dataset.node, r);
             else if (c) op('cancel', +c.dataset.node, c);
+        });
+
+        var confirmMsg = {
+            duplicates: 'Purger les doublons (ne garder que la dernière moisson par rubrique) ?',
+            finished: 'Supprimer toutes les lignes de moisson terminées / en erreur / orphelines ?',
+            all: 'Tout réinitialiser : supprimer TOUTES les lignes de moisson ? (le corpus n\'est pas touché)'
+        };
+        Array.prototype.forEach.call(document.querySelectorAll('.js-cleanup'), function (btn) {
+            btn.addEventListener('click', function () {
+                var mode = btn.dataset.mode;
+                if (!confirm(confirmMsg[mode])) return;
+                btn.disabled = true;
+                fetch('/admin/harvest/cleanup', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode, _csrf: CSRF })
+                })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) { btn.disabled = false; alert(res.d.message || res.d.error || 'OK'); poll(); })
+                .catch(function () { btn.disabled = false; });
+            });
         });
 
         function poll() {
