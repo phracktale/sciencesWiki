@@ -82,6 +82,9 @@ final class HarvestRubricHandler
         // ou primary_topic.id:<concept> pour un topic (niveau 3).
         $key = self::FILTER_KEY[$node->getLevel()] ?? null;
         $filter = null !== $key ? 'primary_topic.'.$key.'.id:'.$concept : 'primary_topic.id:'.$concept;
+        // Exclut les « paratext » d'OpenAlex (sommaires, pages de garde de revue
+        // dont le titre est le nom du journal, sans auteur) : ce ne sont pas des articles.
+        $filter .= ',type:!paratext';
 
         // Fenêtre de récence (paramétrable) : ne garder que les N dernières années.
         if ($recentYears > 0) {
