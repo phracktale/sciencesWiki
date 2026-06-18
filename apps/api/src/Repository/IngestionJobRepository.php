@@ -28,4 +28,23 @@ class IngestionJobRepository extends ServiceEntityRepository
 
         return $job?->getEndCursor();
     }
+
+    /**
+     * Curseur de reprise pour une rubrique donnée (moisson par concept). On reprend
+     * la pagination là où la dernière exécution réussie s'est arrêtée. Si la dernière
+     * exécution avait épuisé le jeu de résultats (curseur nul), on repart de zéro
+     * (re-balayage, le dédup par DOI évite les doublons).
+     */
+    public function findResumeCursorForRubric(string $rubricSlug): ?string
+    {
+        $cursor = $this->getEntityManager()->getConnection()->executeQuery(
+            "SELECT end_cursor FROM ingestion_job
+             WHERE query->>'rubric' = :slug AND status IN ('ok', 'partial')
+             ORDER BY started_at DESC
+             LIMIT 1",
+            ['slug' => $rubricSlug],
+        )->fetchOne();
+
+        return false === $cursor || null === $cursor ? null : (string) $cursor;
+    }
 }

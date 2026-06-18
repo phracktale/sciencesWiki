@@ -9,6 +9,7 @@ use App\Harvester\Ai\PlacementSuggester;
 use App\Harvester\Dto\DiscoveryCursor;
 use App\Harvester\HarvestRunner;
 use App\Harvester\Message\HarvestRubric;
+use App\Repository\IngestionJobRepository;
 use App\Repository\PublicationRepository;
 use App\Repository\SourceRepository;
 use App\Repository\TreeNodeRepository;
@@ -18,9 +19,9 @@ use Symfony\Component\Messenger\Attribute\AsMessageHandler;
 
 /**
  * Moisson ciblée d'une rubrique : récupère d'OpenAlex les travaux dont le
- * concept primaire correspond à la rubrique (incrémental via la date de
- * dernière moisson), les importe (dédup DOI), calcule les embeddings et propose
- * leur placement. Borné par exécution ; re-déclencher reprend l'incrément.
+ * concept primaire correspond à la rubrique (incrémental via reprise du curseur
+ * de pagination), les importe (dédup DOI), calcule les embeddings et propose
+ * leur placement. Borné par exécution ; re-déclencher reprend là où on s'était arrêté.
  */
 #[AsMessageHandler]
 final class HarvestRubricHandler
@@ -37,6 +38,7 @@ final class HarvestRubricHandler
         private readonly PublicationRepository $publications,
         private readonly PublicationEmbedder $embedder,
         private readonly PlacementSuggester $suggester,
+        private readonly IngestionJobRepository $jobs,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
     ) {
@@ -59,8 +61,15 @@ final class HarvestRubricHandler
         $key = self::FILTER_KEY[$node->getLevel()] ?? null;
         $filter = null !== $key ? 'primary_topic.'.$key.'.id:'.$concept : 'primary_topic.id:'.$concept;
 
+        // NB : on n'utilise PAS le filtre `from_updated_date` d'OpenAlex : il est
+        // désormais réservé aux offres payantes (réponse 429 « Plan upgrade
+        // required »). L'incrémental se fait donc par reprise du curseur de
+        // pagination de la dernière exécution réussie (gratuit). Le dédoublonnage
+        // par DOI garantit l'absence de doublons en cas de recouvrement.
+        $resume = $this->jobs->findResumeCursorForRubric($node->getSlug());
+
         $cursor = new DiscoveryCursor(
-            since: $node->getLastHarvestedAt(),
+            cursor: $resume,
             maxRecords: self::MAX_PER_RUN,
             filter: $filter,
         );
