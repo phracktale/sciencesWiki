@@ -57,9 +57,9 @@ final class AdminApiClient
     }
 
     /** @return array{ok:bool,status:int,data:array<string,mixed>} */
-    public function renameNode(int $id, string $label, ?string $description): array
+    public function renameNode(int $id, string $label, ?string $description, ?string $imageUrl = null): array
     {
-        return $this->send('PATCH', '/api/admin/nodes/'.$id, ['label' => $label, 'description' => $description]);
+        return $this->send('PATCH', '/api/admin/nodes/'.$id, ['label' => $label, 'description' => $description, 'imageUrl' => $imageUrl]);
     }
 
     /** @return array{ok:bool,status:int,data:array<string,mixed>} */

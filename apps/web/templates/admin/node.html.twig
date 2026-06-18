@@ -21,6 +21,9 @@
         <input type="text" name="label" value="{{ node.label }}" required>
         <label>Description</label>
         <textarea name="description">{{ node.description }}</textarea>
+        <label>Image de fond du lanceur (URL) <span class="muted">— laisser vide = dégradé coloré</span></label>
+        <input type="text" name="image_url" value="{{ node.imageUrl }}" placeholder="https://…/image.jpg">
+        {% if node.imageUrl %}<img src="{{ node.imageUrl }}" alt="" style="max-height:80px; border-radius:8px; margin-top:.4rem">{% endif %}
         <button type="submit">Enregistrer</button>
     </form>
 

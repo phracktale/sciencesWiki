@@ -60,6 +60,11 @@ class TreeNode
     #[Groups(['node:read'])]
     private ?string $description = null;
 
+    /** Image de fond du lanceur (URL) ; repli sur un dégradé si absente. */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?string $imageUrl = null;
+
     #[ORM\Column(length: 128, nullable: true)]
     #[Groups(['node:read'])]
     private ?string $domain = null;
@@ -217,6 +222,18 @@ class TreeNode
     public function setDescription(?string $description): self
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getImageUrl(): ?string
+    {
+        return $this->imageUrl;
+    }
+
+    public function setImageUrl(?string $imageUrl): self
+    {
+        $this->imageUrl = $imageUrl;
 
         return $this;
     }

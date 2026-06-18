@@ -81,6 +81,10 @@ final class AdminNodeController
         if (\array_key_exists('description', $data)) {
             $node->setDescription(null !== $data['description'] ? (string) $data['description'] : null);
         }
+        if (\array_key_exists('imageUrl', $data)) {
+            $url = trim((string) ($data['imageUrl'] ?? ''));
+            $node->setImageUrl('' !== $url ? $url : null);
+        }
         $this->em->flush();
 
         $this->activity->log('node', 'rename', $this->actor(), \sprintf('Rubrique modifiée : « %s »', $node->getLabel()), ['slug' => $node->getSlug()]);

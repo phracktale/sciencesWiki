@@ -424,6 +424,7 @@ final class AdminController extends AbstractController
                 (int) $request->request->get('id'),
                 trim((string) $request->request->get('label')),
                 trim((string) $request->request->get('description')) ?: null,
+                trim((string) $request->request->get('image_url')) ?: null,
             ),
             'add-child' => $this->admin->createNode(
                 trim((string) $request->request->get('label')),

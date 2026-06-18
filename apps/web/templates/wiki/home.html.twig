@@ -31,8 +31,8 @@
             <h2>Explorer par domaine</h2>
             <div class="domains">
                 {% for domain in domains %}
-                    <a class="domain-card" href="/{{ app.request.locale }}/{{ domain.slug }}"
-                       style="background:{{ palette[loop.index0 % palette|length] }}">
+                    {% set bg = domain.imageUrl ? 'center/cover no-repeat url(' ~ domain.imageUrl ~ ')' : palette[loop.index0 % palette|length] %}
+                    <a class="domain-card" href="/{{ app.request.locale }}/{{ domain.slug }}" style="background:{{ bg }}">
                         <span class="d-label">{{ domain.label }}</span><br>
                         <span class="d-sub">{{ domain.childrenCount }} sous-domaine(s)</span>
                     </a>
