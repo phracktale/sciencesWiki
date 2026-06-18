@@ -64,6 +64,11 @@ class Answer
     #[Groups(['answer:read'])]
     private bool $generatedByAi = true;
 
+    /** Vrai si une source citée a été rétractée/signalée après validation : à revalider. */
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['answer:read'])]
+    private bool $needsRevalidation = false;
+
     #[ORM\Column]
     #[Groups(['answer:read'])]
     private bool $academicBlockValidated = false;
@@ -209,6 +214,18 @@ class Answer
     public function getValidationStatus(): AnswerValidationStatus
     {
         return $this->validationStatus;
+    }
+
+    public function needsRevalidation(): bool
+    {
+        return $this->needsRevalidation;
+    }
+
+    public function setNeedsRevalidation(bool $v): self
+    {
+        $this->needsRevalidation = $v;
+
+        return $this;
     }
 
     public function setValidationStatus(AnswerValidationStatus $status): self

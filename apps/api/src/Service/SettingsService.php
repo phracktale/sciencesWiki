@@ -37,7 +37,7 @@ final class SettingsService
         - La VULGARISATION doit être compréhensible par un ÉLÈVE DE COLLÈGE
           (12-15 ans) : phrases courtes, vocabulaire simple, analogies concrètes,
           tout terme technique expliqué avec des mots simples.
-        - La section ACADEMIQUE peut être plus précise/technique : faits établis,
+        - La section ACADEMIQUE peut être plus précise/technique : faits établis en liste,
           chacun suivi de sa ou ses citations [n]. Reste neutre et rigoureux.
 
         Réponds EXACTEMENT avec ces trois sections, dans cet ordre, et rien d'autre :
@@ -50,14 +50,14 @@ final class SettingsService
         TXT;
 
     private const DEFAULTS = [
-        self::RAG_TEMPERATURE => '0.2',
-        self::RAG_MAX_TOKENS => '1200',
+        self::RAG_TEMPERATURE => '0.6',
+        self::RAG_MAX_TOKENS => '10000',
         self::RAG_MODEL => '',
         self::RAG_NEIGHBORS => '6',
         // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
-        self::OPENALEX_PER_DAY => '100000',
+        self::OPENALEX_PER_DAY => '10000',
     ];
 
     /** @var array<string,string>|null */

@@ -122,16 +122,18 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         // ressorte même si son résumé est moins proche. L'unité reste la publication.
         $rows = $this->getEntityManager()->getConnection()->executeQuery(
             \sprintf(
-                'SELECT id, MIN(distance) AS distance FROM (
+                "SELECT id, MIN(distance) AS distance FROM (
                     SELECT id, embedding <=> CAST(:vec AS vector) AS distance
-                    FROM publication WHERE embedding IS NOT NULL
+                    FROM publication
+                    WHERE embedding IS NOT NULL AND retraction_status = 'none'
                     UNION ALL
-                    SELECT publication_id AS id, embedding <=> CAST(:vec AS vector) AS distance
-                    FROM publication_chunk WHERE embedding IS NOT NULL
+                    SELECT pc.publication_id AS id, pc.embedding <=> CAST(:vec AS vector) AS distance
+                    FROM publication_chunk pc JOIN publication p ON p.id = pc.publication_id
+                    WHERE pc.embedding IS NOT NULL AND p.retraction_status = 'none'
                  ) AS combined
                  GROUP BY id
                  ORDER BY distance ASC
-                 LIMIT %d',
+                 LIMIT %d",
                 $k,
             ),
             ['vec' => $literal],

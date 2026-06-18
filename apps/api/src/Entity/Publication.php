@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use App\Enum\OaStatus;
 use App\Enum\ProcessingStatus;
+use App\Enum\RetractionStatus;
 use App\Repository\PublicationRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -95,6 +96,15 @@ class Publication
 
     #[ORM\Column(length: 16, enumType: ProcessingStatus::class)]
     private ProcessingStatus $processingStatus = ProcessingStatus::ToProcess;
+
+    /** Statut de rétractation / mise en garde (Retraction Watch / Crossref). */
+    #[ORM\Column(length: 16, enumType: RetractionStatus::class)]
+    #[Groups(['publication:read'])]
+    private RetractionStatus $retractionStatus = RetractionStatus::None;
+
+    /** Date de la dernière vérification de rétractation ; null si jamais vérifiée. */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $retractionCheckedAt = null;
 
     /** Date de la dernière résolution OA (Unpaywall) ; null si jamais résolue. */
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
@@ -296,6 +306,30 @@ class Publication
     public function setFulltextStored(bool $fulltextStored): self
     {
         $this->fulltextStored = $fulltextStored;
+
+        return $this;
+    }
+
+    public function getRetractionStatus(): RetractionStatus
+    {
+        return $this->retractionStatus;
+    }
+
+    public function setRetractionStatus(RetractionStatus $status): self
+    {
+        $this->retractionStatus = $status;
+
+        return $this;
+    }
+
+    public function getRetractionCheckedAt(): ?\DateTimeImmutable
+    {
+        return $this->retractionCheckedAt;
+    }
+
+    public function setRetractionCheckedAt(?\DateTimeImmutable $at): self
+    {
+        $this->retractionCheckedAt = $at;
 
         return $this;
     }

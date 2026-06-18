@@ -25,6 +25,14 @@
         {% endif %}
     </p>
 
+    {% if answer.needsRevalidation ?? false %}
+        <div style="border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:10px; padding:.8rem 1rem; margin:.8rem 0">
+            ⚠️ <strong>Source devenue non fiable.</strong> Une des publications citées dans cette réponse a été
+            <strong>rétractée</strong> ou fait l'objet d'une <strong>mise en garde</strong> depuis sa validation.
+            La réponse pourrait être partiellement altérée et <strong>nécessite une nouvelle validation humaine</strong>.
+        </div>
+    {% endif %}
+
     <p class="muted"><strong>Question :</strong> {{ answer.questionText }}</p>
 
     {% if answer.vulgarizationContent %}
