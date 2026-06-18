@@ -66,18 +66,24 @@ final class AdminHarvestController
     {
         $conn = $this->em->getConnection();
 
-        // --- Travaux de moisson par rubrique (40 plus récents) ---
+        // --- UNE ligne par rubrique : la moisson la plus récente (DISTINCT ON).
+        // Relancer une rubrique remplace donc l'affichage au lieu d'empiler des
+        // doublons ; l'historique complet reste en base (et dans le journal d'audit).
         $rows = $conn->executeQuery(
-            "SELECT j.id, j.query->>'rubric' AS rubric, tn.id AS node_id, tn.label AS label,
-                    j.started_at, j.finished_at, j.processed, j.created, j.errors,
-                    j.status, j.log,
-                    EXTRACT(EPOCH FROM (COALESCE(j.finished_at, now()) - j.started_at)) AS duration_s,
-                    (j.status = 'running' AND j.started_at < now() - interval '10 minutes') AS stale
-             FROM ingestion_job j
-             LEFT JOIN tree_node tn ON tn.slug = (j.query->>'rubric')
-             WHERE j.query->>'rubric' IS NOT NULL
-             ORDER BY j.started_at DESC
-             LIMIT 40"
+            "SELECT * FROM (
+                SELECT DISTINCT ON (j.query->>'rubric')
+                       j.id, j.query->>'rubric' AS rubric, tn.id AS node_id, tn.label AS label,
+                       j.started_at, j.finished_at, j.processed, j.created, j.errors,
+                       j.status, j.log,
+                       EXTRACT(EPOCH FROM (COALESCE(j.finished_at, now()) - j.started_at)) AS duration_s,
+                       (j.status = 'running' AND j.started_at < now() - interval '10 minutes') AS stale
+                FROM ingestion_job j
+                LEFT JOIN tree_node tn ON tn.slug = (j.query->>'rubric')
+                WHERE j.query->>'rubric' IS NOT NULL
+                ORDER BY j.query->>'rubric', j.started_at DESC
+             ) latest
+             ORDER BY started_at DESC
+             LIMIT 60"
         )->fetchAllAssociative();
 
         $jobs = array_map(static function (array $r): array {
