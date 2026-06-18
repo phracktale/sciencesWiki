@@ -85,12 +85,33 @@ final class FulltextIngester
     /** Télécharge l'URL si c'est bien un PDF d'une taille raisonnable ; sinon null. */
     private function download(string $url): ?string
     {
-        $response = $this->httpClient->request('GET', $url, [
-            'timeout' => 30,
-            'max_redirects' => 5,
-            'headers' => ['Accept' => 'application/pdf,*/*'],
-        ]);
-        if (200 !== $response->getStatusCode()) {
+        // Anti-SSRF : on suit les redirections manuellement et on revalide CHAQUE
+        // saut (schéma http/https + IP publique uniquement). oaUrl provient de
+        // métadonnées externes : on ne doit jamais atteindre un service interne.
+        $current = $url;
+        $response = null;
+        for ($hop = 0; $hop < 5; ++$hop) {
+            if (!$this->isPublicHttpUrl($current)) {
+                return null;
+            }
+            $response = $this->httpClient->request('GET', $current, [
+                'timeout' => 30,
+                'max_redirects' => 0,
+                'headers' => ['Accept' => 'application/pdf,*/*'],
+            ]);
+            $status = $response->getStatusCode();
+            if ($status >= 300 && $status < 400) {
+                $location = $response->getHeaders(false)['location'][0] ?? null;
+                if (null === $location) {
+                    return null;
+                }
+                // Résout une éventuelle URL relative par rapport à l'URL courante.
+                $current = $this->resolveUrl($current, $location);
+                continue;
+            }
+            break;
+        }
+        if (null === $response || 200 !== $response->getStatusCode()) {
             return null;
         }
         $contentType = strtolower($response->getHeaders(false)['content-type'][0] ?? '');
@@ -111,6 +132,54 @@ final class FulltextIngester
         file_put_contents($tmp, $content);
 
         return $tmp;
+    }
+
+    /**
+     * Vrai uniquement si l'URL est http(s) et que TOUTES ses IP résolues sont
+     * publiques (anti-SSRF : rejette loopback, RFC1918, link-local, réservées).
+     */
+    private function isPublicHttpUrl(string $url): bool
+    {
+        $parts = parse_url($url);
+        $scheme = strtolower($parts['scheme'] ?? '');
+        $host = $parts['host'] ?? '';
+        if (!\in_array($scheme, ['http', 'https'], true) || '' === $host) {
+            return false;
+        }
+
+        // Si l'hôte est déjà une IP littérale, on la valide directement ; sinon DNS.
+        $ips = filter_var($host, \FILTER_VALIDATE_IP) ? [$host] : (gethostbynamel($host) ?: []);
+        if ([] === $ips) {
+            return false;
+        }
+        foreach ($ips as $ip) {
+            // Rejette toute IP privée ou réservée (couvre 127/8, 10/8, 172.16/12,
+            // 192.168/16, 169.254/16, ::1, fc00::/7, etc.).
+            if (false === filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** Résout une URL (absolue ou relative) par rapport à l'URL de base. */
+    private function resolveUrl(string $base, string $location): string
+    {
+        if (preg_match('#^https?://#i', $location)) {
+            return $location;
+        }
+        $b = parse_url($base);
+        $scheme = $b['scheme'] ?? 'https';
+        $host = $b['host'] ?? '';
+        $port = isset($b['port']) ? ':'.$b['port'] : '';
+        if (str_starts_with($location, '/')) {
+            return $scheme.'://'.$host.$port.$location;
+        }
+        $path = $b['path'] ?? '/';
+        $dir = substr($path, 0, (int) strrpos($path, '/') + 1);
+
+        return $scheme.'://'.$host.$port.$dir.$location;
     }
 
     /** Extrait le texte via pdftotext (poppler), lancé sans shell (proc_open + tableau d'arguments). */
