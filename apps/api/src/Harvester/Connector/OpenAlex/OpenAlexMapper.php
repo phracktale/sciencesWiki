@@ -7,6 +7,7 @@ namespace App\Harvester\Connector\OpenAlex;
 use App\Enum\OaStatus;
 use App\Harvester\Dto\RawAuthor;
 use App\Harvester\Dto\RawPublication;
+use App\Harvester\Dto\RawSource;
 
 /**
  * Convertit un objet « work » OpenAlex en {@see RawPublication} normalisable.
@@ -37,6 +38,10 @@ final class OpenAlexMapper
             ?? ($bestOaLocation['landing_page_url'] ?? null);
         $isOa = (bool) ($openAccess['is_oa'] ?? false);
 
+        // Page canonique de l'article chez l'éditeur (humain) : distincte du PDF.
+        $landingPageUrl = $primaryLocation['landing_page_url']
+            ?? ($bestOaLocation['landing_page_url'] ?? null);
+
         return new RawPublication(
             sourceCode: self::SOURCE_CODE,
             idInSource: $openAlexId,
@@ -51,8 +56,39 @@ final class OpenAlexMapper
             license: $primaryLocation['license'] ?? ($bestOaLocation['license'] ?? null),
             oaStatus: OaStatus::fromApi($openAccess['oa_status'] ?? null),
             oaUrl: null !== $oaUrl ? (string) $oaUrl : null,
+            landingPageUrl: null !== $landingPageUrl ? (string) $landingPageUrl : null,
             fulltextAvailable: $isOa && null !== $oaUrl,
             authors: self::authors($work['authorships'] ?? []),
+            source: self::source($primaryLocation),
+        );
+    }
+
+    /**
+     * Revue/source de la publication (host = éditeur), depuis primary_location.source.
+     *
+     * @param array<string,mixed> $primaryLocation
+     */
+    private static function source(array $primaryLocation): ?RawSource
+    {
+        $source = \is_array($primaryLocation['source'] ?? null) ? $primaryLocation['source'] : [];
+        $id = isset($source['id']) ? self::shortId((string) $source['id']) : '';
+        $name = (string) ($source['display_name'] ?? '');
+        if ('' === $id || '' === $name) {
+            return null;
+        }
+
+        $hostId = isset($source['host_organization']) ? self::shortId((string) $source['host_organization']) : null;
+
+        return new RawSource(
+            openAlexId: $id,
+            name: self::clip($name, 500),
+            issnL: isset($source['issn_l']) ? self::clip((string) $source['issn_l'], 32) : null,
+            type: isset($source['type']) ? self::clip((string) $source['type'], 64) : null,
+            isOa: (bool) ($source['is_oa'] ?? false),
+            isInDoaj: (bool) ($source['is_in_doaj'] ?? false),
+            publisherOpenAlexId: '' !== (string) $hostId ? $hostId : null,
+            publisherName: isset($source['host_organization_name']) ? self::clip((string) $source['host_organization_name'], 500) : null,
+            homepageUrl: isset($source['homepage_url']) ? (string) $source['homepage_url'] : null,
         );
     }
 

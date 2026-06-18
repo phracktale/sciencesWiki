@@ -6,14 +6,19 @@ namespace App\Harvester\Pipeline;
 
 use App\Entity\Author;
 use App\Entity\Authorship;
+use App\Entity\Journal;
 use App\Entity\Publication;
 use App\Entity\PublicationProvenance;
+use App\Entity\Publisher;
 use App\Entity\Source;
 use App\Enum\ProcessingStatus;
 use App\Harvester\Dto\RawAuthor;
 use App\Harvester\Dto\RawPublication;
+use App\Harvester\Dto\RawSource;
 use App\Harvester\Support\Doi;
 use App\Repository\AuthorRepository;
+use App\Repository\JournalRepository;
+use App\Repository\PublisherRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -28,12 +33,17 @@ final class PublicationImporter
     /** @var array<string,Author> cache d'auteurs au sein d'une même exécution */
     private array $authorCache = [];
 
+    /** @var array<string,Journal> cache de revues au sein d'une même exécution */
+    private array $journalCache = [];
+
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly Deduplicator $deduplicator,
         private readonly AuthorRepository $authors,
         private readonly LicenseGate $licenseGate,
         private readonly \Doctrine\DBAL\Connection $conn,
+        private readonly JournalRepository $journals,
+        private readonly PublisherRepository $publishers,
     ) {
     }
 
@@ -46,6 +56,7 @@ final class PublicationImporter
     public function reset(): void
     {
         $this->authorCache = [];
+        $this->journalCache = [];
     }
 
     public function import(RawPublication $raw, Source $source): ImportResult
@@ -58,6 +69,11 @@ final class PublicationImporter
         $this->mergeMetadata($publication, $raw, $created);
         $this->ensureProvenance($publication, $raw, $source);
 
+        // Revue + éditeur (référentiel enrichi au fil de la moisson).
+        if (null !== $raw->source && null === $publication->getJournal()) {
+            $publication->setJournal($this->resolveJournal($raw->source));
+        }
+
         if ($created) {
             $this->attachAuthors($publication, $raw->authors);
         }
@@ -68,6 +84,25 @@ final class PublicationImporter
         $this->em->persist($publication);
 
         return new ImportResult($publication, $created);
+    }
+
+    /**
+     * Rattrapage : complète une publication EXISTANTE avec sa revue/éditeur et son
+     * lien canonique (re-fetch OpenAlex). Ne touche que les champs manquants.
+     */
+    public function applySourceAndLanding(Publication $publication, RawPublication $raw): bool
+    {
+        $changed = false;
+        if (null === $publication->getLandingPageUrl() && null !== $raw->landingPageUrl) {
+            $publication->setLandingPageUrl($raw->landingPageUrl);
+            $changed = true;
+        }
+        if (null === $publication->getJournal() && null !== $raw->source) {
+            $publication->setJournal($this->resolveJournal($raw->source));
+            $changed = true;
+        }
+
+        return $changed;
     }
 
     private function mergeMetadata(Publication $publication, RawPublication $raw, bool $created): void
@@ -101,6 +136,9 @@ final class PublicationImporter
         }
         if (null === $publication->getOaUrl() && null !== $raw->oaUrl) {
             $publication->setOaUrl($raw->oaUrl);
+        }
+        if (null === $publication->getLandingPageUrl() && null !== $raw->landingPageUrl) {
+            $publication->setLandingPageUrl($raw->landingPageUrl);
         }
         if ($raw->fulltextAvailable) {
             $publication->setFulltextAvailable(true);
@@ -203,5 +241,65 @@ final class PublicationImporter
         }
 
         return $this->authorCache[$cacheKey] = $author;
+    }
+
+    /**
+     * Résout (ou crée) la revue, race-safe en concurrence comme pour les auteurs
+     * (upsert sur openalex_id), et rattache son éditeur. Renvoie l'entité gérée.
+     */
+    private function resolveJournal(RawSource $src): ?Journal
+    {
+        if (isset($this->journalCache[$src->openAlexId])) {
+            return $this->journalCache[$src->openAlexId];
+        }
+
+        $publisherId = $this->resolvePublisher($src)?->getId();
+
+        $this->conn->executeStatement(
+            'INSERT INTO journal (openalex_id, name, issn_l, type, is_oa, is_in_doaj, homepage_url, publisher_id)
+             VALUES (:o, :n, :i, :t, :oa, :doaj, :h, :p) ON CONFLICT (openalex_id) DO NOTHING',
+            [
+                'o' => $src->openAlexId,
+                'n' => $src->name,
+                'i' => $src->issnL,
+                't' => $src->type,
+                'oa' => $src->isOa ? 'true' : 'false',
+                'doaj' => $src->isInDoaj ? 'true' : 'false',
+                'h' => $src->homepageUrl,
+                'p' => $publisherId,
+            ],
+        );
+
+        $journal = $this->journals->findOneBy(['openAlexId' => $src->openAlexId]);
+
+        return $this->journalCache[$src->openAlexId] = $journal;
+    }
+
+    /** Résout (ou crée) l'éditeur d'une revue, race-safe (upsert sur openalex_id). */
+    private function resolvePublisher(RawSource $src): ?Publisher
+    {
+        $name = $src->publisherName;
+        if (null === $name || '' === $name) {
+            return null;
+        }
+        $openAlexId = $src->publisherOpenAlexId;
+
+        if (null !== $openAlexId && '' !== $openAlexId) {
+            $this->conn->executeStatement(
+                'INSERT INTO publisher (openalex_id, name) VALUES (:o, :n) ON CONFLICT (openalex_id) DO NOTHING',
+                ['o' => $openAlexId, 'n' => $name],
+            );
+
+            return $this->publishers->findOneBy(['openAlexId' => $openAlexId]);
+        }
+
+        // Éditeur sans identifiant OpenAlex (rare) : résolution par nom.
+        $publisher = $this->publishers->findOneBy(['name' => $name]);
+        if (null === $publisher) {
+            $publisher = new Publisher($name);
+            $this->em->persist($publisher);
+        }
+
+        return $publisher;
     }
 }

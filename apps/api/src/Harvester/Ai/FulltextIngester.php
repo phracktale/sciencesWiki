@@ -89,8 +89,15 @@ final class FulltextIngester
         }
     }
 
-    /** Télécharge l'URL si c'est bien un PDF d'une taille raisonnable ; sinon null. */
-    private function download(string $url): ?string
+    /**
+     * Télécharge l'URL si c'est bien un PDF d'une taille raisonnable ; sinon null.
+     * Si l'URL est une page HTML (page d'atterrissage), tente d'y découvrir le PDF
+     * via la méta standard `citation_pdf_url` (présente chez la plupart des éditeurs
+     * même quand OpenAlex n'a pas capté le pdf_url) puis le télécharge — une seule
+     * fois ($allowDiscovery), pour éviter les boucles. Les paywalls renvoient une
+     * page de login (non %PDF) → naturellement rejetés.
+     */
+    private function download(string $url, bool $allowDiscovery = true): ?string
     {
         // Anti-SSRF : on suit les redirections manuellement et on revalide CHAQUE
         // saut (schéma http/https + IP publique uniquement). oaUrl provient de
@@ -136,9 +143,18 @@ final class FulltextIngester
             return null;
         }
         $contentType = strtolower($response->getHeaders(false)['content-type'][0] ?? '');
-        $isPdf = str_contains($contentType, 'pdf') || str_ends_with(strtolower(parse_url($url, \PHP_URL_PATH) ?? ''), '.pdf');
+        $isPdf = str_contains($contentType, 'pdf') || str_ends_with(strtolower(parse_url($current, \PHP_URL_PATH) ?? ''), '.pdf');
         if (!$isPdf) {
-            return null; // page HTML (landing page) et non PDF direct
+            // Page HTML : on tente d'y découvrir le PDF (citation_pdf_url) une fois.
+            if ($allowDiscovery && str_contains($contentType, 'html')) {
+                $html = mb_substr((string) $response->getContent(false), 0, 600_000);
+                $pdfUrl = $this->extractCitationPdfUrl($html, $current);
+                if (null !== $pdfUrl && $pdfUrl !== $current) {
+                    return $this->download($pdfUrl, false);
+                }
+            }
+
+            return null; // page HTML sans PDF découvrable
         }
 
         $content = $response->getContent();
@@ -200,6 +216,24 @@ final class FulltextIngester
     private function isPublicIp(string $ip): bool
     {
         return false !== filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE);
+    }
+
+    /**
+     * Extrait l'URL du PDF déclarée par la page via la méta Highwire/Google Scholar
+     * `citation_pdf_url` (ordre des attributs name/content indifférent). Renvoie une
+     * URL absolue ou null. C'est le standard exposé par Elsevier, Springer, Wiley,
+     * PMC, etc. — souvent renseigné même quand OpenAlex n'a pas le pdf_url.
+     */
+    private function extractCitationPdfUrl(string $html, string $base): ?string
+    {
+        if (preg_match('/<meta[^>]+name=["\']citation_pdf_url["\'][^>]+content=["\']([^"\']+)["\']/i', $html, $m)
+            || preg_match('/<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']citation_pdf_url["\']/i', $html, $m)) {
+            $url = trim(html_entity_decode($m[1], \ENT_QUOTES | \ENT_HTML5));
+
+            return '' !== $url ? $this->resolveUrl($base, $url) : null;
+        }
+
+        return null;
     }
 
     /** Résout une URL (absolue ou relative) par rapport à l'URL de base. */

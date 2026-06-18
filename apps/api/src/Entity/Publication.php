@@ -86,6 +86,17 @@ class Publication
     #[Groups(['publication:read'])]
     private ?string $oaUrl = null;
 
+    /** Page canonique de l'article chez l'éditeur (primary_location.landing_page_url). */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $landingPageUrl = null;
+
+    /** Revue / source de publication (OpenAlex primary_location.source). */
+    #[ORM\ManyToOne(targetEntity: Journal::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['publication:read'])]
+    private ?Journal $journal = null;
+
     #[ORM\Column]
     #[Groups(['publication:read'])]
     private bool $fulltextAvailable = false;
@@ -282,6 +293,30 @@ class Publication
     public function setOaUrl(?string $oaUrl): self
     {
         $this->oaUrl = $oaUrl;
+
+        return $this;
+    }
+
+    public function getLandingPageUrl(): ?string
+    {
+        return $this->landingPageUrl;
+    }
+
+    public function setLandingPageUrl(?string $landingPageUrl): self
+    {
+        $this->landingPageUrl = $landingPageUrl;
+
+        return $this;
+    }
+
+    public function getJournal(): ?Journal
+    {
+        return $this->journal;
+    }
+
+    public function setJournal(?Journal $journal): self
+    {
+        $this->journal = $journal;
 
         return $this;
     }

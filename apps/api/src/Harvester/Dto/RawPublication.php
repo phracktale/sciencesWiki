@@ -32,8 +32,10 @@ final class RawPublication
         public readonly ?string $license = null,
         public readonly OaStatus $oaStatus = OaStatus::Unknown,
         public readonly ?string $oaUrl = null,
+        public readonly ?string $landingPageUrl = null,
         public readonly bool $fulltextAvailable = false,
         public readonly array $authors = [],
+        public readonly ?RawSource $source = null,
     ) {
     }
 }

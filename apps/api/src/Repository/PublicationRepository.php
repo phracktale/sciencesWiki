@@ -87,6 +87,34 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Publications sans revue rattachée mais ayant un identifiant OpenAlex
+     * (rattrapage du référentiel éditeurs/revues sur le stock existant).
+     *
+     * @return list<Publication>
+     */
+    public function findNeedingJournal(int $limit): array
+    {
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                "SELECT id FROM publication
+                 WHERE journal_id IS NULL AND external_ids->>'openalex' IS NOT NULL
+                 ORDER BY id DESC LIMIT %d",
+                max(1, $limit),
+            ),
+        )->fetchFirstColumn();
+
+        $out = [];
+        foreach ($ids as $id) {
+            $pub = $this->find((int) $id);
+            if (null !== $pub) {
+                $out[] = $pub;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Publications avec embedding mais pas encore placées dans l'arbre.
      *
      * @return list<Publication>
