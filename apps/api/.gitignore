@@ -4,6 +4,8 @@
 /.env.local.php
 /.env.*.local
 /config/secrets/prod/prod.decrypt.private.php
+# Clés de déchiffrage des coffres de secrets (toutes envs) : JAMAIS commitées.
+/config/secrets/*/*.decrypt.private.php
 /public/bundles/
 /var/
 /vendor/
