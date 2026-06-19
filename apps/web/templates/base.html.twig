@@ -99,6 +99,7 @@
         .ask button:disabled { opacity:.5; cursor:not-allowed; }
         .loader { display:inline-block; width:1rem; height:1rem; border:2px solid #cbd5e1; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; }
         @keyframes spin { to { transform:rotate(360deg); } }
+        td { vertical-align: top; padding: 0.54rem; border-bottom: 1px solid #b5d6f2; }
         #stream-out { white-space:pre-wrap; margin-top:1rem; padding:1rem; border:1px dashed #cbd5e1; border-radius:10px; min-height:2rem; }
         #stream-out h4 { color:var(--vul); margin:.6rem 0 .2rem; font-size:.95rem; text-transform:uppercase; letter-spacing:.04em; }
         .cartouche { display:flex; gap:.8rem; align-items:flex-start; border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fbfdff; margin:1rem 0; }
@@ -146,7 +147,8 @@
             <a href="{{ path('admin_articles') }}" style="color:#93c5fd">Articles</a>
             <a href="{{ path('admin_settings') }}" style="color:#93c5fd">Paramètres</a>
             {% block admin_context %}{% endblock %}
-            <span id="ab-harvest" style="margin-left:auto; display:flex; align-items:center; gap:.5rem">
+            <span id="ab-load" style="margin-left:auto; display:flex; align-items:center; gap:.7rem; font-size:12px; color:#94a3b8" title="Charge CPU (loadavg/cœurs) · RAM">—</span>
+            <span id="ab-harvest" style="display:flex; align-items:center; gap:.5rem">
                 <span class="muted" style="color:#94a3b8">moisson :</span>
                 <span id="ab-text" style="color:#cbd5e1">—</span>
                 <span style="width:90px; height:7px; background:#334155; border-radius:4px; overflow:hidden"><span id="ab-bar" style="display:block; height:100%; width:0; background:var(--accent)"></span></span>
@@ -155,13 +157,22 @@
         </div>
         <script>
         (function () {
-            var txt = document.getElementById('ab-text'), bar = document.getElementById('ab-bar');
+            var txt = document.getElementById('ab-text'), bar = document.getElementById('ab-bar'), load = document.getElementById('ab-load');
             if (!txt) return;
+            function host(name, s) {
+                if (!s) return name + ' <span style="color:#64748b">n/d</span>';
+                var lp = s.loadPct == null ? '?' : s.loadPct, mp = s.memPct == null ? '?' : s.memPct;
+                var col = (lp >= 90 || mp >= 90) ? '#f87171' : (lp >= 70 || mp >= 70) ? '#fbbf24' : '#86efac';
+                return name + ' <span style="color:' + col + '">' + lp + '%</span>·<span style="color:' + col + '">' + mp + '%</span>';
+            }
             function poll() {
                 fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (d) {
                         if (!d) return;
+                        if (load && d.system) {
+                            load.innerHTML = '🖥 ' + host('Thor', d.system.thor) + ' &nbsp; ' + host('Marvin', d.system.marvin);
+                        }
                         var running = (d.running || []).length, queued = d.queued || 0;
                         var run = (d.jobs || []).filter(function (j) { return j.status === 'running' && !j.stale; })[0];
                         if (run) {

@@ -69,3 +69,38 @@ def embed_batch(request: EmbedBatchRequest) -> dict:
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok", "model": MODEL_NAME, "dimensions": EXPECTED_DIM}
+
+
+def _meminfo() -> dict:
+    """MemTotal/MemAvailable (kB) depuis /proc/meminfo de l'hôte (Marvin)."""
+    total = avail = 0
+    try:
+        with open("/proc/meminfo", "r", encoding="ascii") as fh:
+            for line in fh:
+                if line.startswith("MemTotal:"):
+                    total = int(line.split()[1])
+                elif line.startswith("MemAvailable:"):
+                    avail = int(line.split()[1])
+    except OSError:
+        pass
+    return {"total": total, "avail": avail}
+
+
+@app.get("/stats")
+def stats() -> dict:
+    """Charge CPU (loadavg) + mémoire de Marvin, pour l'indicateur du back-office."""
+    try:
+        load1, load5, _ = os.getloadavg()
+    except OSError:
+        load1 = load5 = 0.0
+    cpus = os.cpu_count() or 1
+    mem = _meminfo()
+    return {
+        "load1": round(load1, 2),
+        "load5": round(load5, 2),
+        "cpus": cpus,
+        "loadPct": int(min(100, load1 / cpus * 100)),
+        "memTotalKb": mem["total"],
+        "memAvailKb": mem["avail"],
+        "memPct": int((mem["total"] - mem["avail"]) / mem["total"] * 100) if mem["total"] else None,
+    }

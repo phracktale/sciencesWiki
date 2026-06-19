@@ -21,8 +21,11 @@ final class AdminHarvestController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SettingsService $settings,
+        private readonly \Symfony\Contracts\HttpClient\HttpClientInterface $httpClient,
         #[\Symfony\Component\DependencyInjection\Attribute\Autowire(env: 'OPENALEX_API_KEY')]
         private readonly string $openalexApiKey = '',
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire(env: 'ML_EMBED_URL')]
+        private readonly string $mlEmbedUrl = '',
     ) {
     }
 
@@ -194,7 +197,70 @@ final class AdminHarvestController
                 'creditCostUsd' => $num('openalex.credit.cost_usd'),
                 'creditUpdatedAt' => $s['openalex.credit.updated_at'] ?? null,
             ],
+            // Charge machines : Thor (cette instance) + Marvin (service ml).
+            'system' => $this->systemStats(),
         ]);
+    }
+
+    /**
+     * @return array<string,array<string,mixed>|null>
+     */
+    private function systemStats(): array
+    {
+        return ['thor' => $this->localStats(), 'marvin' => $this->marvinStats()];
+    }
+
+    /** Charge CPU (loadavg) + mémoire de l'hôte local (Thor), lues dans /proc. */
+    private function localStats(): array
+    {
+        $load = \function_exists('sys_getloadavg') ? (sys_getloadavg() ?: [0, 0, 0]) : [0, 0, 0];
+        $cpus = max(1, \count(glob('/sys/devices/system/cpu/cpu[0-9]*') ?: []) ?: 1);
+        [$total, $avail] = $this->meminfo();
+
+        return [
+            'load1' => round((float) $load[0], 2),
+            'cpus' => $cpus,
+            'loadPct' => (int) min(100, round((float) $load[0] / $cpus * 100)),
+            'memPct' => $total > 0 ? (int) round(($total - $avail) / $total * 100) : null,
+            'memTotalGb' => $total > 0 ? round($total / 1048576, 1) : null,
+        ];
+    }
+
+    /** Charge de Marvin via le service ml (/stats). Null si injoignable. */
+    private function marvinStats(): ?array
+    {
+        $base = preg_replace('#/embed.*$#', '', $this->mlEmbedUrl);
+        if (null === $base || '' === $base) {
+            return null;
+        }
+        try {
+            $d = $this->httpClient->request('GET', rtrim($base, '/').'/stats', ['timeout' => 3])->toArray(false);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return [
+            'load1' => $d['load1'] ?? null,
+            'cpus' => $d['cpus'] ?? null,
+            'loadPct' => $d['loadPct'] ?? null,
+            'memPct' => $d['memPct'] ?? null,
+            'memTotalGb' => isset($d['memTotalKb']) ? round(((int) $d['memTotalKb']) / 1048576, 1) : null,
+        ];
+    }
+
+    /** @return array{0:int,1:int} [MemTotal, MemAvailable] en kB (hôte). */
+    private function meminfo(): array
+    {
+        $total = $avail = 0;
+        foreach (explode("\n", (string) @file_get_contents('/proc/meminfo')) as $line) {
+            if (str_starts_with($line, 'MemTotal:')) {
+                $total = (int) preg_replace('/\D/', '', $line);
+            } elseif (str_starts_with($line, 'MemAvailable:')) {
+                $avail = (int) preg_replace('/\D/', '', $line);
+            }
+        }
+
+        return [$total, $avail];
     }
 
     /**

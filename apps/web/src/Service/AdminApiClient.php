@@ -101,7 +101,8 @@ final class AdminApiClient
     /** @return array{ok:bool,status:int,data:array<string,mixed>} */
     public function regenerateQuestion(int $id): array
     {
-        return $this->send('POST', '/api/admin/questions/'.$id.'/regenerate', []);
+        // La génération LLM est lente : timeout large (le worker n'est pas impliqué ici).
+        return $this->send('POST', '/api/admin/questions/'.$id.'/regenerate', [], 180);
     }
 
     /** @return array<string,mixed> réglages courants */
@@ -264,14 +265,14 @@ final class AdminApiClient
      *
      * @return array{ok:bool,status:int,data:array<string,mixed>}
      */
-    private function send(string $method, string $path, ?array $body): array
+    private function send(string $method, string $path, ?array $body, int $timeout = 20): array
     {
         $token = $this->session()->get(self::SESSION_KEY);
         if (!\is_string($token)) {
             return ['ok' => false, 'status' => 401, 'data' => ['error' => 'Non authentifié.']];
         }
 
-        $options = ['headers' => ['Authorization' => 'Bearer '.$token], 'timeout' => 20];
+        $options = ['headers' => ['Authorization' => 'Bearer '.$token], 'timeout' => $timeout];
         if (null !== $body) {
             $options['json'] = $body;
         }

@@ -101,19 +101,25 @@ final class AdminQuestionController
             return new JsonResponse(['error' => 'Question introuvable.'], Response::HTTP_NOT_FOUND);
         }
 
+        // La génération LLM peut dépasser la limite d'exécution PHP par défaut (30 s).
+        set_time_limit(0);
+
         $existing = $this->answers->findBy(['question' => $question]);
         $type = $existing[0]?->getType() ?? \App\Enum\AnswerType::Canonical;
-        foreach ($existing as $answer) {
-            $this->em->remove($answer);
-        }
-        $this->em->flush();
 
+        // On rédige D'ABORD la nouvelle réponse ; on ne supprime les anciennes
+        // qu'en cas de succès (si le draft échoue, l'ancienne réponse est conservée).
         try {
             $answer = $this->drafter->draft($question, $type);
             $this->em->flush();
         } catch (\Throwable $e) {
             return new JsonResponse(['error' => 'Échec de la génération : '.$e->getMessage()], 502);
         }
+
+        foreach ($existing as $old) {
+            $this->em->remove($old);
+        }
+        $this->em->flush();
 
         $this->activity->log('question', 'regenerate', $this->actor(), \sprintf('Réponse régénérée pour la question #%d', $id), ['questionId' => $id, 'answerId' => $answer->getId()]);
 
