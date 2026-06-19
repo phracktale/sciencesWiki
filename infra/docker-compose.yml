@@ -139,17 +139,13 @@ services:
       - "${WEB_PORT:-8080}:80"
     restart: unless-stopped
 
-  # Adminer : visualisation directe de la base. Exposé UNIQUEMENT sur le LAN du
-  # homelab (port côté hôte, non proxifié par Heimdall public). Accès total à la
-  # base → ne JAMAIS publier via le vhost public. Identifiants = POSTGRES_* (.env.prod),
-  # serveur « database ». URL : http://<IP-LAN-Thor>:${ADMINER_PORT:-8091}
+  # Adminer : visualisation directe de la base (désormais sur Marvin). Exposé
+  # UNIQUEMENT sur le LAN (non proxifié par Heimdall). Accès total → jamais public.
+  # Identifiants = POSTGRES_* (.env.prod), serveur = Marvin. URL : http://<IP-Thor>:${ADMINER_PORT:-8091}
   adminer:
     image: adminer:5
-    depends_on:
-      database:
-        condition: service_healthy
     environment:
-      ADMINER_DEFAULT_SERVER: database
+      ADMINER_DEFAULT_SERVER: ${DB_HOST:-192.168.1.171}
       ADMINER_DESIGN: dracula
     ports:
       - "${ADMINER_PORT:-8091}:8080"
