@@ -121,12 +121,6 @@ class Answer
         return $this->question->getId();
     }
 
-    #[Groups(['answer:read'])]
-    public function getQuestionId(): ?int
-    {
-        return $this->question->getId();
-    }
-
     /** Titre court affiché (sinon, à défaut, le texte de la question). */
     #[Groups(['answer:read'])]
     public function getTitle(): string
