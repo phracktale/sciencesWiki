@@ -146,12 +146,25 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0, 'query' => $q];
     }
 
-    /** @return array<string,mixed> liste paginée d'articles */
-    public function articles(string $q, int $page): array
+    /**
+     * @param array<string,string|int> $filters revue/indexation/domaine/pdf/accès/tri
+     *
+     * @return array<string,mixed> liste paginée d'articles
+     */
+    public function articles(string $q, int $page, array $filters = []): array
     {
-        $res = $this->send('GET', '/api/admin/publications?'.http_build_query(['q' => $q, 'page' => $page]), null);
+        $query = array_merge(['q' => $q, 'page' => $page], array_filter($filters, static fn ($v) => '' !== $v && null !== $v));
+        $res = $this->send('GET', '/api/admin/publications?'.http_build_query($query), null);
 
         return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0, 'query' => $q];
+    }
+
+    /** @return list<array<string,mixed>> revues correspondant à la recherche (autocomplete) */
+    public function journalsSearch(string $q): array
+    {
+        $res = $this->send('GET', '/api/admin/journals?'.http_build_query(['q' => $q]), null);
+
+        return $res['ok'] ? ($res['data']['items'] ?? []) : [];
     }
 
     /** @return array<string,mixed> liste des utilisateurs + rôles disponibles */

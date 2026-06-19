@@ -114,12 +114,36 @@ final class AdminController extends AbstractController
             return $this->redirectToRoute('admin_login');
         }
 
+        $filters = [
+            'journal' => (int) $request->query->get('journal', '0') ?: '',
+            'indexation' => trim((string) $request->query->get('indexation', '')),
+            'domain' => trim((string) $request->query->get('domain', '')),
+            'pdf' => trim((string) $request->query->get('pdf', '')),
+            'access' => trim((string) $request->query->get('access', '')),
+            'sort' => trim((string) $request->query->get('sort', '')),
+        ];
+
         return $this->render('admin/articles.html.twig', [
             'data' => $this->admin->articles(
                 trim((string) $request->query->get('q', '')),
                 max(1, (int) $request->query->get('page', '1')),
+                $filters,
             ),
+            'filters' => $filters,
+            'journalName' => trim((string) $request->query->get('journal_name', '')),
+            'domains' => $this->api->domains(),
         ]);
+    }
+
+    /** Proxy d'autocomplete des revues (le JWT admin reste côté serveur). */
+    #[Route('/admin/journals', name: 'admin_journals', methods: ['GET'])]
+    public function journalsAutocomplete(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->json(['items' => []], 401);
+        }
+
+        return $this->json(['items' => $this->admin->journalsSearch(trim((string) $request->query->get('q', '')))]);
     }
 
     #[Route('/admin/authors', name: 'admin_authors', methods: ['GET'])]

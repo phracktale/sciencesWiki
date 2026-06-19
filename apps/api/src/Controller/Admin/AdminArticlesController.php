@@ -19,6 +19,7 @@ final class AdminArticlesController
 
     /** Statuts OA considérés comme « libre accès ». */
     private const OPEN = ['diamond', 'gold', 'green', 'hybrid', 'bronze'];
+    private const OPEN_SQL = "('diamond','gold','green','hybrid','bronze')";
 
     public function __construct(private readonly EntityManagerInterface $em)
     {
@@ -33,25 +34,64 @@ final class AdminArticlesController
         $offset = ($page - 1) * self::PER_PAGE;
         $like = '%'.$q.'%';
 
-        $where = '';
+        // --- Filtres ---
+        $conditions = [];
         $params = [];
         if ('' !== $q) {
-            $where = 'WHERE (p.title ILIKE :like OR EXISTS (SELECT 1 FROM authorship au JOIN author a ON a.id = au.author_id WHERE au.publication_id = p.id AND a.name ILIKE :like))';
+            $conditions[] = '(p.title ILIKE :like OR EXISTS (SELECT 1 FROM authorship au JOIN author a ON a.id = au.author_id WHERE au.publication_id = p.id AND a.name ILIKE :like))';
             $params['like'] = $like;
         }
+        $journalId = (int) $request->query->get('journal', '0');
+        if ($journalId > 0) {
+            $conditions[] = 'p.journal_id = :jid';
+            $params['jid'] = $journalId;
+        }
+        switch ((string) $request->query->get('indexation', '')) {
+            case 'fulltext': $conditions[] = 'EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)'; break;
+            case 'abstract': $conditions[] = 'NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)'; break;
+        }
+        switch ((string) $request->query->get('pdf', '')) {
+            case 'vectorise': $conditions[] = 'EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)'; break;
+            case 'lien': $conditions[] = "p.oa_url IS NOT NULL AND p.oa_url <> '' AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)"; break;
+            case 'aucun': $conditions[] = "(p.oa_url IS NULL OR p.oa_url = '') AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)"; break;
+        }
+        switch ((string) $request->query->get('access', '')) {
+            case 'libre': $conditions[] = 'p.oa_status IN '.self::OPEN_SQL; break;
+            case 'payant': $conditions[] = "p.oa_status = 'closed'"; break;
+            case 'inconnu': $conditions[] = "p.oa_status NOT IN ".self::OPEN_SQL." AND p.oa_status <> 'closed'"; break;
+        }
+        $domain = trim((string) $request->query->get('domain', ''));
+        if ('' !== $domain) {
+            $conditions[] = 'EXISTS (WITH RECURSIVE sub AS (
+                    SELECT id FROM tree_node WHERE slug = :domain
+                    UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
+                ) SELECT 1 FROM placement_suggestion ps WHERE ps.publication_id = p.id AND ps.tree_node_id IN (SELECT id FROM sub))';
+            $params['domain'] = $domain;
+        }
+        $where = [] !== $conditions ? 'WHERE '.implode(' AND ', $conditions) : '';
+
+        // --- Tri (liste blanche) ---
+        $order = match ((string) $request->query->get('sort', '')) {
+            'titre' => 'p.title ASC',
+            'fragments' => '(SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) DESC, p.id DESC',
+            'ancien' => 'p.publication_date ASC NULLS LAST, p.id ASC',
+            default => 'p.publication_date DESC NULLS LAST, p.id DESC',
+        };
 
         $total = (int) $conn->executeQuery("SELECT count(*) FROM publication p $where", $params)->fetchOne();
 
         $rows = $conn->executeQuery(
-            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url,
+            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
+                    j.name AS journal_name,
                     to_char(p.publication_date, 'YYYY-MM-DD') AS date,
                     (SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) AS chunks,
                     (SELECT string_agg(a.name, ', ' ORDER BY au.position)
                        FROM authorship au JOIN author a ON a.id = au.author_id
                       WHERE au.publication_id = p.id) AS authors
              FROM publication p
+             LEFT JOIN journal j ON j.id = p.journal_id
              $where
-             ORDER BY p.publication_date DESC NULLS LAST, p.id DESC
+             ORDER BY $order
              LIMIT ".self::PER_PAGE.' OFFSET '.$offset,
             $params,
         )->fetchAllAssociative();
@@ -67,11 +107,12 @@ final class AdminArticlesController
                 'title' => $r['title'],
                 'authors' => $r['authors'] ?? '',
                 'date' => $r['date'],
-                'venue' => $r['venue'],
+                'venue' => $r['journal_name'] ?? $r['venue'],
                 'doi' => $r['doi'],
                 'oaStatus' => $status,
                 'access' => $access,
-                'url' => $oaUrl ?: ($r['doi'] ? 'https://doi.org/'.$r['doi'] : null),
+                // Lien : page canonique éditeur > PDF/OA > DOI.
+                'url' => ($r['landing_page_url'] ?? null) ?: ($oaUrl ?: ($r['doi'] ? 'https://doi.org/'.$r['doi'] : null)),
                 // Indexation RAG : texte intégral (fragments présents) ou résumé seul.
                 'indexation' => $chunks > 0 ? 'fulltext' : 'abstract',
                 'chunks' => $chunks,
@@ -87,6 +128,31 @@ final class AdminArticlesController
             'pages' => (int) ceil($total / self::PER_PAGE),
             'query' => $q,
         ]);
+    }
+
+    /** Autocomplete des revues (filtre de la liste d'articles). */
+    #[Route('/api/admin/journals', name: 'admin_journals_search', methods: ['GET'])]
+    public function journals(Request $request): JsonResponse
+    {
+        $q = trim((string) $request->query->get('q', ''));
+        if (mb_strlen($q) < 2) {
+            return new JsonResponse(['items' => []]);
+        }
+        $rows = $this->em->getConnection()->executeQuery(
+            "SELECT j.id, j.name, p.name AS publisher,
+                    (SELECT count(*) FROM publication pub WHERE pub.journal_id = j.id) AS articles
+               FROM journal j LEFT JOIN publisher p ON p.id = j.publisher_id
+              WHERE j.name ILIKE :like
+              ORDER BY articles DESC, j.name LIMIT 15",
+            ['like' => '%'.$q.'%'],
+        )->fetchAllAssociative();
+
+        return new JsonResponse(['items' => array_map(static fn (array $r): array => [
+            'id' => (int) $r['id'],
+            'name' => $r['name'],
+            'publisher' => $r['publisher'],
+            'articles' => (int) $r['articles'],
+        ], $rows)]);
     }
 
     #[Route('/api/admin/publications/{id}', name: 'admin_publication_detail', methods: ['GET'], requirements: ['id' => '\d+'])]
