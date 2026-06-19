@@ -29,6 +29,7 @@ final class OpenAlexMapper
         $openAccess = \is_array($work['open_access'] ?? null) ? $work['open_access'] : [];
         $primaryLocation = \is_array($work['primary_location'] ?? null) ? $work['primary_location'] : [];
         $bestOaLocation = \is_array($work['best_oa_location'] ?? null) ? $work['best_oa_location'] : [];
+        $hasContent = \is_array($work['has_content'] ?? null) ? $work['has_content'] : [];
 
         // On privilégie le PDF DIRECT (téléchargeable + vectorisable) à la page
         // d'atterrissage HTML (open_access.oa_url) — sinon on ne récupère pas le texte.
@@ -60,6 +61,13 @@ final class OpenAlexMapper
             fulltextAvailable: $isOa && null !== $oaUrl,
             authors: self::authors($work['authorships'] ?? []),
             source: self::source($primaryLocation),
+            citedByCount: (int) ($work['cited_by_count'] ?? 0),
+            fwci: isset($work['fwci']) && is_numeric($work['fwci']) ? (float) $work['fwci'] : null,
+            typeCrossref: isset($work['type_crossref']) ? self::clip((string) $work['type_crossref'], 64) : null,
+            referencedWorksCount: (int) ($work['referenced_works_count'] ?? 0),
+            hasPdf: (bool) ($hasContent['pdf'] ?? false),
+            hasGrobidXml: (bool) ($hasContent['grobid_xml'] ?? false),
+            anyRepoFulltext: (bool) ($openAccess['any_repository_has_fulltext'] ?? false),
         );
     }
 

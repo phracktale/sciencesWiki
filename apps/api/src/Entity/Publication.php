@@ -97,6 +97,39 @@ class Publication
     #[Groups(['publication:read'])]
     private ?Journal $journal = null;
 
+    // --- Métadonnées OpenAlex (curation / affichage) ---
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
+    #[Groups(['publication:read'])]
+    private int $citedByCount = 0;
+
+    /** Field-Weighted Citation Impact (impact pondéré par domaine). */
+    #[ORM\Column(type: Types::FLOAT, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?float $fwci = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $typeCrossref = null;
+
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
+    private int $referencedWorksCount = 0;
+
+    /** Disponibilité du contenu chez OpenAlex (has_content). */
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['publication:read'])]
+    private bool $hasPdf = false;
+
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['publication:read'])]
+    private bool $hasGrobidXml = false;
+
+    #[ORM\Column(options: ['default' => false])]
+    private bool $anyRepoFulltext = false;
+
+    /** Provenance du texte intégral indexé : grobid_self|openalex_api|author|publisher. */
+    #[ORM\Column(length: 16, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $fulltextSource = null;
+
     #[ORM\Column]
     #[Groups(['publication:read'])]
     private bool $fulltextAvailable = false;
@@ -317,6 +350,102 @@ class Publication
     public function setJournal(?Journal $journal): self
     {
         $this->journal = $journal;
+
+        return $this;
+    }
+
+    public function getCitedByCount(): int
+    {
+        return $this->citedByCount;
+    }
+
+    public function setCitedByCount(int $n): self
+    {
+        $this->citedByCount = $n;
+
+        return $this;
+    }
+
+    public function getFwci(): ?float
+    {
+        return $this->fwci;
+    }
+
+    public function setFwci(?float $fwci): self
+    {
+        $this->fwci = $fwci;
+
+        return $this;
+    }
+
+    public function getTypeCrossref(): ?string
+    {
+        return $this->typeCrossref;
+    }
+
+    public function setTypeCrossref(?string $typeCrossref): self
+    {
+        $this->typeCrossref = $typeCrossref;
+
+        return $this;
+    }
+
+    public function getReferencedWorksCount(): int
+    {
+        return $this->referencedWorksCount;
+    }
+
+    public function setReferencedWorksCount(int $n): self
+    {
+        $this->referencedWorksCount = $n;
+
+        return $this;
+    }
+
+    public function hasPdf(): bool
+    {
+        return $this->hasPdf;
+    }
+
+    public function setHasPdf(bool $v): self
+    {
+        $this->hasPdf = $v;
+
+        return $this;
+    }
+
+    public function hasGrobidXml(): bool
+    {
+        return $this->hasGrobidXml;
+    }
+
+    public function setHasGrobidXml(bool $v): self
+    {
+        $this->hasGrobidXml = $v;
+
+        return $this;
+    }
+
+    public function hasAnyRepoFulltext(): bool
+    {
+        return $this->anyRepoFulltext;
+    }
+
+    public function setAnyRepoFulltext(bool $v): self
+    {
+        $this->anyRepoFulltext = $v;
+
+        return $this;
+    }
+
+    public function getFulltextSource(): ?string
+    {
+        return $this->fulltextSource;
+    }
+
+    public function setFulltextSource(?string $src): self
+    {
+        $this->fulltextSource = $src;
 
         return $this;
     }

@@ -140,6 +140,17 @@ final class PublicationImporter
         if (null === $publication->getLandingPageUrl() && null !== $raw->landingPageUrl) {
             $publication->setLandingPageUrl($raw->landingPageUrl);
         }
+
+        // Métadonnées OpenAlex : citations/FWCI évoluent → on rafraîchit à chaque passage.
+        $publication->setCitedByCount($raw->citedByCount);
+        $publication->setFwci($raw->fwci);
+        $publication->setReferencedWorksCount($raw->referencedWorksCount);
+        $publication->setHasPdf($raw->hasPdf);
+        $publication->setHasGrobidXml($raw->hasGrobidXml);
+        $publication->setAnyRepoFulltext($raw->anyRepoFulltext);
+        if (null === $publication->getTypeCrossref() && null !== $raw->typeCrossref) {
+            $publication->setTypeCrossref($raw->typeCrossref);
+        }
         if ($raw->fulltextAvailable) {
             $publication->setFulltextAvailable(true);
         }
