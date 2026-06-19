@@ -215,10 +215,13 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         $order = 'p.publication_date DESC NULLS LAST, p.id DESC';
         if ($hasQuery) {
             $params['q'] = $query;
-            $params['cfg'] = $config;
-            // Rang FTS sur titre (poids A) + résumé (poids B).
-            $ftsWhere = "AND to_tsvector(:cfg::regconfig, coalesce(p.title,'') || ' ' || coalesce(p.abstract,'')) @@ plainto_tsquery(:cfg::regconfig, :q)";
-            $order = "ts_rank(setweight(to_tsvector(:cfg::regconfig, coalesce(p.title,'')), 'A') || setweight(to_tsvector(:cfg::regconfig, coalesce(p.abstract,'')), 'B'), plainto_tsquery(:cfg::regconfig, :q)) DESC, p.publication_date DESC NULLS LAST";
+            // Config injectée en LITTÉRAL (liste blanche, pas une entrée utilisateur) :
+            // un paramètre empêcherait l'usage de l'index GIN fonctionnel (cf. migration).
+            // L'expression DOIT être identique à celle de l'index.
+            $tsv = "to_tsvector('$config', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
+            $tsq = "plainto_tsquery('$config', :q)";
+            $ftsWhere = "AND $tsv @@ $tsq";
+            $order = "ts_rank($tsv, $tsq) DESC, p.publication_date DESC NULLS LAST";
         }
         // Tri par colonne (en-têtes cliquables) — prioritaire sur le rang FTS.
         $order = match ($sort) {
