@@ -4,10 +4,18 @@
     {% include 'admin/_nav.html.twig' %}
     <h1>Auteurs <span class="muted">({{ data.total|number_format(0,',',' ') }})</span></h1>
 
+    {% set sort = data.sort|default('') %}
+    {% set baseParams = { q: data.query, sort: sort } %}
     <form method="get" action="{{ path('admin_authors') }}" style="display:flex; gap:.5rem; margin:1rem 0">
         <input type="text" name="q" value="{{ data.query }}" placeholder="Rechercher (nom ou ORCID)…"
                style="flex:1; padding:.55rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
-        <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.55rem 1rem; cursor:pointer">Rechercher</button>
+        <select name="sort" style="padding:.55rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+            <option value="">Tri : publications</option>
+            <option value="retractions" {{ sort == 'retractions' ? 'selected' }}>Rétractations</option>
+            <option value="eoc" {{ sort == 'eoc' ? 'selected' }}>Expressions de préoccupation</option>
+            <option value="nom" {{ sort == 'nom' ? 'selected' }}>Nom (A→Z)</option>
+        </select>
+        <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.55rem 1rem; cursor:pointer">Filtrer</button>
     </form>
 
     {% if data.items is empty %}
@@ -16,7 +24,10 @@
         <table style="width:100%; border-collapse:collapse; font-size:.9rem">
             <thead>
                 <tr style="text-align:left; border-bottom:2px solid var(--line)">
-                    <th style="padding:.4rem">Nom</th><th>ORCID</th><th>Affiliation</th><th style="text-align:right">Publications</th>
+                    <th style="padding:.4rem">Nom</th><th>ORCID</th><th>Affiliation</th>
+                    <th style="text-align:right">Publications</th>
+                    <th style="text-align:right" title="Études rétractées (Retraction Watch)">Rétractations</th>
+                    <th style="text-align:right" title="Expressions de préoccupation (Expression of Concern)">EoC</th>
                 </tr>
             </thead>
             <tbody>
@@ -26,15 +37,17 @@
                         <td>{% if a.orcid %}<a href="https://orcid.org/{{ a.orcid }}" target="_blank" rel="noopener">{{ a.orcid }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
                         <td class="muted">{{ a.affiliation|default('—')|slice(0,70) }}</td>
                         <td style="text-align:right"><strong>{{ a.publications }}</strong></td>
+                        <td style="text-align:right">{% if a.retractions > 0 %}<span class="badge warn" title="Études rétractées">{{ a.retractions }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
+                        <td style="text-align:right">{% if a.eoc > 0 %}<span class="pill" style="background:#fef3c7" title="Expressions de préoccupation">{{ a.eoc }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
 
         <p style="margin-top:1rem; display:flex; gap:1rem; align-items:center">
-            {% if data.page > 1 %}<a href="{{ path('admin_authors', { q: data.query, page: data.page - 1 }) }}">← Précédent</a>{% endif %}
+            {% if data.page > 1 %}<a href="{{ path('admin_authors', baseParams|merge({ page: data.page - 1 })) }}">← Précédent</a>{% endif %}
             <span class="muted">Page {{ data.page }} / {{ data.pages }}</span>
-            {% if data.page < data.pages %}<a href="{{ path('admin_authors', { q: data.query, page: data.page + 1 }) }}">Suivant →</a>{% endif %}
+            {% if data.page < data.pages %}<a href="{{ path('admin_authors', baseParams|merge({ page: data.page + 1 })) }}">Suivant →</a>{% endif %}
         </p>
     {% endif %}
 {% endblock %}

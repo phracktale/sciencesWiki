@@ -38,12 +38,25 @@ final class AdminAuthorsController
 
         $total = (int) $conn->executeQuery("SELECT count(*) FROM author a $where", $params)->fetchOne();
 
+        // Tri (liste blanche) : par publications, rétractations, EoC, ou nom.
+        $sort = (string) $request->query->get('sort', '');
+        $order = match ($sort) {
+            'retractions' => 'retractions DESC, publications DESC',
+            'eoc' => 'eoc DESC, publications DESC',
+            'nom' => 'a.name ASC',
+            default => 'publications DESC, a.name ASC',
+        };
+
         $rows = $conn->executeQuery(
             "SELECT a.id, a.name, a.orcid, a.affiliation,
-                    (SELECT count(*) FROM authorship au WHERE au.author_id = a.id) AS publications
+                    (SELECT count(*) FROM authorship au WHERE au.author_id = a.id) AS publications,
+                    (SELECT count(*) FROM authorship au JOIN publication p ON p.id = au.publication_id
+                       WHERE au.author_id = a.id AND p.retraction_status = 'retracted') AS retractions,
+                    (SELECT count(*) FROM authorship au JOIN publication p ON p.id = au.publication_id
+                       WHERE au.author_id = a.id AND p.retraction_status = 'concern') AS eoc
              FROM author a
              $where
-             ORDER BY publications DESC, a.name ASC
+             ORDER BY $order
              LIMIT ".self::PER_PAGE.' OFFSET '.$offset,
             $params,
         )->fetchAllAssociative();
@@ -54,6 +67,8 @@ final class AdminAuthorsController
             'orcid' => $r['orcid'],
             'affiliation' => $r['affiliation'],
             'publications' => (int) $r['publications'],
+            'retractions' => (int) $r['retractions'],
+            'eoc' => (int) $r['eoc'],
         ], $rows);
 
         return new JsonResponse([
@@ -62,6 +77,7 @@ final class AdminAuthorsController
             'page' => $page,
             'pages' => (int) ceil($total / self::PER_PAGE),
             'query' => $q,
+            'sort' => $sort,
         ]);
     }
 }

@@ -157,6 +157,7 @@ final class AdminController extends AbstractController
             'data' => $this->admin->authorsList(
                 trim((string) $request->query->get('q', '')),
                 max(1, (int) $request->query->get('page', '1')),
+                trim((string) $request->query->get('sort', '')),
             ),
         ]);
     }
