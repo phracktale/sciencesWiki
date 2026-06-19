@@ -71,6 +71,13 @@ final class WikiController extends AbstractController
         return $this->render('wiki/explorer.html.twig', ['node' => $node, 'slug' => $slug]);
     }
 
+    /** Dépôt public de la version auteur d'un article (gated par jeton sécurisé). */
+    #[Route('/{_locale}/contribuer/{token}', name: 'contribute', requirements: ['_locale' => 'fr', 'token' => '[a-f0-9]{32,64}'], methods: ['GET'])]
+    public function contribute(string $token): Response
+    {
+        return $this->render('wiki/contribute.html.twig', ['token' => $token]);
+    }
+
     /**
      * Rubrique par chemin arborescent. Le dernier segment est le slug (unique) ;
      * si le chemin ne correspond pas au chemin canonique, redirection 301 (SEO).

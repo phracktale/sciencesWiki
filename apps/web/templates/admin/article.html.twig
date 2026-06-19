@@ -2,6 +2,8 @@
 {% block title %}Admin — {{ pub.title }}{% endblock %}
 {% block body %}
     {% include 'admin/_nav.html.twig' %}
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.7rem 1rem; word-break:break-all">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.7rem 1rem">{{ msg }}</p>{% endfor %}
 
     <h1 style="font-size:1.35rem">{{ pub.title }}</h1>
     <p class="qmeta">
@@ -62,6 +64,16 @@
         </script>
     {% else %}
         <p class="badge warn">Aucun PDF en accès libre pour cet article — seul le résumé est indexé.</p>
+        {% if not pub.fulltext %}
+            <div style="border:1px solid var(--line); border-radius:10px; padding:1rem; margin-top:.6rem">
+                <p style="margin:.2rem 0"><strong>Solliciter la version auteur</strong></p>
+                <p class="muted" style="font-size:.88rem; margin:.2rem 0 .7rem">Génère un lien sécurisé (usage unique, 90 j) à transmettre aux auteurs pour qu'ils déposent leur PDF (postprint), qui sera alors indexé dans le RAG.</p>
+                <form method="post" action="{{ path('admin_article_contribution', { id: pub.id }) }}">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1rem; cursor:pointer">🔗 Générer un lien de dépôt auteur</button>
+                </form>
+            </div>
+        {% endif %}
     {% endif %}
 
     {% if pub.fulltext %}

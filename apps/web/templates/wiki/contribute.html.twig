@@ -1,0 +1,74 @@
+{% extends 'base.html.twig' %}
+{% block title %}Déposer la version auteur{% endblock %}
+{% block body %}
+    <div style="max-width:680px; margin:0 auto">
+        <h1>Déposer votre version auteur</h1>
+        <div id="ct-state" class="muted">Vérification du lien…</div>
+
+        <div id="ct-form" style="display:none; margin-top:1rem">
+            <p class="muted">
+                Vous êtes invité·e à déposer la <strong>version auteur</strong> (manuscrit accepté / postprint)
+                de votre article afin qu'il soit indexé et exploité — avec attribution — dans les réponses de
+                SciencesWiki. Merci de ne déposer un PDF que si vous en détenez les droits.
+            </p>
+            <div style="border:1px solid var(--line); border-radius:12px; padding:1rem 1.2rem; background:#f8fafc">
+                <p style="margin:.2rem 0"><strong id="ct-title"></strong></p>
+                <p class="muted" id="ct-authors" style="font-size:.9rem"></p>
+                <p class="muted" id="ct-venue" style="font-size:.85rem"></p>
+            </div>
+
+            <form id="ct-upload" style="margin-top:1.2rem; display:flex; flex-direction:column; gap:.8rem">
+                <label>Fichier PDF (texte, 30 Mo max)</label>
+                <input type="file" name="pdf" id="ct-file" accept="application/pdf" required>
+                <button type="submit" id="ct-submit" style="background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.7rem 1.4rem; cursor:pointer; font:inherit; font-weight:600; align-self:flex-start">Déposer et indexer</button>
+            </form>
+        </div>
+
+        <div id="ct-result" style="margin-top:1rem"></div>
+    </div>
+
+    <script>
+    (function () {
+        var TOKEN = {{ token|json_encode|raw }};
+        var stateEl = document.getElementById('ct-state');
+        var formWrap = document.getElementById('ct-form');
+        var result = document.getElementById('ct-result');
+
+        function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+
+        fetch('/api/contribute/' + TOKEN).then(function (r) { return r.json(); }).then(function (d) {
+            if (!d.valid) { stateEl.innerHTML = '<p class="badge warn">' + esc(d.error || 'Lien invalide.') + '</p>'; return; }
+            stateEl.style.display = 'none';
+            formWrap.style.display = 'block';
+            document.getElementById('ct-title').textContent = d.title || '';
+            document.getElementById('ct-authors').textContent = (d.authors || []).join(', ');
+            document.getElementById('ct-venue').textContent = [d.venue, d.doi ? 'DOI ' + d.doi : ''].filter(Boolean).join(' · ');
+        }).catch(function () { stateEl.innerHTML = '<p class="badge warn">Erreur de connexion.</p>'; });
+
+        document.getElementById('ct-upload').addEventListener('submit', function (e) {
+            e.preventDefault();
+            var file = document.getElementById('ct-file').files[0];
+            if (!file) return;
+            var btn = document.getElementById('ct-submit');
+            btn.disabled = true; btn.textContent = 'Traitement en cours… (peut prendre 1 min)';
+            result.innerHTML = '';
+            var fd = new FormData(); fd.append('pdf', file);
+            fetch('/api/contribute/' + TOKEN, { method: 'POST', body: fd })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (res) {
+                    if (res.ok && res.j.ok) {
+                        formWrap.style.display = 'none';
+                        result.innerHTML = '<p class="badge ok" style="display:block; padding:.8rem 1rem">✅ ' + esc(res.j.message) + '</p>';
+                    } else {
+                        btn.disabled = false; btn.textContent = 'Déposer et indexer';
+                        result.innerHTML = '<p class="badge warn" style="display:block; padding:.8rem 1rem">' + esc(res.j.error || 'Échec.') + '</p>';
+                    }
+                })
+                .catch(function () {
+                    btn.disabled = false; btn.textContent = 'Déposer et indexer';
+                    result.innerHTML = '<p class="badge warn">Erreur réseau.</p>';
+                });
+        });
+    })();
+    </script>
+{% endblock %}

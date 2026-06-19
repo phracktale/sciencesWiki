@@ -130,6 +130,12 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0, 'category' => $category, 'categories' => []];
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} génère un lien de dépôt auteur */
+    public function createContributionToken(int $id): array
+    {
+        return $this->send('POST', '/api/admin/publications/'.$id.'/contribution-token', []);
+    }
+
     /** @return array<string,mixed>|null fiche détaillée d'un article */
     public function publication(int $id): ?array
     {

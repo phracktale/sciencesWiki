@@ -90,6 +90,46 @@ final class FulltextIngester
     }
 
     /**
+     * Ingère un PDF DÉJÀ présent sur le disque (version auteur déposée via le
+     * formulaire de contribution) : extraction du texte, découpage, embeddings →
+     * publication_chunk. Retourne le nombre de fragments créés. Idempotent :
+     * purge d'abord les fragments existants de cette publication.
+     */
+    public function ingestUploadedPdf(int $publicationId, string $pdfPath): int
+    {
+        $text = $this->extractText($pdfPath);
+        if (null === $text || mb_strlen($text) < 500) {
+            return 0;
+        }
+        $chunks = $this->chunk($text);
+        if ([] === $chunks) {
+            return 0;
+        }
+
+        $vectors = $this->embedder->embedBatch($chunks);
+        // Remplace d'éventuels fragments précédents (réingestion).
+        $this->conn->executeStatement('DELETE FROM publication_chunk WHERE publication_id = :id', ['id' => $publicationId]);
+
+        $ord = 0;
+        foreach ($chunks as $i => $chunk) {
+            if (!isset($vectors[$i])) {
+                continue;
+            }
+            $this->conn->executeStatement(
+                'INSERT INTO publication_chunk (publication_id, ord, content, embedding)
+                 VALUES (:p, :o, :c, CAST(:v AS vector))',
+                ['p' => $publicationId, 'o' => $ord++, 'c' => $chunk, 'v' => (string) new Vector($vectors[$i])],
+            );
+        }
+        $this->conn->executeStatement(
+            'UPDATE publication SET fulltext_available = true, fulltext_stored = true, author_pdf_at = now(), fulltext_fetched_at = now() WHERE id = :id',
+            ['id' => $publicationId],
+        );
+
+        return $ord;
+    }
+
+    /**
      * Télécharge l'URL si c'est bien un PDF d'une taille raisonnable ; sinon null.
      * Si l'URL est une page HTML (page d'atterrissage), tente d'y découvrir le PDF
      * via la méta standard `citation_pdf_url` (présente chez la plupart des éditeurs

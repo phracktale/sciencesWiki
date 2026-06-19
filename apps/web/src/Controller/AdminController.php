@@ -176,6 +176,29 @@ final class AdminController extends AbstractController
         return $this->render('admin/article.html.twig', ['pub' => $pub]);
     }
 
+    /** Génère un lien de dépôt auteur pour un article et l'affiche (à transmettre aux auteurs). */
+    #[Route('/admin/articles/{id}/contribution-token', name: 'admin_article_contribution', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function articleContributionToken(int $id, Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_article', ['id' => $id]);
+        }
+        $res = $this->admin->createContributionToken($id);
+        if ($res['ok'] && isset($res['data']['path'])) {
+            $url = $request->getSchemeAndHttpHost().$res['data']['path'];
+            $this->addFlash('success', 'Lien de dépôt auteur (valable 90 j, usage unique) — à transmettre aux auteurs : '.$url);
+        } else {
+            $this->addFlash('error', 'Échec de génération : '.($res['data']['error'] ?? 'erreur inconnue'));
+        }
+
+        return $this->redirectToRoute('admin_article', ['id' => $id]);
+    }
+
     /** Proxy du PDF en accès libre (même origine → visualiseur natif + impression). Anti-SSRF. */
     #[Route('/admin/articles/{id}/pdf', name: 'admin_article_pdf', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function articlePdf(int $id, Request $request): Response
