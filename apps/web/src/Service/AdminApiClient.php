@@ -145,9 +145,9 @@ final class AdminApiClient
     }
 
     /** @return array<string,mixed> liste paginée d'auteurs */
-    public function authorsList(string $q, int $page, string $sort = ''): array
+    public function authorsList(string $q, int $page, string $sort = '', string $dir = ''): array
     {
-        $res = $this->send('GET', '/api/admin/authors?'.http_build_query(array_filter(['q' => $q, 'page' => $page, 'sort' => $sort])), null);
+        $res = $this->send('GET', '/api/admin/authors?'.http_build_query(array_filter(['q' => $q, 'page' => $page, 'sort' => $sort, 'dir' => $dir])), null);
 
         return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0, 'page' => 1, 'pages' => 0, 'query' => $q];
     }

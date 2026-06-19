@@ -121,6 +121,7 @@ final class AdminController extends AbstractController
             'pdf' => trim((string) $request->query->get('pdf', '')),
             'access' => trim((string) $request->query->get('access', '')),
             'sort' => trim((string) $request->query->get('sort', '')),
+            'dir' => trim((string) $request->query->get('dir', '')),
         ];
 
         return $this->render('admin/articles.html.twig', [
@@ -158,6 +159,7 @@ final class AdminController extends AbstractController
                 trim((string) $request->query->get('q', '')),
                 max(1, (int) $request->query->get('page', '1')),
                 trim((string) $request->query->get('sort', '')),
+                trim((string) $request->query->get('dir', '')),
             ),
         ]);
     }

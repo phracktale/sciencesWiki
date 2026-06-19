@@ -38,14 +38,16 @@ final class AdminAuthorsController
 
         $total = (int) $conn->executeQuery("SELECT count(*) FROM author a $where", $params)->fetchOne();
 
-        // Tri (liste blanche) : par publications, rétractations, EoC, ou nom.
+        // Tri (liste blanche) par colonne + direction (en-têtes cliquables).
         $sort = (string) $request->query->get('sort', '');
-        $order = match ($sort) {
-            'retractions' => 'retractions DESC, publications DESC',
-            'eoc' => 'eoc DESC, publications DESC',
-            'nom' => 'a.name ASC',
-            default => 'publications DESC, a.name ASC',
+        $d = 'asc' === strtolower((string) $request->query->get('dir', '')) ? 'ASC' : 'DESC';
+        $col = match ($sort) {
+            'retractions' => 'retractions',
+            'eoc' => 'eoc',
+            'nom' => 'a.name',
+            default => 'publications',
         };
+        $order = 'a.name' === $col ? "a.name $d" : "$col $d, a.name ASC";
 
         $rows = $conn->executeQuery(
             "SELECT a.id, a.name, a.orcid, a.affiliation,

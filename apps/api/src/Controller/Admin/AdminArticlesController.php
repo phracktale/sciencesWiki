@@ -70,13 +70,15 @@ final class AdminArticlesController
         }
         $where = [] !== $conditions ? 'WHERE '.implode(' AND ', $conditions) : '';
 
-        // --- Tri (liste blanche) ---
-        $order = match ((string) $request->query->get('sort', '')) {
-            'titre' => 'p.title ASC',
-            'fragments' => '(SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) DESC, p.id DESC',
-            'ancien' => 'p.publication_date ASC NULLS LAST, p.id ASC',
-            default => 'p.publication_date DESC NULLS LAST, p.id DESC',
+        // --- Tri par colonne + direction (en-têtes cliquables) ---
+        $d = 'asc' === strtolower((string) $request->query->get('dir', '')) ? 'ASC' : 'DESC';
+        $col = match ((string) $request->query->get('sort', '')) {
+            'titre' => 'p.title',
+            'revue' => 'COALESCE(j.name, p.venue)',
+            'fragments' => '(SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id)',
+            default => 'p.publication_date',
         };
+        $order = "$col $d NULLS LAST, p.id DESC";
 
         $total = (int) $conn->executeQuery("SELECT count(*) FROM publication p $where", $params)->fetchOne();
 

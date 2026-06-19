@@ -1,0 +1,12 @@
+{# En-tête de colonne cliquable (tri asc/desc, flèche d'état).
+   - label  : intitulé affiché
+   - col    : valeur du paramètre sort
+   - route  : nom de route
+   - params : paramètres à conserver (recherche, filtres…) #}
+{% macro th(label, col, route, params) %}
+{%- set cur = app.request.query.get('sort') -%}
+{%- set curDir = app.request.query.get('dir')|default('asc') -%}
+{%- set nextDir = (cur == col and curDir == 'asc') ? 'desc' : 'asc' -%}
+{%- set arrow = (cur == col) ? (curDir == 'asc' ? ' ▲' : ' ▼') : '' -%}
+<a href="{{ path(route, params|merge({ sort: col, dir: nextDir })) }}" style="color:inherit; text-decoration:none; white-space:nowrap">{{ label }}<span style="color:var(--accent)">{{ arrow }}</span></a>
+{%- endmacro %}
