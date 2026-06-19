@@ -157,7 +157,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                     FROM publication
                     WHERE embedding IS NOT NULL AND retraction_status = 'none'
                     UNION ALL
-                    SELECT pc.publication_id AS id, pc.embedding <=> CAST(:vec AS vector) AS distance
+                    SELECT pc.publication_id AS id, pc.embedding <=> CAST(:vec AS halfvec) AS distance
                     FROM publication_chunk pc JOIN publication p ON p.id = pc.publication_id
                     WHERE pc.embedding IS NOT NULL AND p.retraction_status = 'none'
                  ) AS combined

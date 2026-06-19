@@ -113,7 +113,7 @@ final class FulltextIngester
             }
             $this->conn->executeStatement(
                 'INSERT INTO publication_chunk (publication_id, ord, content, embedding)
-                 VALUES (:p, :o, :c, CAST(:v AS vector))',
+                 VALUES (:p, :o, :c, CAST(:v AS halfvec))',
                 ['p' => $publicationId, 'o' => $ord++, 'c' => $chunk, 'v' => (string) new Vector($vectors[$i])],
             );
         }
