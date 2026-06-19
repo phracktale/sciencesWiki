@@ -8,3 +8,8 @@ Dockerfile      text eol=lf
 Caddyfile       text eol=lf
 .dockerignore   text eol=lf
 *.conf          text eol=lf
+
+# Polices : binaires (jamais de conversion de fins de ligne)
+*.ttf binary
+*.woff binary
+*.woff2 binary

@@ -8,12 +8,28 @@
     {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}
     <script src="/js/turbo.min.js" defer></script>
     <style>
-        :root { --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937; }
-        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/monofur-regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
-        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/monofur-bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
+        :root {
+            --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937;
+            /* Roboto Mono = base + structure (titres, menus, boutons, en-têtes de tables). */
+            --font-base: 'Roboto Mono', ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+            /* Monofur = contenu des listes/articles + texte secondaire des cartes + badges. */
+            --font-content: 'Monofur', ui-monospace, monospace;
+        }
+        @font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+        @font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
+        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/MonofurNerdFont-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/MonofurNerdFont-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
         * { box-sizing: border-box; }
-        body { font-family: 'Monofur', ui-monospace, 'Cascadia Code', 'Consolas', monospace; max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
-        h1, h2, h3, .brand { font-family: 'Monofur', ui-monospace, monospace; }
+        /* Classes utilitaires explicites (cf. usage dans les templates). */
+        .font-roboto { font-family: var(--font-base); }
+        .font-monofur { font-family: var(--font-content); }
+        /* Base + structure = Roboto Mono. */
+        body, button, input, select, textarea { font-family: var(--font-base); }
+        body { max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
+        h1, h2, h3, h4, .brand, header nav, footer, table th { font-family: var(--font-base); }
+        /* Contenu (listes/articles) + secondaire des cartes + badges = Monofur. */
+        table td, .badge, .pill, .qlist, .card .muted,
+        .block-vul, .block-aca, .sources, .xp-detail, table.xp td { font-family: var(--font-content); }
         /* Accueil : 2 colonnes (principal + barre latérale). */
         .home-grid { display:grid; grid-template-columns: 1.7fr 1fr; gap:1.6rem; align-items:start; }
         @media (max-width:880px) { .home-grid { grid-template-columns:1fr; } }
@@ -63,7 +79,7 @@
         .pill { display:inline-block; font-size:.72rem; padding:.12rem .55rem; border-radius:999px; background:#f1f5f9; color:#475569; border:1px solid var(--line); }
         .pill.author { background:#eef2ff; color:#3730a3; border-color:#e0e7ff; }
         .pill.node { background:#ecfdf5; color:#065f46; border-color:#d1fae5; }
-        .badge { display:inline-block; font-size:.78rem; padding:.1rem .55rem; border-radius:999px; }
+        .badge { display:inline-block; font-size:.78rem; padding:.1rem .55rem; border-radius:8px; }
         .badge.ok { background:#dcfce7; color:#166534; }
         .badge.warn { background:#fef3c7; color:#92400e; }
         .qlist { list-style:none; padding:0; margin:0; }

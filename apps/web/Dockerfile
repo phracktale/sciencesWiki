@@ -49,19 +49,9 @@ RUN set -eux; \
         echo "AVERTISSEMENT : téléchargement PDF.js échoué — repli visualiseur natif"; \
     fi
 
-# Police Monofur (Nerd Font) auto-hébergée, souveraine (pas de CDN). Non-fatal si
-# le réseau manque au build (repli sur la pile monospace système).
-ARG MONOFUR_URL=https://github.com/ryanoasis/nerd-fonts/releases/download/v3.4.0/Monofur.zip
-RUN set -eux; \
-    mkdir -p public/fonts/monofur; \
-    if curl -fsSL -o /tmp/monofur.zip "${MONOFUR_URL}"; then \
-        unzip -q /tmp/monofur.zip -d /tmp/monofur && rm -f /tmp/monofur.zip; \
-        cp "$(find /tmp/monofur -iname '*Regular*.ttf' | grep -vi italic | head -1)" public/fonts/monofur/monofur-regular.ttf; \
-        cp "$(find /tmp/monofur -iname '*Bold*.ttf' | grep -vi italic | head -1)" public/fonts/monofur/monofur-bold.ttf; \
-        rm -rf /tmp/monofur; echo "Monofur vendoré"; \
-    else \
-        echo "AVERTISSEMENT : téléchargement Monofur échoué — repli monospace système"; \
-    fi
+# Polices auto-hébergées (souveraines) : Roboto Mono (base/structure) + Monofur
+# Nerd Font (contenu/secondaire) sont versionnées dans public/fonts/ (copiées via
+# COPY . ./), donc servies directement par FrankenPHP. Aucune dépendance réseau.
 
 RUN set -eux; \
     rm -rf frankenphp/ ; \
