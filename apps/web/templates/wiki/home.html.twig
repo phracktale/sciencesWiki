@@ -29,9 +29,10 @@
             </section>
 
             <h2>Explorer par domaine</h2>
+            {% import 'wiki/_colors.html.twig' as colors %}
             <div class="domains">
                 {% for domain in domains %}
-                    {% set bg = domain.imageUrl ? 'center/cover no-repeat url(' ~ domain.imageUrl ~ ')' : palette[domain.id % palette|length] %}
+                    {% set bg = domain.imageUrl ? 'center/cover no-repeat url(' ~ domain.imageUrl ~ ')' : colors.card_bg(domain.slug, 0) %}
                     <a class="domain-card" href="/{{ app.request.locale }}/{{ domain.slug }}" style="background:{{ bg }}">
                         <span class="d-label">{{ domain.label }}</span><br>
                         <span class="d-sub">{{ domain.childrenCount }} sous-domaine(s)</span>

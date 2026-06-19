@@ -7,17 +7,10 @@
 {% endblock %}
 
 {% block body %}
-    {% set palette = [
-        'linear-gradient(135deg,#0ea5e9,#1e3a8a)','linear-gradient(135deg,#10b981,#065f46)',
-        'linear-gradient(135deg,#f59e0b,#b45309)','linear-gradient(135deg,#8b5cf6,#5b21b6)',
-        'linear-gradient(135deg,#ef4444,#7f1d1d)','linear-gradient(135deg,#ec4899,#831843)',
-        'linear-gradient(135deg,#14b8a6,#134e4a)','linear-gradient(135deg,#6366f1,#312e81)',
-        'linear-gradient(135deg,#84cc16,#3f6212)','linear-gradient(135deg,#f97316,#7c2d12)'
-    ] %}
+    {% import 'wiki/_colors.html.twig' as colors %}
     {% set crumbs = node.breadcrumb ?? [] %}
-    {# Couleur du domaine racine (1er fil d'Ariane, sinon le nœud lui-même) — cohérente avec l'accueil. #}
-    {% set rootId = (crumbs|first).id ?? node.id %}
-    {% set rootColor = palette[rootId % palette|length] %}
+    {# Slug du domaine racine (1er fil d'Ariane, sinon le nœud lui-même) → teinte. #}
+    {% set rootSlug = (crumbs|first).slug ?? node.slug %}
     {% if crumbs|length > 1 %}
         <p class="crumbs">
             {% set acc = '' %}
@@ -43,7 +36,7 @@
         <div class="grid">
             {% for child in node.children %}
                 {% set cs = (childrenStats[child.slug] ?? {}) %}
-                <a class="domain-card" href="/{{ app.request.locale }}/{{ path }}/{{ child.slug }}" style="background:{{ rootColor }}; min-height:96px">
+                <a class="domain-card" href="/{{ app.request.locale }}/{{ path }}/{{ child.slug }}" style="background:{{ colors.card_bg(rootSlug, child.level) }}; min-height:96px">
                     <span class="d-label">{{ child.label }}</span>
                     <span style="display:block; margin-top:.45rem">
                         <span class="pill" style="background:rgba(255,255,255,.85)" title="Publications (cette sous-rubrique et ses descendantes)">📚 {{ (cs.publications ?? 0)|number_format(0, ',', ' ') }}</span>
