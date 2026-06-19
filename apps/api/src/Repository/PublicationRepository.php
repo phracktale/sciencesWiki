@@ -68,9 +68,11 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     {
         $ids = $this->getEntityManager()->getConnection()->executeQuery(
             \sprintf(
+                // Curation : on traite d'abord ce qui a un TEI GROBID dispo et le plus
+                // cité (haut du panier), puis les PDF directs.
                 "SELECT id FROM publication
                  WHERE oa_url IS NOT NULL AND oa_url <> '' AND fulltext_fetched_at IS NULL
-                 ORDER BY (oa_url ILIKE '%%.pdf%%') DESC, id DESC LIMIT %d",
+                 ORDER BY has_grobid_xml DESC, cited_by_count DESC, (oa_url ILIKE '%%.pdf%%') DESC, id DESC LIMIT %d",
                 max(1, $limit),
             ),
         )->fetchFirstColumn();

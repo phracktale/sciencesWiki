@@ -33,13 +33,15 @@ final class FulltextIngester
         private readonly HttpClientInterface $httpClient,
         private readonly Connection $conn,
         private readonly LoggerInterface $logger,
+        private readonly GrobidExtractor $grobid,
     ) {
         $this->embedder = $factory->create();
     }
 
     /**
      * Tente d'ingérer le texte intégral d'une publication OA. Retourne le nombre
-     * de fragments créés (0 si ignoré/échec).
+     * de fragments créés (0 si ignoré/échec). Voie privilégiée : PDF éditeur →
+     * GROBID (TEI structuré) ; repli : pdftotext.
      */
     public function ingest(Publication $publication): int
     {
@@ -57,31 +59,13 @@ final class FulltextIngester
             if (null === $pdf) {
                 return 0;
             }
-            $text = $this->extractText($pdf);
+            [$chunks, $source] = $this->pdfToChunks($pdf);
             @unlink($pdf);
-            if (null === $text || mb_strlen($text) < 500) {
-                return 0; // texte trop court / extraction infructueuse
-            }
-
-            $chunks = $this->chunk($text);
             if ([] === $chunks) {
                 return 0;
             }
-            // Embeddings des fragments PAR LOT (un seul appel au service ml/).
-            $vectors = $this->embedder->embedBatch($chunks);
-            $ord = 0;
-            foreach ($chunks as $i => $chunk) {
-                if (!isset($vectors[$i])) {
-                    continue;
-                }
-                $this->conn->executeStatement(
-                    'INSERT INTO publication_chunk (publication_id, ord, content, embedding)
-                     VALUES (:p, :o, :c, CAST(:v AS vector))',
-                    ['p' => $id, 'o' => $ord++, 'c' => $chunk, 'v' => (string) new Vector($vectors[$i])],
-                );
-            }
 
-            return $ord;
+            return $this->storeChunks($id, $chunks, $source);
         } catch (\Throwable $e) {
             $this->logger->info('Texte intégral non ingéré : '.$e->getMessage(), ['publication' => $id, 'url' => $url]);
 
@@ -90,24 +74,35 @@ final class FulltextIngester
     }
 
     /**
-     * Ingère un PDF DÉJÀ présent sur le disque (version auteur déposée via le
-     * formulaire de contribution) : extraction du texte, découpage, embeddings →
-     * publication_chunk. Retourne le nombre de fragments créés. Idempotent :
-     * purge d'abord les fragments existants de cette publication.
+     * Extrait des fragments d'un PDF local : GROBID (TEI, sections) si disponible,
+     * sinon pdftotext. Retourne [fragments, provenance].
+     *
+     * @return array{0: list<string>, 1: string}
      */
-    public function ingestUploadedPdf(int $publicationId, string $pdfPath): int
+    private function pdfToChunks(string $pdfPath): array
     {
+        $chunks = $this->grobid->extract($pdfPath, self::MAX_CHUNKS);
+        if ([] !== $chunks) {
+            return [$chunks, 'grobid_self'];
+        }
+        // Repli : extraction plate via pdftotext.
         $text = $this->extractText($pdfPath);
         if (null === $text || mb_strlen($text) < 500) {
-            return 0;
-        }
-        $chunks = $this->chunk($text);
-        if ([] === $chunks) {
-            return 0;
+            return [[], 'publisher'];
         }
 
+        return [$this->chunk($text), 'publisher'];
+    }
+
+    /**
+     * Vectorise + persiste des fragments pour une publication (purge préalable),
+     * marque le texte intégral disponible + sa provenance. Retourne le nb de fragments.
+     *
+     * @param list<string> $chunks
+     */
+    private function storeChunks(int $publicationId, array $chunks, string $source): int
+    {
         $vectors = $this->embedder->embedBatch($chunks);
-        // Remplace d'éventuels fragments précédents (réingestion).
         $this->conn->executeStatement('DELETE FROM publication_chunk WHERE publication_id = :id', ['id' => $publicationId]);
 
         $ord = 0;
@@ -121,10 +116,35 @@ final class FulltextIngester
                 ['p' => $publicationId, 'o' => $ord++, 'c' => $chunk, 'v' => (string) new Vector($vectors[$i])],
             );
         }
-        $this->conn->executeStatement(
-            'UPDATE publication SET fulltext_available = true, fulltext_stored = true, author_pdf_at = now(), fulltext_fetched_at = now() WHERE id = :id',
-            ['id' => $publicationId],
-        );
+        if ($ord > 0) {
+            $this->conn->executeStatement(
+                'UPDATE publication SET fulltext_available = true, fulltext_stored = true, fulltext_source = :s WHERE id = :id',
+                ['s' => $source, 'id' => $publicationId],
+            );
+        }
+
+        return $ord;
+    }
+
+    /**
+     * Ingère un PDF DÉJÀ présent sur le disque (version auteur déposée via le
+     * formulaire de contribution) : extraction du texte, découpage, embeddings →
+     * publication_chunk. Retourne le nombre de fragments créés. Idempotent :
+     * purge d'abord les fragments existants de cette publication.
+     */
+    public function ingestUploadedPdf(int $publicationId, string $pdfPath): int
+    {
+        [$chunks] = $this->pdfToChunks($pdfPath);
+        if ([] === $chunks) {
+            return 0;
+        }
+        $ord = $this->storeChunks($publicationId, $chunks, 'author');
+        if ($ord > 0) {
+            $this->conn->executeStatement(
+                'UPDATE publication SET author_pdf_at = now(), fulltext_fetched_at = now() WHERE id = :id',
+                ['id' => $publicationId],
+            );
+        }
 
         return $ord;
     }
