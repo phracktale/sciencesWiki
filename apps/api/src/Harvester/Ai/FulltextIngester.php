@@ -179,7 +179,12 @@ final class FulltextIngester
             $options = [
                 'timeout' => 30,
                 'max_redirects' => 0,
-                'headers' => ['Accept' => 'application/pdf,*/*'],
+                // User-Agent poli (avec contact) : beaucoup d'éditeurs rejettent les
+                // requêtes sans UA. Accept large (certains servent le PDF en octet-stream).
+                'headers' => [
+                    'Accept' => 'application/pdf,*/*',
+                    'User-Agent' => 'SciencesWikiBot/1.0 (+https://scienceswiki.eu; mailto:contact@scienceswiki.org)',
+                ],
             ];
             // Épingle la connexion à l'IP validée (anti DNS-rebinding) ; le client
             // garde le nom d'hôte pour TLS/SNI/Host. Inutile si l'hôte est déjà une IP.
