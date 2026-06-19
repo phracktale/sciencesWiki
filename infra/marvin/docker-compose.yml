@@ -6,9 +6,37 @@
 # Déploiement : voir infra/marvin/deploy.sh (git clone sur Marvin + build ici).
 # Lancer depuis ce dossier : `docker compose up -d --build`.
 # Le service écoute sur 8001 ; l'API de Thor le joint via ML_EMBED_URL.
+#
+# Marvin héberge aussi désormais la BASE PostgreSQL/pgvector (données sur /data,
+# le gros disque). L'api/worker de Thor s'y connectent via le réseau privé
+# (DB_HOST=192.168.1.171). Données = bind-mount /data/scienceswiki-pgdata (pas un
+# volume Docker, qui irait sur le disque système). Nécessite infra/marvin/.env
+# avec POSTGRES_USER/DB/PASSWORD (mêmes valeurs que Thor). NON exposé sur Internet.
 name: scienceswiki-ml
 
 services:
+  database:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      # Perf : la base vivant sur /data, on profite des 128 Go de RAM.
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - /data/scienceswiki-pgdata:/var/lib/postgresql/data:rw
+    ports:
+      # LAN homelab uniquement (Thor s'y connecte). Ne JAMAIS publier sur Internet.
+      - "5432:5432"
+    shm_size: "1gb"
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]
+      timeout: 5s
+      interval: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
   embeddings:
     build:
       # ml/ est à la racine du dépôt ; ce compose vit dans infra/marvin/.
