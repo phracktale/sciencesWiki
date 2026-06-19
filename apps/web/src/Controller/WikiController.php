@@ -56,6 +56,22 @@ final class WikiController extends AbstractController
     }
 
     /**
+     * Explorateur d'articles d'un sous-domaine (recherche plein-texte + fiche
+     * détaillée façon OpenAlex). Interactif : la liste et la fiche sont chargées
+     * côté navigateur depuis l'API publique.
+     */
+    #[Route('/{_locale}/explorer/{slug}', name: 'explorer', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function explorer(string $slug): Response
+    {
+        $node = $this->api->node($slug);
+        if (null === $node) {
+            return $this->redirectToRoute('home', ['_locale' => 'fr']);
+        }
+
+        return $this->render('wiki/explorer.html.twig', ['node' => $node, 'slug' => $slug]);
+    }
+
+    /**
      * Rubrique par chemin arborescent. Le dernier segment est le slug (unique) ;
      * si le chemin ne correspond pas au chemin canonique, redirection 301 (SEO).
      */

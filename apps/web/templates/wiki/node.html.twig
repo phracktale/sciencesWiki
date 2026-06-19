@@ -33,6 +33,7 @@
     {% if corpusCount is defined and corpusCount > 0 %}
         <p><span class="pill">📚 {{ corpusCount|number_format(0, ',', ' ') }} publication(s) dans cette rubrique et ses sous-rubriques</span></p>
     {% endif %}
+    <p><a href="{{ path('explorer', { slug: node.slug }) }}" style="display:inline-block; background:var(--accent); color:#fff; text-decoration:none; padding:.5rem 1rem; border-radius:9px; font-weight:600">🔎 Explorer les articles de cette rubrique</a></p>
     {% if node.openalexUrl %}
         <p class="muted" style="font-size:.85rem">Concept de référence : <a href="{{ node.openalexUrl }}" rel="noopener" target="_blank">OpenAlex ↗</a></p>
     {% endif %}

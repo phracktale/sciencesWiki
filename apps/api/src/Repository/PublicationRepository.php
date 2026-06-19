@@ -195,6 +195,71 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Recherche paginée des articles d'un sous-domaine (le nœud + ses descendants),
+     * avec recherche plein-texte facultative. Le stemming (racinisation) est
+     * activable : config FTS « english » (mots de la même famille rapprochés) ou
+     * « simple » (correspondance exacte des tokens). Exclut les études rétractées.
+     *
+     * @return array{items: list<array<string,mixed>>, total: int}
+     */
+    public function searchInSubtree(string $slug, string $query, bool $stemming, int $page, int $perPage, string $sort = '', string $dir = 'asc'): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $offset = max(0, ($page - 1) * $perPage);
+        $hasQuery = '' !== trim($query);
+        $config = $stemming ? 'english' : 'simple';
+        $d = 'desc' === strtolower($dir) ? 'DESC' : 'ASC';
+
+        $params = ['slug' => $slug];
+        $ftsWhere = '';
+        $order = 'p.publication_date DESC NULLS LAST, p.id DESC';
+        if ($hasQuery) {
+            $params['q'] = $query;
+            $params['cfg'] = $config;
+            // Rang FTS sur titre (poids A) + résumé (poids B).
+            $ftsWhere = "AND to_tsvector(:cfg::regconfig, coalesce(p.title,'') || ' ' || coalesce(p.abstract,'')) @@ plainto_tsquery(:cfg::regconfig, :q)";
+            $order = "ts_rank(setweight(to_tsvector(:cfg::regconfig, coalesce(p.title,'')), 'A') || setweight(to_tsvector(:cfg::regconfig, coalesce(p.abstract,'')), 'B'), plainto_tsquery(:cfg::regconfig, :q)) DESC, p.publication_date DESC NULLS LAST";
+        }
+        // Tri par colonne (en-têtes cliquables) — prioritaire sur le rang FTS.
+        $order = match ($sort) {
+            'titre' => "p.title $d NULLS LAST",
+            'annee' => "p.publication_date $d NULLS LAST, p.id DESC",
+            'revue' => "coalesce(j.name, p.venue) $d NULLS LAST",
+            'auteurs' => "authors $d NULLS LAST",
+            default => $order,
+        };
+
+        $base = "FROM publication p
+            LEFT JOIN journal j ON j.id = p.journal_id
+            WHERE p.retraction_status = 'none'
+              AND EXISTS (
+                WITH RECURSIVE sub AS (
+                    SELECT id FROM tree_node WHERE slug = :slug
+                    UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
+                ) SELECT 1 FROM placement_suggestion ps WHERE ps.publication_id = p.id AND ps.tree_node_id IN (SELECT id FROM sub)
+              )
+              $ftsWhere";
+
+        $total = (int) $conn->executeQuery("SELECT count(*) $base", $params)->fetchOne();
+
+        $rows = $conn->executeQuery(
+            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
+                    j.name AS journal_name,
+                    to_char(p.publication_date, 'YYYY') AS year,
+                    (SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) AS chunks,
+                    (SELECT string_agg(a.name, ', ' ORDER BY au.position)
+                       FROM authorship au JOIN author a ON a.id = au.author_id
+                      WHERE au.publication_id = p.id) AS authors
+             $base
+             ORDER BY $order
+             LIMIT $perPage OFFSET $offset",
+            $params,
+        )->fetchAllAssociative();
+
+        return ['items' => $rows, 'total' => $total];
+    }
+
+    /**
      * Recherche par identifiant externe (ex. openalex/arxiv) stocké dans le JSON
      * `external_ids`. Utilise l'opérateur JSON de PostgreSQL.
      */
