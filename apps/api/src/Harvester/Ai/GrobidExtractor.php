@@ -6,8 +6,6 @@ namespace App\Harvester\Ai;
 
 use Psr\Log\LoggerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mime\Part\DataPart;
-use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -46,17 +44,29 @@ final class GrobidExtractor
             return [];
         }
 
-        $form = new FormDataPart([
-            'input' => DataPart::fromPath($pdfPath, 'document.pdf', 'application/pdf'),
-            'consolidateHeader' => '0',
-            'consolidateCitations' => '0',
-            'segmentSentences' => '0',
-        ]);
+        $pdf = @file_get_contents($pdfPath);
+        if (false === $pdf || '' === $pdf) {
+            return [];
+        }
+
+        // Corps multipart/form-data construit à la main (pas de dépendance symfony/mime).
+        $boundary = '----SciencesWikiGrobid'.bin2hex(random_bytes(8));
+        $eol = "\r\n";
+        $body = '--'.$boundary.$eol
+            .'Content-Disposition: form-data; name="input"; filename="document.pdf"'.$eol
+            .'Content-Type: application/pdf'.$eol.$eol
+            .$pdf.$eol;
+        foreach (['consolidateHeader' => '0', 'consolidateCitations' => '0', 'segmentSentences' => '0'] as $name => $value) {
+            $body .= '--'.$boundary.$eol
+                .'Content-Disposition: form-data; name="'.$name.'"'.$eol.$eol
+                .$value.$eol;
+        }
+        $body .= '--'.$boundary.'--'.$eol;
 
         try {
             $response = $this->httpClient->request('POST', rtrim($this->grobidUrl, '/').'/api/processFulltextDocument', [
-                'headers' => $form->getPreparedHeaders()->toArray(),
-                'body' => $form->bodyToIterable(),
+                'headers' => ['Content-Type' => 'multipart/form-data; boundary='.$boundary],
+                'body' => $body,
                 'timeout' => 180,
             ]);
             if (200 !== $response->getStatusCode()) {
