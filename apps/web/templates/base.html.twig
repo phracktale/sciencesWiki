@@ -9,8 +9,11 @@
     <script src="/js/turbo.min.js" defer></script>
     <style>
         :root { --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937; }
+        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/monofur-regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/monofur-bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
         * { box-sizing: border-box; }
-        body { font-family: system-ui, -apple-system, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
+        body { font-family: 'Monofur', ui-monospace, 'Cascadia Code', 'Consolas', monospace; max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
+        h1, h2, h3, .brand { font-family: 'Monofur', ui-monospace, monospace; }
         /* Accueil : 2 colonnes (principal + barre latérale). */
         .home-grid { display:grid; grid-template-columns: 1.7fr 1fr; gap:1.6rem; align-items:start; }
         @media (max-width:880px) { .home-grid { grid-template-columns:1fr; } }
