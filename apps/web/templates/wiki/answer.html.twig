@@ -4,6 +4,8 @@
 {% block description %}{{ answer.vulgarizationContent|striptags|slice(0, 155) }}{% endblock %}
 
 {% block body %}
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
     {% set crumbs = (node.breadcrumb ?? []) %}
     {% if crumbs is not empty %}
         <p class="crumbs">
@@ -34,6 +36,30 @@
     {% endif %}
 
     <p class="muted"><strong>Question :</strong> {{ answer.questionText }}</p>
+
+    {% if admin_session.logged and answer.questionId %}
+        <div style="border:1px dashed var(--accent); border-radius:10px; padding:.8rem 1rem; margin:.8rem 0; background:rgba(1,159,185,.06)">
+            <strong style="font-size:.85rem; color:var(--accent-dark)">⚙️ Admin — gérer cette question</strong>
+            <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'edit' }) }}" style="margin-top:.6rem; display:flex; flex-direction:column; gap:.4rem">
+                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                <input type="hidden" name="back" value="{{ answer.id }}">
+                <input type="text" name="title" value="{{ answer.title }}" placeholder="Titre" style="padding:.4rem .6rem; border:1px solid #d1d5db; border-radius:7px; font:inherit">
+                <textarea name="text" rows="2" style="padding:.4rem .6rem; border:1px solid #d1d5db; border-radius:7px; font:inherit">{{ answer.questionText }}</textarea>
+                <button type="submit" style="align-self:flex-start; background:var(--accent); color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">💾 Enregistrer l'intitulé</button>
+            </form>
+            <div style="display:flex; gap:.5rem; margin-top:.6rem">
+                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'regenerate' }) }}" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='⏳ Génération…'">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <input type="hidden" name="back" value="{{ answer.id }}">
+                    <button type="submit" style="background:#0f172a; color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">🔄 Régénérer la réponse</button>
+                </form>
+                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'delete' }) }}" onsubmit="return confirm('Supprimer définitivement cette question et ses réponses ?')">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <button type="submit" style="background:#7f1d1d; color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">🗑 Supprimer</button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
 
     {% if answer.vulgarizationContent %}
         <div class="block-vul">

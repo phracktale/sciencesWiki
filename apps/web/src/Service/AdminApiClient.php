@@ -92,6 +92,18 @@ final class AdminApiClient
         return $this->send('DELETE', '/api/admin/questions/'.$id, null);
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function editQuestion(int $id, string $text, ?string $title): array
+    {
+        return $this->send('PATCH', '/api/admin/questions/'.$id, ['text' => $text, 'title' => $title]);
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function regenerateQuestion(int $id): array
+    {
+        return $this->send('POST', '/api/admin/questions/'.$id.'/regenerate', []);
+    }
+
     /** @return array<string,mixed> réglages courants */
     public function getSettings(): array
     {

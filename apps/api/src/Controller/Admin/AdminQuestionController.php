@@ -26,6 +26,7 @@ final class AdminQuestionController
         private readonly EntityManagerInterface $em,
         private readonly \App\Service\ActivityLogger $activity,
         private readonly \Symfony\Bundle\SecurityBundle\Security $security,
+        private readonly \App\Rag\AnswerDrafter $drafter,
     ) {
     }
 
@@ -58,6 +59,65 @@ final class AdminQuestionController
         $this->activity->log('question', 'move', $this->actor(), \sprintf('Question #%d déplacée vers « %s »', $id, $node->getLabel()), ['questionId' => $id, 'node' => $node->getSlug()]);
 
         return new JsonResponse(['id' => $id, 'node' => ['slug' => $node->getSlug(), 'label' => $node->getLabel()]]);
+    }
+
+    /** Édite l'intitulé/titre d'une question (réinitialise l'embedding pour le RAG). */
+    #[Route('/api/admin/questions/{id}', name: 'admin_question_edit', methods: ['PATCH'], requirements: ['id' => '\d+'])]
+    public function edit(int $id, Request $request): JsonResponse
+    {
+        $question = $this->questions->find($id);
+        if (null === $question) {
+            return new JsonResponse(['error' => 'Question introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+        /** @var array<string,mixed> $data */
+        $data = json_decode($request->getContent() ?: '[]', true) ?? [];
+
+        if (\array_key_exists('text', $data)) {
+            $text = trim((string) $data['text']);
+            if ('' === $text) {
+                return new JsonResponse(['error' => 'L\'intitulé ne peut être vide.'], 422);
+            }
+            if ($text !== $question->getText()) {
+                $question->setText($text);
+                $question->setEmbedding(null); // recalculé à la prochaine génération
+            }
+        }
+        if (\array_key_exists('title', $data)) {
+            $question->setTitle(null !== $data['title'] ? (string) $data['title'] : null);
+        }
+        $this->em->flush();
+
+        $this->activity->log('question', 'edit', $this->actor(), \sprintf('Question #%d éditée', $id), ['questionId' => $id]);
+
+        return new JsonResponse(['id' => $id, 'text' => $question->getText(), 'title' => $question->getTitle()]);
+    }
+
+    /** Régénère la réponse (RAG) : supprime les réponses existantes et en rédige une neuve. */
+    #[Route('/api/admin/questions/{id}/regenerate', name: 'admin_question_regenerate', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function regenerate(int $id): JsonResponse
+    {
+        $question = $this->questions->find($id);
+        if (null === $question) {
+            return new JsonResponse(['error' => 'Question introuvable.'], Response::HTTP_NOT_FOUND);
+        }
+
+        $existing = $this->answers->findBy(['question' => $question]);
+        $type = $existing[0]?->getType() ?? \App\Enum\AnswerType::Canonical;
+        foreach ($existing as $answer) {
+            $this->em->remove($answer);
+        }
+        $this->em->flush();
+
+        try {
+            $answer = $this->drafter->draft($question, $type);
+            $this->em->flush();
+        } catch (\Throwable $e) {
+            return new JsonResponse(['error' => 'Échec de la génération : '.$e->getMessage()], 502);
+        }
+
+        $this->activity->log('question', 'regenerate', $this->actor(), \sprintf('Réponse régénérée pour la question #%d', $id), ['questionId' => $id, 'answerId' => $answer->getId()]);
+
+        return new JsonResponse(['id' => $id, 'answerId' => $answer->getId(), 'message' => 'Réponse régénérée.']);
     }
 
     #[Route('/api/admin/questions/{id}', name: 'admin_question_delete', methods: ['DELETE'], requirements: ['id' => '\d+'])]

@@ -497,6 +497,50 @@ final class AdminController extends AbstractController
         return $this->redirectToRoute('admin_node', ['slug' => $slug]);
     }
 
+    /** Actions admin sur une question depuis la page réponse (ROLE_ADMIN). */
+    #[Route('/admin/q/{id}/{op}', name: 'admin_question_op', requirements: ['id' => '\d+', 'op' => 'edit|regenerate|delete'], methods: ['POST'])]
+    public function questionOp(int $id, string $op, Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('home', ['_locale' => 'fr']);
+        }
+        $back = (int) $request->request->get('back', '0'); // id de la réponse courante
+
+        if ('delete' === $op) {
+            $res = $this->admin->deleteQuestion($id);
+            $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Question et réponses supprimées.' : 'Échec de la suppression.');
+
+            return $this->redirectToRoute('home', ['_locale' => 'fr']);
+        }
+
+        if ('edit' === $op) {
+            $res = $this->admin->editQuestion(
+                $id,
+                trim((string) $request->request->get('text')),
+                trim((string) $request->request->get('title')) ?: null,
+            );
+            $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Question éditée. Pensez à régénérer la réponse.' : 'Échec de l\'édition.');
+
+            return $back > 0 ? $this->redirectToRoute('answer', ['_locale' => 'fr', 'id' => $back]) : $this->redirectToRoute('home', ['_locale' => 'fr']);
+        }
+
+        // regenerate
+        $res = $this->admin->regenerateQuestion($id);
+        if ($res['ok'] && isset($res['data']['answerId'])) {
+            $this->addFlash('success', 'Réponse régénérée.');
+
+            return $this->redirectToRoute('answer', ['_locale' => 'fr', 'id' => (int) $res['data']['answerId']]);
+        }
+        $this->addFlash('error', 'Échec de la régénération : '.($res['data']['error'] ?? 'erreur'));
+
+        return $back > 0 ? $this->redirectToRoute('answer', ['_locale' => 'fr', 'id' => $back]) : $this->redirectToRoute('home', ['_locale' => 'fr']);
+    }
+
     #[Route('/admin/action', name: 'admin_action', methods: ['POST'])]
     public function action(Request $request): Response
     {
