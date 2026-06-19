@@ -26,8 +26,9 @@ services:
     volumes:
       - /data/scienceswiki-pgdata:/var/lib/postgresql/data:rw
     ports:
-      # LAN homelab uniquement (Thor s'y connecte). Ne JAMAIS publier sur Internet.
-      - "5432:5432"
+      # Lié explicitement à l'IP LAN de Marvin (pas 0.0.0.0) → non exposé sur
+      # d'éventuelles interfaces WAN/WiFi. Thor s'y connecte par le réseau privé.
+      - "192.168.1.171:5432:5432"
     shm_size: "1gb"
     healthcheck:
       test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]
