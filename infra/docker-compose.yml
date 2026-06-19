@@ -13,8 +13,13 @@
 name: scienceswiki
 
 services:
+  # ⚠️ Base MIGRÉE sur Marvin (cf. infra/marvin). Cette base locale n'est plus
+  # utilisée — conservée en ROLLBACK uniquement (volume database_data intact).
+  # Ne démarre que sur demande explicite : `docker compose --profile rollback up -d database`
+  # (et repasser DB_HOST=database dans .env.prod pour l'utiliser).
   database:
     image: pgvector/pgvector:pg16
+    profiles: ["rollback"]
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -34,9 +39,7 @@ services:
       context: ../apps/api
       dockerfile: Dockerfile
       target: prod
-    depends_on:
-      database:
-        condition: service_healthy
+    # La base est désormais sur Marvin (DB_HOST). Plus de dépendance à la base locale.
     environment:
       APP_ENV: prod
       APP_SECRET: ${APP_SECRET}
@@ -78,8 +81,6 @@ services:
       dockerfile: Dockerfile
       target: prod
     depends_on:
-      database:
-        condition: service_healthy
       api:
         condition: service_started
     environment:
