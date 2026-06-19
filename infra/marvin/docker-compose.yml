@@ -38,6 +38,18 @@ services:
       start_period: 30s
     restart: unless-stopped
 
+  # GROBID : extraction structurée (TEI) des PDF scientifiques. Modèles CRF inclus
+  # dans l'image (CPU, pas de GPU). Exposé sur le LAN ; l'ingesteur de Thor l'appelle
+  # via GROBID_URL=http://192.168.1.171:8070. Cohabite avec embeddings/Ollama (128 Go).
+  grobid:
+    image: grobid/grobid:0.8.1
+    environment:
+      # Borne mémoire JVM (large marge sur 128 Go) + concurrence raisonnable.
+      JAVA_OPTS: "-Xmx6g"
+    ports:
+      - "192.168.1.171:8070:8070"
+    restart: unless-stopped
+
   embeddings:
     build:
       # ml/ est à la racine du dépôt ; ce compose vit dans infra/marvin/.
