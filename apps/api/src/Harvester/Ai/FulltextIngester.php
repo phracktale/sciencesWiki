@@ -8,6 +8,7 @@ use App\Entity\Publication;
 use Doctrine\DBAL\Connection;
 use Pgvector\Vector;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\HttpClient\NoPrivateNetworkHttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -150,79 +151,54 @@ final class FulltextIngester
     }
 
     /**
-     * Télécharge l'URL si c'est bien un PDF d'une taille raisonnable ; sinon null.
-     * Si l'URL est une page HTML (page d'atterrissage), tente d'y découvrir le PDF
-     * via la méta standard `citation_pdf_url` (présente chez la plupart des éditeurs
-     * même quand OpenAlex n'a pas capté le pdf_url) puis le télécharge — une seule
-     * fois ($allowDiscovery), pour éviter les boucles. Les paywalls renvoient une
-     * page de login (non %PDF) → naturellement rejetés.
+     * Télécharge le PDF de l'URL. Suit les redirections NATIVEMENT (y compris le
+     * « cookie dance » de certains éditeurs, ex. nature.com → idp → pdf), tout en
+     * bloquant l'accès aux réseaux privés/réservés à CHAQUE saut via
+     * NoPrivateNetworkHttpClient (anti-SSRF, redirections comprises).
+     * Si la cible est une page HTML, tente d'y découvrir le PDF via citation_pdf_url
+     * (une seule fois). Paywalls (page de login non-%PDF) → rejetés.
      */
     private function download(string $url, bool $allowDiscovery = true): ?string
     {
-        // Anti-SSRF : on suit les redirections manuellement et on revalide CHAQUE
-        // saut (schéma http/https + IP publique uniquement). oaUrl provient de
-        // métadonnées externes : on ne doit jamais atteindre un service interne.
-        $current = $url;
-        $response = null;
-        for ($hop = 0; $hop < 5; ++$hop) {
-            $parts = parse_url($current);
-            $scheme = strtolower($parts['scheme'] ?? '');
-            $host = $parts['host'] ?? '';
-            if (!\in_array($scheme, ['http', 'https'], true) || '' === $host) {
-                return null;
-            }
-            $host = trim($host, '[]'); // littéral IPv6 éventuel
-            $pinnedIp = $this->validatedIp($host);
-            if (null === $pinnedIp) {
-                return null; // hôte non résolu OU IP privée/réservée → on refuse
-            }
-            $options = [
-                'timeout' => 30,
-                'max_redirects' => 0,
-                // User-Agent poli (avec contact) : beaucoup d'éditeurs rejettent les
-                // requêtes sans UA. Accept large (certains servent le PDF en octet-stream).
+        $scheme = strtolower((string) parse_url($url, \PHP_URL_SCHEME));
+        if (!\in_array($scheme, ['http', 'https'], true)) {
+            return null;
+        }
+        $client = new NoPrivateNetworkHttpClient($this->httpClient);
+        try {
+            $response = $client->request('GET', $url, [
+                'timeout' => 40,
+                'max_redirects' => 8,
                 'headers' => [
                     'Accept' => 'application/pdf,*/*',
                     'User-Agent' => 'SciencesWikiBot/1.0 (+https://scienceswiki.eu; mailto:contact@scienceswiki.org)',
                 ],
-            ];
-            // Épingle la connexion à l'IP validée (anti DNS-rebinding) ; le client
-            // garde le nom d'hôte pour TLS/SNI/Host. Inutile si l'hôte est déjà une IP.
-            if (!filter_var($host, \FILTER_VALIDATE_IP)) {
-                $options['resolve'] = [$host => $pinnedIp];
+            ]);
+            if (200 !== $response->getStatusCode()) {
+                return null;
             }
-            $response = $this->httpClient->request('GET', $current, $options);
-            $status = $response->getStatusCode();
-            if ($status >= 300 && $status < 400) {
-                $location = $response->getHeaders(false)['location'][0] ?? null;
-                if (null === $location) {
-                    return null;
+            $final = (string) ($response->getInfo('url') ?: $url);
+            $contentType = strtolower($response->getHeaders(false)['content-type'][0] ?? '');
+            $isPdf = str_contains($contentType, 'pdf') || str_ends_with(strtolower((string) parse_url($final, \PHP_URL_PATH)), '.pdf');
+            if (!$isPdf) {
+                // Page HTML : découverte du PDF via citation_pdf_url (une fois).
+                if ($allowDiscovery && str_contains($contentType, 'html')) {
+                    $html = mb_substr((string) $response->getContent(false), 0, 600_000);
+                    $pdfUrl = $this->extractCitationPdfUrl($html, $final);
+                    if (null !== $pdfUrl && $pdfUrl !== $final) {
+                        return $this->download($pdfUrl, false);
+                    }
                 }
-                // Résout une éventuelle URL relative par rapport à l'URL courante.
-                $current = $this->resolveUrl($current, $location);
-                continue;
+
+                return null;
             }
-            break;
-        }
-        if (null === $response || 200 !== $response->getStatusCode()) {
+            $content = $response->getContent(false);
+        } catch (\Throwable $e) {
+            $this->logger->info('Téléchargement PDF échoué : '.$e->getMessage(), ['url' => $url]);
+
             return null;
         }
-        $contentType = strtolower($response->getHeaders(false)['content-type'][0] ?? '');
-        $isPdf = str_contains($contentType, 'pdf') || str_ends_with(strtolower(parse_url($current, \PHP_URL_PATH) ?? ''), '.pdf');
-        if (!$isPdf) {
-            // Page HTML : on tente d'y découvrir le PDF (citation_pdf_url) une fois.
-            if ($allowDiscovery && str_contains($contentType, 'html')) {
-                $html = mb_substr((string) $response->getContent(false), 0, 600_000);
-                $pdfUrl = $this->extractCitationPdfUrl($html, $current);
-                if (null !== $pdfUrl && $pdfUrl !== $current) {
-                    return $this->download($pdfUrl, false);
-                }
-            }
 
-            return null; // page HTML sans PDF découvrable
-        }
-
-        $content = $response->getContent();
         if ('' === $content || \strlen($content) > self::MAX_PDF_BYTES || !str_starts_with($content, '%PDF')) {
             return null;
         }
@@ -234,53 +210,6 @@ final class FulltextIngester
         file_put_contents($tmp, $content);
 
         return $tmp;
-    }
-
-    /**
-     * Résout l'hôte (A + AAAA), valide que TOUTES les IP sont publiques, et renvoie
-     * UNE IP validée à épingler. Renvoie null si l'hôte ne résout pas ou si une
-     * IP est privée/réservée (anti-SSRF, échec fermé). Valider l'ensemble puis
-     * épingler élimine le DNS rebinding et le contournement par IPv6.
-     */
-    private function validatedIp(string $host): ?string
-    {
-        // Hôte déjà littéral (IPv4/IPv6) : on le valide directement.
-        if (filter_var($host, \FILTER_VALIDATE_IP)) {
-            return $this->isPublicIp($host) ? $host : null;
-        }
-
-        $ips = [];
-        foreach (@dns_get_record($host, \DNS_A) ?: [] as $r) {
-            if (isset($r['ip'])) {
-                $ips[] = $r['ip'];
-            }
-        }
-        foreach (@dns_get_record($host, \DNS_AAAA) ?: [] as $r) {
-            if (isset($r['ipv6'])) {
-                $ips[] = $r['ipv6'];
-            }
-        }
-        // Repli IPv4 si dns_get_record n'a rien renvoyé (chaînes CNAME, etc.).
-        if ([] === $ips) {
-            $ips = gethostbynamel($host) ?: [];
-        }
-        if ([] === $ips) {
-            return null;
-        }
-
-        foreach ($ips as $ip) {
-            if (!$this->isPublicIp($ip)) {
-                return null; // une seule IP privée/réservée suffit à tout refuser
-            }
-        }
-
-        return $ips[0];
-    }
-
-    /** IP publique uniquement (rejette 127/8, 10/8, 172.16/12, 192.168/16, 169.254/16, ::1, fc00::/7…). */
-    private function isPublicIp(string $ip): bool
-    {
-        return false !== filter_var($ip, \FILTER_VALIDATE_IP, \FILTER_FLAG_NO_PRIV_RANGE | \FILTER_FLAG_NO_RES_RANGE);
     }
 
     /**
