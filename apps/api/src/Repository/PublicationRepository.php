@@ -236,8 +236,25 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         // par défaut, uniquement les papiers de recherche primaires.
         $searchTypes = \App\Catalog\PublicationType::searchTypes($types);
 
-        $params = ['slug' => $slug, 'ptypes' => $searchTypes];
-        $paramTypes = ['ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING];
+        // Sous-arbre résolu UNE SEULE FOIS : si on laisse la CTE récursive dans
+        // l'EXISTS corrélé, PostgreSQL la ré-évalue par ligne candidate (×100k+)
+        // → timeout. On passe les ids des nœuds en paramètre.
+        $nodeIds = array_map('intval', $conn->executeQuery(
+            'WITH RECURSIVE sub AS (
+                SELECT id FROM tree_node WHERE slug = :slug
+                UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
+             ) SELECT id FROM sub',
+            ['slug' => $slug],
+        )->fetchFirstColumn());
+        if ([] === $nodeIds) {
+            return ['items' => [], 'total' => 0];
+        }
+
+        $params = ['nodes' => $nodeIds, 'ptypes' => $searchTypes];
+        $paramTypes = [
+            'nodes' => \Doctrine\DBAL\ArrayParameterType::INTEGER,
+            'ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING,
+        ];
         $ftsWhere = '';
         $order = 'p.publication_date DESC NULLS LAST, p.id DESC';
         if ($hasQuery) {
@@ -264,10 +281,8 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             WHERE p.retraction_status = 'none'
               AND p.type IN (:ptypes)
               AND EXISTS (
-                WITH RECURSIVE sub AS (
-                    SELECT id FROM tree_node WHERE slug = :slug
-                    UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
-                ) SELECT 1 FROM placement_suggestion ps WHERE ps.publication_id = p.id AND ps.tree_node_id IN (SELECT id FROM sub)
+                SELECT 1 FROM placement_suggestion ps
+                 WHERE ps.publication_id = p.id AND ps.tree_node_id IN (:nodes)
               )
               $ftsWhere";
 
