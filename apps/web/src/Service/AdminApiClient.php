@@ -186,6 +186,26 @@ final class AdminApiClient
         return $res['ok'] ? ($res['data']['items'] ?? []) : [];
     }
 
+    /** @return array<string,mixed> demandes « Nous rejoindre » + rôles attribuables */
+    public function joinRequests(string $status = ''): array
+    {
+        $res = $this->send('GET', '/api/admin/join-requests?'.http_build_query(array_filter(['status' => $status])), null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'availableRoles' => []];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function promoteJoinRequest(int $id, string $role): array
+    {
+        return $this->send('POST', '/api/admin/join-requests/'.$id.'/promote', ['role' => $role]);
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function rejectJoinRequest(int $id): array
+    {
+        return $this->send('POST', '/api/admin/join-requests/'.$id.'/reject', []);
+    }
+
     /** @return array<string,mixed> liste des utilisateurs + rôles disponibles */
     public function users(): array
     {

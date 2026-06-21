@@ -203,6 +203,49 @@ final class AdminController extends AbstractController
         return $this->redirectToRoute('admin_article', ['id' => $id]);
     }
 
+    /** Demandes « Nous rejoindre » (vue back-office). */
+    #[Route('/admin/join-requests', name: 'admin_join', methods: ['GET'])]
+    public function joinRequests(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/join.html.twig', [
+            'data' => $this->admin->joinRequests(trim((string) $request->query->get('status', ''))),
+            'status' => trim((string) $request->query->get('status', '')),
+        ]);
+    }
+
+    /** Promouvoir (attribuer un rôle) ou rejeter une demande « Nous rejoindre ». */
+    #[Route('/admin/join-requests/{id}/{op}', name: 'admin_join_op', requirements: ['id' => '\d+', 'op' => 'promote|reject'], methods: ['POST'])]
+    public function joinOp(int $id, string $op, Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_join');
+        }
+        if ('reject' === $op) {
+            $res = $this->admin->rejectJoinRequest($id);
+            $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Demande rejetée.' : 'Échec.');
+        } else {
+            $res = $this->admin->promoteJoinRequest($id, trim((string) $request->request->get('role')));
+            if ($res['ok']) {
+                $tmp = $res['data']['temporaryPassword'] ?? null;
+                $this->addFlash('success', 'Promu : '.($res['data']['email'] ?? '').' → '.($res['data']['role'] ?? '')
+                    .($tmp ? ' · mot de passe temporaire : '.$tmp.' (compte créé)' : ' (compte existant mis à jour)').'. E-mail de bienvenue envoyé (si Mailer configuré).');
+            } else {
+                $this->addFlash('error', 'Échec : '.($res['data']['error'] ?? 'erreur'));
+            }
+        }
+
+        return $this->redirectToRoute('admin_join');
+    }
+
     /** Proxy du PDF en accès libre (même origine → visualiseur natif + impression). Anti-SSRF. */
     #[Route('/admin/articles/{id}/pdf', name: 'admin_article_pdf', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function articlePdf(int $id, Request $request): Response
