@@ -20,6 +20,7 @@ final class IngestFulltextHandler
     public function __construct(
         private readonly PublicationRepository $publications,
         private readonly FulltextIngester $fulltext,
+        private readonly \App\Service\HarvestTicker $ticker,
     ) {
     }
 
@@ -28,6 +29,7 @@ final class IngestFulltextHandler
         $publication = $this->publications->find($message->publicationId);
         if (null !== $publication) {
             $this->fulltext->ingest($publication);
+            $this->ticker->tick('fulltext');
         }
     }
 }

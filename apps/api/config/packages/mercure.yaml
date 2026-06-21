@@ -1,0 +1,10 @@
+mercure:
+    hubs:
+        default:
+            # URL interne du hub (l'api/worker publient ici, réseau compose).
+            url: '%env(MERCURE_URL)%'
+            # URL publique du hub (les navigateurs s'y abonnent via Heimdall).
+            public_url: '%env(MERCURE_PUBLIC_URL)%'
+            jwt:
+                secret: '%env(MERCURE_JWT_SECRET)%'
+                publish: ['*']

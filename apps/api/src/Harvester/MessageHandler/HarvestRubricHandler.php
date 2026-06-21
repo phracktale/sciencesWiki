@@ -50,6 +50,7 @@ final class HarvestRubricHandler
         private readonly \App\Service\SettingsService $settings,
         private readonly EntityManagerInterface $em,
         private readonly LoggerInterface $logger,
+        private readonly \App\Service\HarvestTicker $ticker,
     ) {
     }
 
@@ -145,5 +146,8 @@ final class HarvestRubricHandler
                 'durationSeconds' => (int) $duration,
             ],
         );
+
+        // Notifie l'UI (barre admin) en quasi temps réel via Mercure.
+        $this->ticker->tick('harvest');
     }
 }
