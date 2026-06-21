@@ -122,7 +122,7 @@ final class AdminApiClient
     /** @return array<string,mixed> données du dashboard admin */
     public function adminStats(): array
     {
-        $res = $this->send('GET', '/api/admin/dashboard', null);
+        $res = $this->send('GET', '/api/admin/dashboard', null, 60);
 
         return $res['ok'] ? $res['data'] : [];
     }

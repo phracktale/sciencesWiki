@@ -60,8 +60,12 @@ final class AdminDashboardController
         $pdfConsultables = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
         // Texte intégral converti (TEI/pdftotext) + vectorisé vs résumé seul.
         $fulltextVectorized = $pdfConsultables;
-        $abstractOnly = (int) $conn->executeQuery('SELECT count(*) FROM publication WHERE embedding IS NOT NULL AND id NOT IN (SELECT publication_id FROM publication_chunk)')->fetchOne();
-        $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_fetched_at IS NOT NULL AND oa_url IS NOT NULL AND oa_url <> '' AND id NOT IN (SELECT publication_id FROM publication_chunk)")->fetchOne();
+        // Résumé seul = (articles avec embedding) − (articles avec texte intégral).
+        // Arithmétique plutôt qu'un NOT IN (trop lent sur publication_chunk volumineux).
+        $embeddingTotal = (int) $conn->executeQuery('SELECT count(*) FROM publication WHERE embedding IS NOT NULL')->fetchOne();
+        $abstractOnly = max(0, $embeddingTotal - $fulltextVectorized);
+        // NOT EXISTS (indexé sur publication_id) au lieu de NOT IN.
+        $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication p WHERE p.fulltext_fetched_at IS NOT NULL AND p.oa_url IS NOT NULL AND p.oa_url <> '' AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)")->fetchOne();
         $fulltextGrobid = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_source = 'grobid_self'")->fetchOne();
         $authorsCount = (int) $conn->executeQuery('SELECT count(*) FROM author')->fetchOne();
         $publishersCount = (int) $conn->executeQuery('SELECT count(*) FROM publisher')->fetchOne();
