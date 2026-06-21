@@ -63,6 +63,16 @@ class Publication
     #[Groups(['publication:read'])]
     private ?string $abstractFr = null;
 
+    /** Pour un « satellite » (erratum, peer-review…) : DOI de l'article parent. */
+    #[ORM\Column(name: 'parent_doi', type: Types::STRING, length: 255, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $parentDoi = null;
+
+    /** FK locale vers l'article parent, si présent en base. */
+    #[ORM\Column(name: 'parent_publication_id', type: Types::INTEGER, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?int $parentPublicationId = null;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     #[Groups(['publication:read'])]
     private ?\DateTimeImmutable $publicationDate = null;
@@ -252,6 +262,30 @@ class Publication
     public function getAbstractFr(): ?string
     {
         return $this->abstractFr;
+    }
+
+    public function getParentDoi(): ?string
+    {
+        return $this->parentDoi;
+    }
+
+    public function setParentDoi(?string $doi): self
+    {
+        $this->parentDoi = $doi;
+
+        return $this;
+    }
+
+    public function getParentPublicationId(): ?int
+    {
+        return $this->parentPublicationId;
+    }
+
+    public function setParentPublicationId(?int $id): self
+    {
+        $this->parentPublicationId = $id;
+
+        return $this;
     }
 
     public function setAbstractFr(?string $abstractFr): self
