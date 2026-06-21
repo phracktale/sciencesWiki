@@ -41,15 +41,67 @@ final class AdminDashboardController
 
         // --- Corpus global (filtré par type le cas échéant) ---
         // Sans filtre : total estimé (pg_class) — instantané sur 1,3 M lignes.
-        $publications = $hasType
-            ? (int) $conn->executeQuery('SELECT count(*) FROM publication'.$tWhere, $tp, $tpt)->fetchOne()
-            : (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'publication'")->fetchOne();
-        $answers = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status IN ('valide','non_relu')")->fetchOne();
+        // --- Métriques : depuis les VUES MATÉRIALISÉES (rafraîchies en cron) si
+        // aucun filtre type n'est actif ; sinon calcul direct (filtré). Repli live
+        // si la vue n'est pas encore peuplée. ---
+        $mv = null;
+        if (!$hasType) {
+            try {
+                $mv = $conn->executeQuery('SELECT * FROM dashboard_stats LIMIT 1')->fetchAssociative() ?: null;
+            } catch (\Throwable) {
+                $mv = null;
+            }
+        }
+
+        if (null !== $mv) {
+            $publications = (int) $mv['publications'];
+            $freeFullArticles = (int) $mv['free_full'];
+            $paywalled = (int) $mv['paywalled'];
+            $embeddingTotal = (int) $mv['embedding_total'];
+            $fulltextGrobid = (int) $mv['fulltext_grobid'];
+            $fulltextRetryable = (int) $mv['fulltext_retryable'];
+            $pdfConsultables = (int) $mv['pdf_consultables'];
+            $answersValidated = (int) $mv['answers_validated'];
+            $answersAi = (int) $mv['answers_ai'];
+            $questionsAi = (int) $mv['questions_ai'];
+            $questionsHuman = (int) $mv['questions_human'];
+            $authorsCount = (int) $mv['authors'];
+            $publishersCount = (int) $mv['publishers'];
+            $journalsCount = (int) $mv['journals'];
+        } else {
+            $publications = $hasType
+                ? (int) $conn->executeQuery('SELECT count(*) FROM publication'.$tWhere, $tp, $tpt)->fetchOne()
+                : (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'publication'")->fetchOne();
+            $freeFullArticles = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status NOT IN ('closed','unknown')".$tAnd, $tp, $tpt)->fetchOne();
+            $paywalled = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status = 'closed'".$tAnd, $tp, $tpt)->fetchOne();
+            $pdfConsultables = $hasType
+                ? (int) $conn->executeQuery('SELECT count(DISTINCT pc.publication_id) FROM publication_chunk pc JOIN publication p ON p.id = pc.publication_id WHERE p.type IN (:types)', $tp, $tpt)->fetchOne()
+                : (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
+            $embeddingTotal = (int) $conn->executeQuery('SELECT count(*) FROM publication WHERE embedding IS NOT NULL'.$tAnd, $tp, $tpt)->fetchOne();
+            $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication p WHERE p.fulltext_fetched_at IS NOT NULL AND p.oa_url IS NOT NULL AND p.oa_url <> '' AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)".$tAnd, $tp, $tpt)->fetchOne();
+            $fulltextGrobid = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_source = 'grobid_self'".$tAnd, $tp, $tpt)->fetchOne();
+            $authorsCount = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'author'")->fetchOne();
+            $publishersCount = (int) $conn->executeQuery('SELECT count(*) FROM publisher')->fetchOne();
+            $journalsCount = (int) $conn->executeQuery('SELECT count(*) FROM journal')->fetchOne();
+            $answersValidated = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'valide'")->fetchOne();
+            $answersAi = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'non_relu'")->fetchOne();
+            $questionsAi = (int) $conn->executeQuery("SELECT count(*) FROM question WHERE origin = 'suggeree_ia'")->fetchOne();
+            $questionsHuman = (int) $conn->executeQuery("SELECT count(*) FROM question WHERE origin = 'libre_utilisateur'")->fetchOne();
+        }
+        $fulltextVectorized = $pdfConsultables;
+        $abstractOnly = max(0, $embeddingTotal - $fulltextVectorized);
+
+        // Petites valeurs toujours calculées en direct (tables légères).
+        $answers = $answersValidated + $answersAi;
         $questions = (int) $conn->executeQuery('SELECT count(*) FROM question')->fetchOne();
         $treeNodes = (int) $conn->executeQuery('SELECT count(*) FROM tree_node')->fetchOne();
+        $topPublishers = $conn->executeQuery(
+            'SELECT p.name, count(j.id) AS journals FROM publisher p JOIN journal j ON j.publisher_id = p.id
+              GROUP BY p.id, p.name ORDER BY journals DESC, p.name LIMIT 10'
+        )->fetchAllAssociative();
+        $openAlexTotal = (int) $conn->executeQuery("SELECT COALESCE(SUM(value::bigint),0) FROM setting WHERE name LIKE 'openalex.total.%' AND value ~ '^[0-9]+$'")->fetchOne();
 
-        // Snapshot du jour (progression dans le temps) + série des 30 derniers jours.
-        // Uniquement sur les chiffres GLOBAUX (jamais filtrés) pour ne pas polluer l'historique.
+        // Snapshot du jour (chiffres GLOBAUX uniquement) + série 30 jours.
         if (!$hasType) {
             $conn->executeStatement(
                 'INSERT INTO daily_stat (day, publications, answers, questions) VALUES (CURRENT_DATE, :p, :a, :q)
@@ -57,64 +109,37 @@ final class AdminDashboardController
                 ['p' => $publications, 'a' => $answers, 'q' => $questions],
             );
         }
-        $history = $conn->executeQuery(
+        $history = array_reverse($conn->executeQuery(
             'SELECT day::text AS day, publications, answers, questions FROM daily_stat ORDER BY day DESC LIMIT 30'
-        )->fetchAllAssociative();
-        $history = array_reverse($history);
+        )->fetchAllAssociative());
 
-        // --- Par domaine racine (niveau 0) : publications du nœud + descendants ---
-        $roots = [];
-        foreach ($conn->executeQuery('SELECT slug, label FROM tree_node WHERE level = 0 ORDER BY label')->fetchAllAssociative() as $root) {
-            $count = (int) $conn->executeQuery(
-                'WITH RECURSIVE sub AS (
-                    SELECT id FROM tree_node WHERE slug = :slug
-                    UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
-                 ) SELECT count(DISTINCT ps.publication_id) FROM placement_suggestion ps WHERE ps.tree_node_id IN (SELECT id FROM sub)',
-                ['slug' => $root['slug']],
-            )->fetchOne();
-            $roots[] = ['slug' => $root['slug'], 'label' => $root['label'], 'publications' => $count];
+        // Répartition par type : vue matérialisée (repli live si non peuplée).
+        try {
+            $typeBreakdown = $conn->executeQuery('SELECT type, n FROM dashboard_type_breakdown ORDER BY n DESC')->fetchAllAssociative();
+            if ([] === $typeBreakdown) {
+                throw new \RuntimeException('vide');
+            }
+        } catch (\Throwable) {
+            $typeBreakdown = $conn->executeQuery("SELECT COALESCE(NULLIF(type, ''), '(inconnu)') AS type, count(*) AS n FROM publication GROUP BY 1 ORDER BY n DESC")->fetchAllAssociative();
         }
 
-        // --- Indicateurs détaillés demandés (filtrés par type le cas échéant) ---
-        $freeFullArticles = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status NOT IN ('closed','unknown')".$tAnd, $tp, $tpt)->fetchOne();
-        $paywalled = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status = 'closed'".$tAnd, $tp, $tpt)->fetchOne();
-        // Texte intégral consultable : fragments présents (jointure sur publication si filtre type).
-        $pdfConsultables = $hasType
-            ? (int) $conn->executeQuery('SELECT count(DISTINCT pc.publication_id) FROM publication_chunk pc JOIN publication p ON p.id = pc.publication_id WHERE p.type IN (:types)', $tp, $tpt)->fetchOne()
-            : (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
-        // Texte intégral converti (TEI/pdftotext) + vectorisé vs résumé seul.
-        $fulltextVectorized = $pdfConsultables;
-        // Résumé seul = (articles avec embedding) − (articles avec texte intégral).
-        // Arithmétique plutôt qu'un NOT IN (trop lent sur publication_chunk volumineux).
-        $embeddingTotal = (int) $conn->executeQuery('SELECT count(*) FROM publication WHERE embedding IS NOT NULL'.$tAnd, $tp, $tpt)->fetchOne();
-        $abstractOnly = max(0, $embeddingTotal - $fulltextVectorized);
-        // NOT EXISTS (indexé sur publication_id) au lieu de NOT IN.
-        $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication p WHERE p.fulltext_fetched_at IS NOT NULL AND p.oa_url IS NOT NULL AND p.oa_url <> '' AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)".$tAnd, $tp, $tpt)->fetchOne();
-        $fulltextGrobid = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_source = 'grobid_self'".$tAnd, $tp, $tpt)->fetchOne();
-        $authorsCount = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'author'")->fetchOne();
-        $publishersCount = (int) $conn->executeQuery('SELECT count(*) FROM publisher')->fetchOne();
-        $journalsCount = (int) $conn->executeQuery('SELECT count(*) FROM journal')->fetchOne();
-        $topPublishers = $conn->executeQuery(
-            'SELECT p.name, count(j.id) AS journals
-               FROM publisher p JOIN journal j ON j.publisher_id = p.id
-              GROUP BY p.id, p.name ORDER BY journals DESC, p.name LIMIT 10'
-        )->fetchAllAssociative();
-
-        // Réponses : validées humain vs encore « IA seule » (non relues).
-        $answersValidated = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'valide'")->fetchOne();
-        $answersAi = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'non_relu'")->fetchOne();
-        // Questions : proposées par l'IA vs posées par un humain.
-        $questionsAi = (int) $conn->executeQuery("SELECT count(*) FROM question WHERE origin = 'suggeree_ia'")->fetchOne();
-        $questionsHuman = (int) $conn->executeQuery("SELECT count(*) FROM question WHERE origin = 'libre_utilisateur'")->fetchOne();
-        // Total ≈ disponible chez OpenAlex (somme des meta.count par rubrique moissonnée ;
-        // surcompte les articles présents dans plusieurs rubriques → indicatif).
-        $openAlexTotal = (int) $conn->executeQuery("SELECT COALESCE(SUM(value::bigint),0) FROM setting WHERE name LIKE 'openalex.total.%' AND value ~ '^[0-9]+$'")->fetchOne();
-
-        // Répartition du corpus par type (toujours globale : aide à choisir le filtre).
-        $typeBreakdown = $conn->executeQuery(
-            "SELECT COALESCE(NULLIF(type, ''), '(inconnu)') AS type, count(*) AS n
-               FROM publication GROUP BY 1 ORDER BY n DESC"
-        )->fetchAllAssociative();
+        // Par domaine racine : vue matérialisée (repli live si non peuplée).
+        try {
+            $roots = $conn->executeQuery('SELECT slug, label, publications FROM dashboard_domain_stats ORDER BY label')->fetchAllAssociative();
+            if ([] === $roots) {
+                throw new \RuntimeException('vide');
+            }
+        } catch (\Throwable) {
+            $roots = [];
+            foreach ($conn->executeQuery('SELECT slug, label FROM tree_node WHERE level = 0 ORDER BY label')->fetchAllAssociative() as $root) {
+                $count = (int) $conn->executeQuery(
+                    'WITH RECURSIVE sub AS (SELECT id FROM tree_node WHERE slug = :slug UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id)
+                     SELECT count(DISTINCT ps.publication_id) FROM placement_suggestion ps WHERE ps.tree_node_id IN (SELECT id FROM sub)',
+                    ['slug' => $root['slug']],
+                )->fetchOne();
+                $roots[] = ['slug' => $root['slug'], 'label' => $root['label'], 'publications' => $count];
+            }
+        }
 
         // --- Base de données ---
         $dbVersion = (string) $conn->executeQuery('SHOW server_version')->fetchOne();
