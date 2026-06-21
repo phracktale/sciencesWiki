@@ -224,7 +224,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
      *
      * @return array{items: list<array<string,mixed>>, total: int}
      */
-    public function searchInSubtree(string $slug, string $query, bool $stemming, int $page, int $perPage, string $sort = '', string $dir = 'asc'): array
+    public function searchInSubtree(string $slug, string $query, bool $stemming, int $page, int $perPage, string $sort = '', string $dir = 'asc', array $types = []): array
     {
         $conn = $this->getEntityManager()->getConnection();
         $offset = max(0, ($page - 1) * $perPage);
@@ -232,7 +232,12 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         $config = $stemming ? 'english' : 'simple';
         $d = 'desc' === strtolower($dir) ? 'DESC' : 'ASC';
 
-        $params = ['slug' => $slug];
+        // Front : on ne remonte que les types demandés (satellites retirés) ;
+        // par défaut, uniquement les papiers de recherche primaires.
+        $searchTypes = \App\Catalog\PublicationType::searchTypes($types);
+
+        $params = ['slug' => $slug, 'ptypes' => $searchTypes];
+        $paramTypes = ['ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING];
         $ftsWhere = '';
         $order = 'p.publication_date DESC NULLS LAST, p.id DESC';
         if ($hasQuery) {
@@ -257,7 +262,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         $base = "FROM publication p
             LEFT JOIN journal j ON j.id = p.journal_id
             WHERE p.retraction_status = 'none'
-              AND p.".\App\Catalog\PublicationType::notSatelliteSql()."
+              AND p.type IN (:ptypes)
               AND EXISTS (
                 WITH RECURSIVE sub AS (
                     SELECT id FROM tree_node WHERE slug = :slug
@@ -266,7 +271,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
               )
               $ftsWhere";
 
-        $total = (int) $conn->executeQuery("SELECT count(*) $base", $params)->fetchOne();
+        $total = (int) $conn->executeQuery("SELECT count(*) $base", $params, $paramTypes)->fetchOne();
 
         $rows = $conn->executeQuery(
             "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
@@ -280,6 +285,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
              ORDER BY $order
              LIMIT $perPage OFFSET $offset",
             $params,
+            $paramTypes,
         )->fetchAllAssociative();
 
         return ['items' => $rows, 'total' => $total];

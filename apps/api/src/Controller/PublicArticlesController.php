@@ -73,8 +73,13 @@ final class PublicArticlesController
         $stemming = '0' !== (string) $request->query->get('stemming', '1');
         $sort = (string) $request->query->get('sort', '');
         $dir = (string) $request->query->get('dir', 'asc');
+        $types = array_values(array_filter(array_map(
+            static fn ($v): string => trim((string) $v),
+            $request->query->all('types'),
+        )));
 
-        $res = $this->publications->searchInSubtree($slug, $q, $stemming, $page, self::PER_PAGE, $sort, $dir);
+        $res = $this->publications->searchInSubtree($slug, $q, $stemming, $page, self::PER_PAGE, $sort, $dir, $types);
+        $appliedTypes = \App\Catalog\PublicationType::searchTypes($types);
 
         $items = array_map(function (array $r): array {
             $status = (string) $r['oa_status'];
@@ -100,6 +105,10 @@ final class PublicArticlesController
             'stemming' => $stemming,
             'sort' => $sort,
             'dir' => $dir,
+            // Filtre de type (front) : familles proposables + types réellement appliqués.
+            'families' => \App\Catalog\PublicationType::selectableFamilies(),
+            'primaryTypes' => \App\Catalog\PublicationType::PRIMARY,
+            'appliedTypes' => $appliedTypes,
         ]);
     }
 

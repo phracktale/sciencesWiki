@@ -36,6 +36,10 @@
         <label class="xp-toggle" title="Rapproche les mots de la même famille (run, running, runs…)">
             <input type="checkbox" id="xp-stem" checked> Racinisation (stemming)
         </label>
+        <div style="position:relative">
+            <button type="button" id="xp-types-btn" style="background:#fff; border:1px solid #d1d5db; border-radius:9px; padding:.6rem .9rem; cursor:pointer; font:inherit">Types ▾</button>
+            <div id="xp-types-panel" hidden style="position:absolute; z-index:20; top:calc(100% + 4px); left:0; background:#fff; border:1px solid #d1d5db; border-radius:9px; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:.6rem .8rem; min-width:260px; max-height:340px; overflow:auto"></div>
+        </div>
         <button id="xp-go" style="background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.6rem 1.1rem; cursor:pointer; font:inherit">Rechercher</button>
         <span id="xp-count" class="muted" style="font-size:.85rem"></span>
     </div>
@@ -65,11 +69,13 @@
     <script>
     (function () {
         var SLUG = {{ slug|json_encode|raw }};
-        var state = { q: '', stemming: true, sort: '', dir: 'asc', page: 1, selected: null };
+        var state = { q: '', stemming: true, sort: '', dir: 'asc', page: 1, selected: null, types: [] };
         var rows = document.getElementById('xp-rows');
         var pager = document.getElementById('xp-pager');
         var countEl = document.getElementById('xp-count');
         var detail = document.getElementById('xp-detail');
+        var typesPanel = document.getElementById('xp-types-panel');
+        var typesBuilt = false;
 
         function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
 
@@ -88,12 +94,50 @@
                 + '&page=' + state.page
                 + '&stemming=' + (state.stemming ? '1' : '0')
                 + '&sort=' + encodeURIComponent(state.sort)
-                + '&dir=' + state.dir;
+                + '&dir=' + state.dir
+                + state.types.map(function (t) { return '&types[]=' + encodeURIComponent(t); }).join('');
             fetch(u).then(function (r) { return r.json(); }).then(function (d) {
+                if (!typesBuilt) buildTypes(d);
                 renderRows(d);
                 renderPager(d);
                 countEl.textContent = d.total.toLocaleString('fr-FR') + ' article(s)';
                 updateArrows();
+            });
+        }
+
+        // Construit le panneau de types (familles + cases) depuis la 1re réponse.
+        // Par défaut : seuls les papiers primaires sont cochés (et remontés).
+        function buildTypes(d) {
+            typesBuilt = true;
+            var families = d.families || {};
+            var applied = d.appliedTypes || d.primaryTypes || [];
+            var html = '';
+            Object.keys(families).forEach(function (fam, i) {
+                html += '<fieldset style="border:1px solid #eee; border-radius:8px; padding:.3rem .6rem; margin:.3rem 0">'
+                    + '<legend style="font-size:.75rem; font-weight:700"><label style="cursor:pointer"><input type="checkbox" class="xp-grp-all" data-grp="xpg-' + i + '"> ' + esc(fam) + '</label></legend>';
+                families[fam].forEach(function (t) {
+                    var ck = applied.indexOf(t) !== -1 ? ' checked' : '';
+                    html += '<label style="display:block; font-size:.82rem; cursor:pointer"><input type="checkbox" class="xp-type xpg-' + i + '" value="' + esc(t) + '"' + ck + '> ' + esc(t) + '</label>';
+                });
+                html += '</fieldset>';
+            });
+            html += '<div style="display:flex; gap:.5rem; margin-top:.4rem"><button type="button" id="xp-types-apply" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.4rem .9rem; cursor:pointer">Appliquer</button>'
+                + '<button type="button" id="xp-types-primary" style="background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:.4rem .9rem; cursor:pointer">Papiers primaires</button></div>';
+            typesPanel.innerHTML = html;
+
+            typesPanel.querySelectorAll('.xp-grp-all').forEach(function (master) {
+                var boxes = typesPanel.querySelectorAll('input.' + master.getAttribute('data-grp'));
+                function sync() { var all = boxes.length > 0; boxes.forEach(function (b) { if (!b.checked) all = false; }); master.checked = all; }
+                master.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = master.checked; }); });
+                boxes.forEach(function (b) { b.addEventListener('change', sync); });
+                sync();
+            });
+            document.getElementById('xp-types-apply').addEventListener('click', function () {
+                state.types = Array.prototype.map.call(typesPanel.querySelectorAll('.xp-type:checked'), function (b) { return b.value; });
+                state.page = 1; typesPanel.hidden = true; load();
+            });
+            document.getElementById('xp-types-primary').addEventListener('click', function () {
+                state.types = []; state.page = 1; typesPanel.hidden = true; typesBuilt = false; load();
             });
         }
 
@@ -214,6 +258,13 @@
             state.page = 1; load();
         });
         document.getElementById('xp-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('xp-go').click(); });
+
+        // Ouverture/fermeture du panneau de types.
+        document.getElementById('xp-types-btn').addEventListener('click', function (e) {
+            e.stopPropagation(); typesPanel.hidden = !typesPanel.hidden;
+        });
+        typesPanel.addEventListener('click', function (e) { e.stopPropagation(); });
+        document.addEventListener('click', function () { typesPanel.hidden = true; });
 
         load();
     })();

@@ -30,29 +30,33 @@
         {% for r in stats.typeBreakdown ?? [] %}{% set bd = bd|merge({ (r.type): r.n }) %}{% endfor %}
         <h2 style="margin-top:0">Corpus</h2>
 
-        <form method="get" action="{{ path('admin_dashboard') }}" style="margin:.2rem 0 1rem">
-            <p class="muted" style="font-size:.9rem; margin:.2rem 0 .5rem">Filtrer la volumétrie par type(s) — cocher une famille entière ou des types précis&nbsp;:</p>
-            <div style="display:flex; flex-wrap:wrap; gap:1rem">
-            {% for famLabel, types in stats.families ?? {} %}
-                <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.5rem .8rem; min-width:240px">
-                    <legend style="font-size:.8rem; font-weight:700; padding:0 .3rem">
-                        <label style="cursor:pointer"><input type="checkbox" class="grp-all" data-grp="grp-{{ loop.index }}"> {{ famLabel }}</label>
-                    </legend>
-                    {% for t in types %}
-                        <label style="display:block; font-size:.85rem; cursor:pointer; padding:.05rem 0">
-                            <input type="checkbox" name="types[]" value="{{ t }}" class="grp-{{ loop.parent.index }}" {{ t in tf ? 'checked' }}>
-                            {{ t }}{% if bd[t] is defined %} <span class="muted">({{ bd[t]|number_format(0,',',' ') }})</span>{% endif %}
-                        </label>
+        <form method="get" action="{{ path('admin_dashboard') }}" style="margin:.2rem 0 1rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap">
+            <div style="position:relative">
+                <button type="button" id="type-btn" style="background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:.5rem .9rem; cursor:pointer; font:inherit">
+                    Filtrer par type{% if tf|length %} <span class="badge" style="font-size:.7rem">{{ tf|length }}</span>{% endif %} ▾
+                </button>
+                <div id="type-panel" hidden style="position:absolute; z-index:20; top:calc(100% + 4px); left:0; background:#fff; border:1px solid #d1d5db; border-radius:9px; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:.7rem .9rem; min-width:300px; max-height:360px; overflow:auto">
+                    {% for famLabel, types in stats.families ?? {} %}
+                        <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.4rem .7rem; margin:.3rem 0">
+                            <legend style="font-size:.78rem; font-weight:700; padding:0 .3rem">
+                                <label style="cursor:pointer"><input type="checkbox" class="grp-all" data-grp="grp-{{ loop.index }}"> {{ famLabel }}</label>
+                            </legend>
+                            {% for t in types %}
+                                <label style="display:block; font-size:.83rem; cursor:pointer; padding:.05rem 0">
+                                    <input type="checkbox" name="types[]" value="{{ t }}" class="grp-{{ loop.parent.index }}" {{ t in tf ? 'checked' }}>
+                                    {{ t }}{% if bd[t] is defined %} <span class="muted">({{ bd[t]|number_format(0,',',' ') }})</span>{% endif %}
+                                </label>
+                            {% endfor %}
+                        </fieldset>
                     {% endfor %}
-                </fieldset>
-            {% endfor %}
+                    <div style="display:flex; gap:.5rem; margin-top:.4rem">
+                        <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.45rem 1rem; cursor:pointer">Appliquer</button>
+                        {% if tf|length %}<a href="{{ path('admin_dashboard') }}" style="font-size:.85rem; align-self:center">réinitialiser</a>{% endif %}
+                    </div>
+                </div>
             </div>
-            <div style="margin-top:.6rem; display:flex; gap:.6rem; align-items:center">
-                <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1.2rem; cursor:pointer">Filtrer</button>
-                {% if tf|length %}<a href="{{ path('admin_dashboard') }}" style="font-size:.85rem">réinitialiser ({{ tf|length }} sélectionné·s)</a>{% endif %}
-            </div>
+            {% if tf|length %}<span class="badge">Filtré&nbsp;: <strong>{{ tf|join(', ') }}</strong></span>{% endif %}
         </form>
-        {% if tf|length %}<p class="badge">Volumétrie filtrée sur&nbsp;: <strong>{{ tf|join(', ') }}</strong> — les blocs Domaines / Système / Base restent globaux.</p>{% endif %}
         <script>
         (function () {
             document.querySelectorAll('.grp-all').forEach(function (master) {
@@ -62,6 +66,10 @@
                 boxes.forEach(function (b) { b.addEventListener('change', sync); });
                 sync();
             });
+            var btn = document.getElementById('type-btn'), panel = document.getElementById('type-panel');
+            btn.addEventListener('click', function (e) { e.stopPropagation(); panel.hidden = !panel.hidden; });
+            panel.addEventListener('click', function (e) { e.stopPropagation(); });
+            document.addEventListener('click', function () { panel.hidden = true; });
         })();
         </script>
 

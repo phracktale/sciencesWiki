@@ -45,6 +45,14 @@ final class PublicationType
     ];
 
     /**
+     * Papiers de recherche PRIMAIRES (article + preprint + variantes). Seuls ces
+     * types remontent par défaut dans la recherche publique (front).
+     *
+     * @var list<string>
+     */
+    public const PRIMARY = ['article', 'journalArticle', 'preprint', 'conferencePaper', 'conference-paper'];
+
+    /**
      * Regroupement par famille pour l'affichage des statistiques (libellé => types).
      *
      * @var array<string, list<string>>
@@ -55,6 +63,34 @@ final class PublicationType
         'Éditorial & référence' => ['editorial', 'letter', 'reference-entry', 'other'],
         'Satellites (rattachés / exclus de la recherche)' => self::SATELLITE,
     ];
+
+    /**
+     * Familles proposables à l'utilisateur dans un filtre (sans les satellites).
+     *
+     * @return array<string, list<string>>
+     */
+    public static function selectableFamilies(): array
+    {
+        $families = self::FAMILIES;
+        unset($families['Satellites (rattachés / exclus de la recherche)']);
+
+        return $families;
+    }
+
+    /**
+     * Normalise une liste de types demandée pour la recherche : retire les
+     * satellites ; si vide, retombe sur les papiers primaires.
+     *
+     * @param list<string> $types
+     *
+     * @return list<string>
+     */
+    public static function searchTypes(array $types): array
+    {
+        $clean = array_values(array_diff($types, self::SATELLITE));
+
+        return [] !== $clean ? $clean : self::PRIMARY;
+    }
 
     /** Liste SQL entre quotes (sûre : valeurs en dur) pour un IN/NOT IN. */
     public static function sqlList(array $types): string
