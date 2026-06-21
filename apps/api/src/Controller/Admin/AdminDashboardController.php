@@ -153,8 +153,8 @@ final class AdminDashboardController
             ],
             'history' => $history,
             'typeFilter' => $types,
-            'families' => \App\Corpus\PublicationType::FAMILIES,
-            'satelliteTypes' => \App\Corpus\PublicationType::SATELLITE,
+            'families' => \App\Catalog\PublicationType::FAMILIES,
+            'satelliteTypes' => \App\Catalog\PublicationType::SATELLITE,
             'typeBreakdown' => $typeBreakdown,
             'metrics' => [
                 'freeFullArticles' => $freeFullArticles,
