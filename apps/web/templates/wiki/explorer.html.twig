@@ -161,7 +161,15 @@
             if (a.fulltextAvailable) m += '<b>Texte intégral :</b> indexé pour la recherche<br>';
             m += '</div>';
 
-            if (a.abstract) m += '<hr class="sep"><div class="meta"><b>Résumé</b><br>' + esc(a.abstract) + '</div>';
+            if (a.abstractFr) {
+                m += '<hr class="sep"><div class="meta"><b>Résumé (traduit en français)</b><br>' + esc(a.abstractFr) + '</div>';
+                if (a.abstract) m += '<details style="margin-top:.2rem"><summary class="muted" style="cursor:pointer; font-size:.82rem">Voir l\'original</summary><div class="meta">' + esc(a.abstract) + '</div></details>';
+            } else if (a.abstract) {
+                var trBtn = (a.language && a.language !== 'fr')
+                    ? ' <button class="xp-tr" data-id="' + a.id + '" style="background:var(--accent); color:#fff; border:0; border-radius:7px; padding:.15rem .6rem; cursor:pointer; font-size:.78rem">🌐 Traduire en français</button>'
+                    : '';
+                m += '<hr class="sep"><div class="meta"><b>Résumé</b>' + trBtn + '<br>' + esc(a.abstract) + '</div>';
+            }
 
             m += '<hr class="sep"><div class="meta">';
             if (a.venue) m += '<b>Revue :</b> ' + esc(a.venue) + (a.issnL ? ' (ISSN ' + esc(a.issnL) + ')' : '') + '<br>';
@@ -175,6 +183,20 @@
                      '</div>';
             }
             detail.innerHTML = m;
+            var trBtn = detail.querySelector('.xp-tr');
+            if (trBtn) {
+                trBtn.addEventListener('click', function () {
+                    var id = trBtn.dataset.id;
+                    trBtn.disabled = true; trBtn.textContent = '⏳ Traduction…';
+                    fetch('/api/articles/' + id + '/translate', { method: 'POST' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            if (d.abstractFr) { select(id); } // recharge la fiche (traduction en cache)
+                            else { trBtn.disabled = false; trBtn.textContent = '🌐 Réessayer'; }
+                        })
+                        .catch(function () { trBtn.disabled = false; trBtn.textContent = '🌐 Réessayer'; });
+                });
+            }
         }
 
         // Tri par en-tête

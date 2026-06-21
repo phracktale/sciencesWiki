@@ -58,6 +58,11 @@ class Publication
     #[Groups(['publication:read'])]
     private ?string $abstract = null;
 
+    /** Traduction française du résumé (à la demande, mise en cache). */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $abstractFr = null;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     #[Groups(['publication:read'])]
     private ?\DateTimeImmutable $publicationDate = null;
@@ -240,6 +245,18 @@ class Publication
     public function setAbstract(?string $abstract): self
     {
         $this->abstract = $abstract;
+
+        return $this;
+    }
+
+    public function getAbstractFr(): ?string
+    {
+        return $this->abstractFr;
+    }
+
+    public function setAbstractFr(?string $abstractFr): self
+    {
+        $this->abstractFr = $abstractFr;
 
         return $this;
     }

@@ -25,7 +25,44 @@ final class PublicArticlesController
     public function __construct(
         private readonly PublicationRepository $publications,
         private readonly EntityManagerInterface $em,
+        private readonly \App\Ai\Llm\LlmClient $llm,
     ) {
+    }
+
+    /** Traduit (et met en cache) le résumé en français pour un article non francophone. */
+    #[Route('/api/articles/{id}/translate', name: 'api_article_translate', methods: ['POST'], requirements: ['id' => '\d+'])]
+    public function translate(int $id): JsonResponse
+    {
+        $pub = $this->publications->find($id);
+        if (null === $pub) {
+            return new JsonResponse(['error' => 'Article introuvable.'], 404);
+        }
+        if (null !== $pub->getAbstractFr() && '' !== $pub->getAbstractFr()) {
+            return new JsonResponse(['abstractFr' => $pub->getAbstractFr(), 'cached' => true]);
+        }
+        $abstract = (string) $pub->getAbstract();
+        if ('' === trim($abstract)) {
+            return new JsonResponse(['error' => 'Pas de résumé à traduire.'], 422);
+        }
+
+        set_time_limit(0); // la génération LLM peut dépasser la limite PHP par défaut
+        try {
+            $completion = $this->llm->complete([
+                ['role' => 'system', 'content' => 'Tu es un traducteur scientifique. Traduis fidèlement en français, sans rien ajouter ni commenter, en conservant la terminologie. Réponds UNIQUEMENT la traduction.'],
+                ['role' => 'user', 'content' => $abstract],
+            ], ['temperature' => 0.1, 'max_tokens' => 1500]);
+        } catch (\Throwable $e) {
+            return new JsonResponse(['error' => 'Échec de la traduction : '.$e->getMessage()], 502);
+        }
+
+        $fr = trim($completion->content);
+        if ('' === $fr) {
+            return new JsonResponse(['error' => 'Traduction vide.'], 502);
+        }
+        $pub->setAbstractFr($fr);
+        $this->em->flush();
+
+        return new JsonResponse(['abstractFr' => $fr, 'cached' => false]);
     }
 
     #[Route('/api/nodes/{slug}/articles', name: 'api_node_articles', methods: ['GET'])]
@@ -71,7 +108,7 @@ final class PublicArticlesController
     {
         $conn = $this->em->getConnection();
         $r = $conn->executeQuery(
-            "SELECT p.id, p.title, p.abstract, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
+            "SELECT p.id, p.title, p.abstract, p.abstract_fr, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
                     p.language, p.type, p.retraction_status,
                     to_char(p.publication_date, 'YYYY-MM-DD') AS date,
                     to_char(p.publication_date, 'YYYY') AS year,
@@ -99,6 +136,7 @@ final class PublicArticlesController
             'id' => (int) $r['id'],
             'title' => $r['title'],
             'abstract' => $r['abstract'],
+            'abstractFr' => $r['abstract_fr'] ?: null,
             'authors' => null !== $r['authors'] ? explode('|', (string) $r['authors']) : [],
             'year' => $r['year'],
             'date' => $r['date'],
