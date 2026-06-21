@@ -32,7 +32,7 @@ final class AdminJoinRequestController
         private readonly \App\Service\ActivityLogger $activity,
         private readonly \Symfony\Bundle\SecurityBundle\Security $security,
         private readonly MailerInterface $mailer,
-        #[Autowire(env: 'PUBLIC_URL')]
+        #[Autowire(env: 'DEFAULT_URI')]
         private readonly string $publicUrl = 'https://scienceswiki.eu',
         #[Autowire(env: 'HARVESTER_CONTACT_EMAIL')]
         private readonly string $fromEmail = 'contact@scienceswiki.eu',
