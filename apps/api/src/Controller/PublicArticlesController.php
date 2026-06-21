@@ -48,8 +48,8 @@ final class PublicArticlesController
         set_time_limit(0); // la génération LLM peut dépasser la limite PHP par défaut
         try {
             $completion = $this->llm->complete([
-                ['role' => 'system', 'content' => 'Tu es un traducteur scientifique. Traduis fidèlement en français, sans rien ajouter ni commenter, en conservant la terminologie. Réponds UNIQUEMENT la traduction.'],
-                ['role' => 'user', 'content' => $abstract],
+                \App\Ai\Llm\LlmMessage::system('Tu es un traducteur scientifique. Traduis fidèlement en français, sans rien ajouter ni commenter, en conservant la terminologie. Réponds UNIQUEMENT la traduction.'),
+                \App\Ai\Llm\LlmMessage::user($abstract),
             ], ['temperature' => 0.1, 'max_tokens' => 1500]);
         } catch (\Throwable $e) {
             return new JsonResponse(['error' => 'Échec de la traduction : '.$e->getMessage()], 502);
