@@ -58,15 +58,18 @@ final class AdminController extends AbstractController
     }
 
     #[Route('/admin', name: 'admin_dashboard', methods: ['GET'])]
-    public function dashboard(): Response
+    public function dashboard(Request $request): Response
     {
         if (!$this->admin->isLogged()) {
             return $this->redirectToRoute('admin_login');
         }
 
+        $type = trim((string) $request->query->get('type', ''));
+
         return $this->render('admin/dashboard.html.twig', [
             'domains' => $this->api->domains(),
-            'stats' => $this->admin->adminStats(),
+            'stats' => $this->admin->adminStats($type),
+            'typeFilter' => $type,
         ]);
     }
 

@@ -28,11 +28,14 @@ final class Version20260621120000 extends AbstractMigration
     {
         $this->addSql('CREATE INDEX IF NOT EXISTS idx_pub_emb_hnsw ON publication USING hnsw (embedding vector_cosine_ops)');
         $this->addSql('CREATE INDEX IF NOT EXISTS idx_chunk_emb_hnsw ON publication_chunk USING hnsw (embedding halfvec_cosine_ops)');
+        // Filtre + répartition par type de publication (dashboard / liste d'articles).
+        $this->addSql('CREATE INDEX IF NOT EXISTS idx_pub_type ON publication (type)');
     }
 
     public function down(Schema $schema): void
     {
         $this->addSql('DROP INDEX IF EXISTS idx_pub_emb_hnsw');
         $this->addSql('DROP INDEX IF EXISTS idx_chunk_emb_hnsw');
+        $this->addSql('DROP INDEX IF EXISTS idx_pub_type');
     }
 }

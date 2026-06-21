@@ -6,6 +6,7 @@ namespace App\Controller\Admin;
 
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -20,22 +21,34 @@ final class AdminDashboardController
     }
 
     #[Route('/api/admin/dashboard', name: 'admin_dashboard_data', methods: ['GET'])]
-    public function __invoke(): JsonResponse
+    public function __invoke(Request $request): JsonResponse
     {
         $conn = $this->em->getConnection();
 
-        // --- Corpus global ---
-        $publications = (int) $conn->executeQuery('SELECT count(*) FROM publication')->fetchOne();
+        // Filtre optionnel par type de publication (article, preprint, book…).
+        // Il scope la VOLUMÉTRIE DU CORPUS + les indicateurs détaillés liés aux
+        // publications ; les blocs structure/base/système restent globaux.
+        $type = trim((string) $request->query->get('type', ''));
+        $hasType = '' !== $type;
+        $tWhere = $hasType ? ' WHERE type = :t' : '';   // requêtes sans autre filtre
+        $tAnd = $hasType ? ' AND type = :t' : '';       // requêtes avec déjà un WHERE
+        $tp = $hasType ? ['t' => $type] : [];           // paramètres liés
+
+        // --- Corpus global (filtré par type le cas échéant) ---
+        $publications = (int) $conn->executeQuery('SELECT count(*) FROM publication'.$tWhere, $tp)->fetchOne();
         $answers = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status IN ('valide','non_relu')")->fetchOne();
         $questions = (int) $conn->executeQuery('SELECT count(*) FROM question')->fetchOne();
         $treeNodes = (int) $conn->executeQuery('SELECT count(*) FROM tree_node')->fetchOne();
 
         // Snapshot du jour (progression dans le temps) + série des 30 derniers jours.
-        $conn->executeStatement(
-            'INSERT INTO daily_stat (day, publications, answers, questions) VALUES (CURRENT_DATE, :p, :a, :q)
-             ON CONFLICT (day) DO UPDATE SET publications = :p, answers = :a, questions = :q',
-            ['p' => $publications, 'a' => $answers, 'q' => $questions],
-        );
+        // Uniquement sur les chiffres GLOBAUX (jamais filtrés) pour ne pas polluer l'historique.
+        if (!$hasType) {
+            $conn->executeStatement(
+                'INSERT INTO daily_stat (day, publications, answers, questions) VALUES (CURRENT_DATE, :p, :a, :q)
+                 ON CONFLICT (day) DO UPDATE SET publications = :p, answers = :a, questions = :q',
+                ['p' => $publications, 'a' => $answers, 'q' => $questions],
+            );
+        }
         $history = $conn->executeQuery(
             'SELECT day::text AS day, publications, answers, questions FROM daily_stat ORDER BY day DESC LIMIT 30'
         )->fetchAllAssociative();
@@ -54,19 +67,22 @@ final class AdminDashboardController
             $roots[] = ['slug' => $root['slug'], 'label' => $root['label'], 'publications' => $count];
         }
 
-        // --- Indicateurs détaillés demandés ---
-        $freeFullArticles = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status NOT IN ('closed','unknown')")->fetchOne();
-        $paywalled = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status = 'closed'")->fetchOne();
-        $pdfConsultables = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
+        // --- Indicateurs détaillés demandés (filtrés par type le cas échéant) ---
+        $freeFullArticles = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status NOT IN ('closed','unknown')".$tAnd, $tp)->fetchOne();
+        $paywalled = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status = 'closed'".$tAnd, $tp)->fetchOne();
+        // Texte intégral consultable : fragments présents (jointure sur publication si filtre type).
+        $pdfConsultables = $hasType
+            ? (int) $conn->executeQuery('SELECT count(DISTINCT pc.publication_id) FROM publication_chunk pc JOIN publication p ON p.id = pc.publication_id WHERE p.type = :t', $tp)->fetchOne()
+            : (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
         // Texte intégral converti (TEI/pdftotext) + vectorisé vs résumé seul.
         $fulltextVectorized = $pdfConsultables;
         // Résumé seul = (articles avec embedding) − (articles avec texte intégral).
         // Arithmétique plutôt qu'un NOT IN (trop lent sur publication_chunk volumineux).
-        $embeddingTotal = (int) $conn->executeQuery('SELECT count(*) FROM publication WHERE embedding IS NOT NULL')->fetchOne();
+        $embeddingTotal = (int) $conn->executeQuery('SELECT count(*) FROM publication WHERE embedding IS NOT NULL'.$tAnd, $tp)->fetchOne();
         $abstractOnly = max(0, $embeddingTotal - $fulltextVectorized);
         // NOT EXISTS (indexé sur publication_id) au lieu de NOT IN.
-        $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication p WHERE p.fulltext_fetched_at IS NOT NULL AND p.oa_url IS NOT NULL AND p.oa_url <> '' AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)")->fetchOne();
-        $fulltextGrobid = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_source = 'grobid_self'")->fetchOne();
+        $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication p WHERE p.fulltext_fetched_at IS NOT NULL AND p.oa_url IS NOT NULL AND p.oa_url <> '' AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)".$tAnd, $tp)->fetchOne();
+        $fulltextGrobid = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_source = 'grobid_self'".$tAnd, $tp)->fetchOne();
         $authorsCount = (int) $conn->executeQuery('SELECT count(*) FROM author')->fetchOne();
         $publishersCount = (int) $conn->executeQuery('SELECT count(*) FROM publisher')->fetchOne();
         $journalsCount = (int) $conn->executeQuery('SELECT count(*) FROM journal')->fetchOne();
@@ -85,6 +101,12 @@ final class AdminDashboardController
         // Total ≈ disponible chez OpenAlex (somme des meta.count par rubrique moissonnée ;
         // surcompte les articles présents dans plusieurs rubriques → indicatif).
         $openAlexTotal = (int) $conn->executeQuery("SELECT COALESCE(SUM(value::bigint),0) FROM setting WHERE name LIKE 'openalex.total.%' AND value ~ '^[0-9]+$'")->fetchOne();
+
+        // Répartition du corpus par type (toujours globale : aide à choisir le filtre).
+        $typeBreakdown = $conn->executeQuery(
+            "SELECT COALESCE(NULLIF(type, ''), '(inconnu)') AS type, count(*) AS n
+               FROM publication GROUP BY 1 ORDER BY n DESC"
+        )->fetchAllAssociative();
 
         // --- Base de données ---
         $dbVersion = (string) $conn->executeQuery('SHOW server_version')->fetchOne();
@@ -125,6 +147,9 @@ final class AdminDashboardController
                 'diskUsedBytes' => (int) ($diskTotal - $diskFree),
             ],
             'history' => $history,
+            'typeFilter' => $type,
+            'availableTypes' => ['article', 'preprint', 'review', 'book', 'book-chapter', 'dataset', 'dissertation', 'report', 'editorial', 'letter', 'reference-entry', 'standard', 'peer-review', 'erratum', 'other'],
+            'typeBreakdown' => $typeBreakdown,
             'metrics' => [
                 'freeFullArticles' => $freeFullArticles,
                 'paywalled' => $paywalled,
