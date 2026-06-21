@@ -145,25 +145,45 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     {
         $literal = (string) new Vector($embedding);
         $k = max(1, $k);
+        // Sur-échantillonnage par côté : marge pour la déduplication (un article
+        // peut sortir des deux côtés) et le filtre rétraction appliqué ensuite.
+        $perSide = min($k * 4, 120);
+
+        $conn = $this->getEntityManager()->getConnection();
+        // ef_search ≥ taille demandée : qualité du kNN approximatif HNSW.
+        $conn->executeStatement('SET hnsw.ef_search = '.max(40, $perSide));
 
         // Recherche kNN combinée : embedding du résumé (publication) ET fragments
-        // de texte intégral (publication_chunk). On retient la meilleure distance
-        // par publication, afin qu'un article dont le corps répond précisément
-        // ressorte même si son résumé est moins proche. L'unité reste la publication.
-        $rows = $this->getEntityManager()->getConnection()->executeQuery(
+        // de texte intégral (publication_chunk). Chaque sous-requête
+        // « ORDER BY embedding <=> const LIMIT n » exploite l'index HNSW (≈ ms
+        // au lieu d'un scan séquentiel). On fusionne en retenant la meilleure
+        // distance par publication, afin qu'un article dont le corps répond
+        // précisément ressorte même si son résumé est moins proche, puis on
+        // filtre les rétractations et on limite. L'unité reste la publication.
+        $rows = $conn->executeQuery(
             \sprintf(
-                "SELECT id, MIN(distance) AS distance FROM (
+                "WITH abs AS (
                     SELECT id, embedding <=> CAST(:vec AS vector) AS distance
                     FROM publication
-                    WHERE embedding IS NOT NULL AND retraction_status = 'none'
-                    UNION ALL
-                    SELECT pc.publication_id AS id, pc.embedding <=> CAST(:vec AS halfvec) AS distance
-                    FROM publication_chunk pc JOIN publication p ON p.id = pc.publication_id
-                    WHERE pc.embedding IS NOT NULL AND p.retraction_status = 'none'
-                 ) AS combined
-                 GROUP BY id
-                 ORDER BY distance ASC
-                 LIMIT %d",
+                    ORDER BY embedding <=> CAST(:vec AS vector)
+                    LIMIT %1\$d
+                 ), chk AS (
+                    SELECT publication_id AS id, embedding <=> CAST(:vec AS halfvec) AS distance
+                    FROM publication_chunk
+                    ORDER BY embedding <=> CAST(:vec AS halfvec)
+                    LIMIT %1\$d
+                 ), merged AS (
+                    SELECT id, MIN(distance) AS distance
+                    FROM (SELECT id, distance FROM abs UNION ALL SELECT id, distance FROM chk) AS u
+                    GROUP BY id
+                 )
+                 SELECT m.id, m.distance
+                 FROM merged m
+                 JOIN publication p ON p.id = m.id
+                 WHERE p.retraction_status = 'none'
+                 ORDER BY m.distance ASC
+                 LIMIT %2\$d",
+                $perSide,
                 $k,
             ),
             ['vec' => $literal],
