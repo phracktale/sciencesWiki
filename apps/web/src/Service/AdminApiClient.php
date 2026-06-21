@@ -120,13 +120,13 @@ final class AdminApiClient
     }
 
     /**
-     * @param string $type filtre optionnel par type de publication (scope la volumétrie du corpus)
+     * @param list<string> $types filtre optionnel par type(s) de publication (scope la volumétrie)
      *
      * @return array<string,mixed> données du dashboard admin
      */
-    public function adminStats(string $type = ''): array
+    public function adminStats(array $types = []): array
     {
-        $path = '/api/admin/dashboard'.('' !== $type ? '?'.http_build_query(['type' => $type]) : '');
+        $path = '/api/admin/dashboard'.([] !== $types ? '?'.http_build_query(['types' => $types]) : '');
         $res = $this->send('GET', $path, null, 60);
 
         return $res['ok'] ? $res['data'] : [];

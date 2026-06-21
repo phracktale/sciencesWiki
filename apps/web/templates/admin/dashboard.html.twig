@@ -25,20 +25,45 @@
     {# ===== Onglet 1 : Corpus + progression du corpus ===== #}
     <section class="tabpane" id="pane-corpus">
         {% set c = stats.corpus ?? {} %}
-        {% set tf = typeFilter ?? '' %}
+        {% set tf = stats.typeFilter ?? [] %}
+        {% set bd = {} %}
+        {% for r in stats.typeBreakdown ?? [] %}{% set bd = bd|merge({ (r.type): r.n }) %}{% endfor %}
         <h2 style="margin-top:0">Corpus</h2>
 
-        <form method="get" action="{{ path('admin_dashboard') }}" style="display:flex; align-items:center; gap:.5rem; margin:.2rem 0 1rem">
-            <label class="muted" style="font-size:.9rem">Filtrer la volumétrie par type&nbsp;:</label>
-            <select name="type" onchange="this.form.submit()" style="padding:.45rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
-                <option value="">Type : tous</option>
-                {% for t in stats.availableTypes ?? [] %}
-                    <option value="{{ t }}" {{ tf == t ? 'selected' }}>{{ t }}</option>
-                {% endfor %}
-            </select>
-            {% if tf %}<a href="{{ path('admin_dashboard') }}" style="font-size:.85rem">réinitialiser</a>{% endif %}
+        <form method="get" action="{{ path('admin_dashboard') }}" style="margin:.2rem 0 1rem">
+            <p class="muted" style="font-size:.9rem; margin:.2rem 0 .5rem">Filtrer la volumétrie par type(s) — cocher une famille entière ou des types précis&nbsp;:</p>
+            <div style="display:flex; flex-wrap:wrap; gap:1rem">
+            {% for famLabel, types in stats.families ?? {} %}
+                <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.5rem .8rem; min-width:240px">
+                    <legend style="font-size:.8rem; font-weight:700; padding:0 .3rem">
+                        <label style="cursor:pointer"><input type="checkbox" class="grp-all" data-grp="grp-{{ loop.index }}"> {{ famLabel }}</label>
+                    </legend>
+                    {% for t in types %}
+                        <label style="display:block; font-size:.85rem; cursor:pointer; padding:.05rem 0">
+                            <input type="checkbox" name="types[]" value="{{ t }}" class="grp-{{ loop.parent.index }}" {{ t in tf ? 'checked' }}>
+                            {{ t }}{% if bd[t] is defined %} <span class="muted">({{ bd[t]|number_format(0,',',' ') }})</span>{% endif %}
+                        </label>
+                    {% endfor %}
+                </fieldset>
+            {% endfor %}
+            </div>
+            <div style="margin-top:.6rem; display:flex; gap:.6rem; align-items:center">
+                <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1.2rem; cursor:pointer">Filtrer</button>
+                {% if tf|length %}<a href="{{ path('admin_dashboard') }}" style="font-size:.85rem">réinitialiser ({{ tf|length }} sélectionné·s)</a>{% endif %}
+            </div>
         </form>
-        {% if tf %}<p class="badge">Volumétrie filtrée sur le type « <strong>{{ tf }}</strong> » — les blocs Domaines / Système / Base restent globaux.</p>{% endif %}
+        {% if tf|length %}<p class="badge">Volumétrie filtrée sur&nbsp;: <strong>{{ tf|join(', ') }}</strong> — les blocs Domaines / Système / Base restent globaux.</p>{% endif %}
+        <script>
+        (function () {
+            document.querySelectorAll('.grp-all').forEach(function (master) {
+                var boxes = document.querySelectorAll('input.' + master.getAttribute('data-grp'));
+                function sync() { var all = boxes.length > 0; boxes.forEach(function (b) { if (!b.checked) all = false; }); master.checked = all; }
+                master.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = master.checked; }); });
+                boxes.forEach(function (b) { b.addEventListener('change', sync); });
+                sync();
+            });
+        })();
+        </script>
 
         <div class="grid">
             <div class="card"><strong style="font-size:1.6rem">{{ (c.publications ?? 0)|number_format(0,',',' ') }}</strong>{% if (stats.metrics.openAlexTotal ?? 0) > 0 %} <span class="muted">/ ≈ {{ stats.metrics.openAlexTotal|number_format(0,',',' ') }}</span>{% endif %}<br><span class="muted">publications moissonnées{% if (stats.metrics.openAlexTotal ?? 0) > 0 %} / dispo. OpenAlex{% endif %}</span></div>
@@ -70,7 +95,7 @@
                 {% for row in stats.typeBreakdown %}
                     <tr>
                         <td style="padding:.3rem 0">
-                            {% if row.type != '(inconnu)' %}<a href="{{ path('admin_dashboard', { type: row.type }) }}" {{ tf == row.type ? 'style="font-weight:700"' }}>{{ row.type }}</a>{% else %}<span class="muted">{{ row.type }}</span>{% endif %}
+                            {% if row.type != '(inconnu)' %}<a href="{{ path('admin_dashboard', { 'types[]': row.type }) }}" {{ row.type in tf ? 'style="font-weight:700"' }}>{{ row.type }}</a>{% if row.type in (stats.satelliteTypes ?? []) %} <span class="badge warn" style="font-size:.65rem">satellite</span>{% endif %}{% else %}<span class="muted">{{ row.type }}</span>{% endif %}
                         </td>
                         <td style="text-align:right">{{ row.n|number_format(0,',',' ') }}</td>
                     </tr>

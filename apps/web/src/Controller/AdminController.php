@@ -64,12 +64,15 @@ final class AdminController extends AbstractController
             return $this->redirectToRoute('admin_login');
         }
 
-        $type = trim((string) $request->query->get('type', ''));
+        // Multi-types (cases à cocher par famille) + compat ancien ?type=
+        $types = array_values(array_filter(array_map(
+            static fn ($v): string => trim((string) $v),
+            array_merge($request->query->all('types'), [$request->query->get('type', '')]),
+        )));
 
         return $this->render('admin/dashboard.html.twig', [
             'domains' => $this->api->domains(),
-            'stats' => $this->admin->adminStats($type),
-            'typeFilter' => $type,
+            'stats' => $this->admin->adminStats($types),
         ]);
     }
 

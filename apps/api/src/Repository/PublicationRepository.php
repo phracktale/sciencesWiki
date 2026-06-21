@@ -180,7 +180,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                  SELECT m.id, m.distance
                  FROM merged m
                  JOIN publication p ON p.id = m.id
-                 WHERE p.retraction_status = 'none'
+                 WHERE p.retraction_status = 'none' AND p.".\App\Corpus\PublicationType::notSatelliteSql()."
                  ORDER BY m.distance ASC
                  LIMIT %2\$d",
                 $perSide,
@@ -257,6 +257,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         $base = "FROM publication p
             LEFT JOIN journal j ON j.id = p.journal_id
             WHERE p.retraction_status = 'none'
+              AND p.".\App\Corpus\PublicationType::notSatelliteSql()."
               AND EXISTS (
                 WITH RECURSIVE sub AS (
                     SELECT id FROM tree_node WHERE slug = :slug
