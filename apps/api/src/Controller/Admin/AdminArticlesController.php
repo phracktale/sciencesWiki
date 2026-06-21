@@ -60,6 +60,11 @@ final class AdminArticlesController
             case 'payant': $conditions[] = "p.oa_status = 'closed'"; break;
             case 'inconnu': $conditions[] = "p.oa_status NOT IN ".self::OPEN_SQL." AND p.oa_status <> 'closed'"; break;
         }
+        $type = trim((string) $request->query->get('type', ''));
+        if ('' !== $type) {
+            $conditions[] = 'p.type = :type';
+            $params['type'] = $type;
+        }
         $domain = trim((string) $request->query->get('domain', ''));
         if ('' !== $domain) {
             $conditions[] = 'EXISTS (WITH RECURSIVE sub AS (
@@ -75,6 +80,7 @@ final class AdminArticlesController
         $col = match ((string) $request->query->get('sort', '')) {
             'titre' => 'p.title',
             'revue' => 'COALESCE(j.name, p.venue)',
+            'type' => 'p.type',
             'fragments' => '(SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id)',
             default => 'p.publication_date',
         };
@@ -83,7 +89,7 @@ final class AdminArticlesController
         $total = (int) $conn->executeQuery("SELECT count(*) FROM publication p $where", $params)->fetchOne();
 
         $rows = $conn->executeQuery(
-            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
+            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url, p.type,
                     j.name AS journal_name,
                     to_char(p.publication_date, 'YYYY-MM-DD') AS date,
                     (SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) AS chunks,
@@ -107,6 +113,7 @@ final class AdminArticlesController
             return [
                 'id' => (int) $r['id'],
                 'title' => $r['title'],
+                'type' => $r['type'],
                 'authors' => $r['authors'] ?? '',
                 'date' => $r['date'],
                 'venue' => $r['journal_name'] ?? $r['venue'],
@@ -129,6 +136,8 @@ final class AdminArticlesController
             'page' => $page,
             'pages' => (int) ceil($total / self::PER_PAGE),
             'query' => $q,
+            // Types OpenAlex courants (pour le filtre).
+            'availableTypes' => ['article', 'preprint', 'review', 'book', 'book-chapter', 'dataset', 'dissertation', 'report', 'editorial', 'letter', 'reference-entry', 'standard', 'peer-review', 'erratum', 'other'],
         ]);
     }
 

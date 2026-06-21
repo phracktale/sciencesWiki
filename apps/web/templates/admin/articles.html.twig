@@ -10,7 +10,7 @@
     {% set baseParams = {
         q: data.query, journal: f.journal, journal_name: journalName,
         indexation: f.indexation, domain: f.domain, pdf: f.pdf, access: f.access,
-        sort: f.sort, dir: f.dir
+        type: f.type, sort: f.sort, dir: f.dir
     } %}
 
     <form method="get" action="{{ path('admin_articles') }}" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:.5rem; margin:1rem 0">
@@ -54,6 +54,12 @@
                 <option value="lien" {{ f.pdf == 'lien' ? 'selected' }}>Lien seul</option>
                 <option value="aucun" {{ f.pdf == 'aucun' ? 'selected' }}>Aucun</option>
             </select>
+            <select name="type" style="flex:1; padding:.5rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+                <option value="">Type : tous</option>
+                {% for t in data.availableTypes ?? [] %}
+                    <option value="{{ t }}" {{ f.type == t ? 'selected' }}>{{ t }}</option>
+                {% endfor %}
+            </select>
         </div>
 
         <div style="display:flex; gap:.5rem; grid-column:1 / 4">
@@ -70,6 +76,7 @@
                 <tr style="text-align:left; border-bottom:2px solid var(--line)">
                     <th style="padding:.4rem">{{ s.th('Titre', 'titre', 'admin_articles', baseParams) }}</th>
                     <th>Auteurs</th>
+                    <th>{{ s.th('Type', 'type', 'admin_articles', baseParams) }}</th>
                     <th>{{ s.th('Date', 'date', 'admin_articles', baseParams) }}</th>
                     <th>{{ s.th('Revue', 'revue', 'admin_articles', baseParams) }}</th>
                     <th>Accès</th>
@@ -85,6 +92,7 @@
                             {% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener" title="Source externe" style="font-size:.75rem"> ↗</a>{% endif %}
                         </td>
                         <td class="muted">{{ a.authors|slice(0,60) }}</td>
+                        <td>{% if a.type %}<span class="pill">{{ a.type }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
                         <td class="muted">{{ a.date }}</td>
                         <td class="muted">{{ a.venue|slice(0,30) }}</td>
                         <td>

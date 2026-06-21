@@ -122,6 +122,7 @@ final class AdminController extends AbstractController
             'domain' => trim((string) $request->query->get('domain', '')),
             'pdf' => trim((string) $request->query->get('pdf', '')),
             'access' => trim((string) $request->query->get('access', '')),
+            'type' => trim((string) $request->query->get('type', '')),
             'sort' => trim((string) $request->query->get('sort', '')),
             'dir' => trim((string) $request->query->get('dir', '')),
         ];
