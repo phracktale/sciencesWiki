@@ -10,6 +10,14 @@ framework:
                     max_retries: 3
                     delay: 2000
                     multiplier: 2
+            # File dédiée au texte intégral (PDF→GROBID→vecteurs), drainée par un
+            # pool de workers séparé → ne bloque pas la moisson.
+            fulltext:
+                dsn: 'doctrine://default?queue_name=fulltext'
+                retry_strategy:
+                    max_retries: 2
+                    delay: 5000
+                    multiplier: 3
             failed: 'doctrine://default?queue_name=failed'
             sync: 'sync://'
 
@@ -17,6 +25,7 @@ framework:
             App\Harvester\Message\ProcessWork: harvester
             App\Harvester\Message\ResolveOpenAccess: harvester
             App\Harvester\Message\HarvestRubric: harvester
+            App\Harvester\Message\IngestFulltext: fulltext
 
 # when@test:
 #    framework:

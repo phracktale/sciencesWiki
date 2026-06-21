@@ -56,6 +56,7 @@ final class AdminDashboardController
 
         // --- Indicateurs détaillés demandés ---
         $freeFullArticles = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status NOT IN ('closed','unknown')")->fetchOne();
+        $paywalled = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status = 'closed'")->fetchOne();
         $pdfConsultables = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
         // Texte intégral converti (TEI/pdftotext) + vectorisé vs résumé seul.
         $fulltextVectorized = $pdfConsultables;
@@ -122,6 +123,7 @@ final class AdminDashboardController
             'history' => $history,
             'metrics' => [
                 'freeFullArticles' => $freeFullArticles,
+                'paywalled' => $paywalled,
                 'pdfConsultables' => $pdfConsultables,
                 'fulltextVectorized' => $fulltextVectorized,
                 'fulltextGrobid' => $fulltextGrobid,

@@ -37,6 +37,7 @@
         <h3>Indicateurs</h3>
         <div class="grid">
             <div class="card"><strong style="font-size:1.6rem">{{ (m.freeFullArticles ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles en accès libre</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.paywalled ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles payants (résumé seul)</span></div>
             <div class="card"><strong style="font-size:1.6rem">{{ (m.fulltextVectorized ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles <strong>texte intégral</strong> vectorisés{% if (m.fulltextGrobid ?? 0) > 0 %} <span class="muted">(dont {{ m.fulltextGrobid|number_format(0,',',' ') }} TEI GROBID)</span>{% endif %}</span></div>
             <div class="card"><strong style="font-size:1.6rem">{{ (m.abstractOnly ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles <strong>résumé seul</strong> vectorisés</span></div>
             <div class="card"><strong style="font-size:1.6rem">{{ (m.fulltextRetryable ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">échecs texte intégral <span class="muted">(reprenables : <code>app:fulltext:retry</code>)</span></span></div>
