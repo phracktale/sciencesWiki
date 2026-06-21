@@ -1,0 +1,4 @@
+framework:
+    mailer:
+        # DSN défini par l'environnement (Brevo SMTP en prod). Défaut : null (n'envoie rien).
+        dsn: '%env(MAILER_DSN)%'

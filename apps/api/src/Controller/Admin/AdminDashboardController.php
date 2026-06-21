@@ -57,6 +57,11 @@ final class AdminDashboardController
         // --- Indicateurs détaillés demandés ---
         $freeFullArticles = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE oa_status NOT IN ('closed','unknown')")->fetchOne();
         $pdfConsultables = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne();
+        // Texte intégral converti (TEI/pdftotext) + vectorisé vs résumé seul.
+        $fulltextVectorized = $pdfConsultables;
+        $abstractOnly = (int) $conn->executeQuery('SELECT count(*) FROM publication WHERE embedding IS NOT NULL AND id NOT IN (SELECT publication_id FROM publication_chunk)')->fetchOne();
+        $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_fetched_at IS NOT NULL AND oa_url IS NOT NULL AND oa_url <> '' AND id NOT IN (SELECT publication_id FROM publication_chunk)")->fetchOne();
+        $fulltextGrobid = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_source = 'grobid_self'")->fetchOne();
         $authorsCount = (int) $conn->executeQuery('SELECT count(*) FROM author')->fetchOne();
         $publishersCount = (int) $conn->executeQuery('SELECT count(*) FROM publisher')->fetchOne();
         $journalsCount = (int) $conn->executeQuery('SELECT count(*) FROM journal')->fetchOne();
@@ -118,6 +123,10 @@ final class AdminDashboardController
             'metrics' => [
                 'freeFullArticles' => $freeFullArticles,
                 'pdfConsultables' => $pdfConsultables,
+                'fulltextVectorized' => $fulltextVectorized,
+                'fulltextGrobid' => $fulltextGrobid,
+                'abstractOnly' => $abstractOnly,
+                'fulltextRetryable' => $fulltextRetryable,
                 'authors' => $authorsCount,
                 'publishers' => $publishersCount,
                 'journals' => $journalsCount,

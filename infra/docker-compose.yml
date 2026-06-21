@@ -65,6 +65,7 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL}
       LLM_MODEL: ${LLM_MODEL}
       LLM_API_TOKEN: ${LLM_API_TOKEN}
+      MAILER_DSN: ${MAILER_DSN:-null://null}
       # Cette instance initialise la base (migrations + clés JWT + seed).
       RUN_INIT: "1"
     volumes:
@@ -100,6 +101,7 @@ services:
       LLM_BASE_URL: ${LLM_BASE_URL}
       LLM_MODEL: ${LLM_MODEL}
       LLM_API_TOKEN: ${LLM_API_TOKEN}
+      MAILER_DSN: ${MAILER_DSN:-null://null}
       # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
     # memory_limit PHP relevé (embeddings par lots + gros lots de moisson) ; le
     # --memory-limit Messenger (RSS) redémarre proprement avant tout dépassement.

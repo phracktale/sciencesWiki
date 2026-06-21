@@ -95,6 +95,8 @@ final class AdminController extends AbstractController
                 'harvest.recent_years' => (string) $request->request->get('harvest_recent_years'),
                 'harvest.cap_per_rubric' => (string) $request->request->get('harvest_cap_per_rubric'),
                 'harvest.max_per_run' => (string) $request->request->get('harvest_max_per_run'),
+                'mail.reroute_enabled' => $request->request->get('reroute_enabled') ? '1' : '0',
+                'mail.reroute_to' => trim((string) $request->request->get('reroute_to')),
             ]);
             $this->addFlash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Paramètres IA enregistrés.' : 'Échec de l\'enregistrement.');
 
