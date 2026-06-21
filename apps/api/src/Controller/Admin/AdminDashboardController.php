@@ -40,7 +40,10 @@ final class AdminDashboardController
         $tpt = $hasType ? ['types' => \Doctrine\DBAL\ArrayParameterType::STRING] : []; // typage du IN
 
         // --- Corpus global (filtré par type le cas échéant) ---
-        $publications = (int) $conn->executeQuery('SELECT count(*) FROM publication'.$tWhere, $tp, $tpt)->fetchOne();
+        // Sans filtre : total estimé (pg_class) — instantané sur 1,3 M lignes.
+        $publications = $hasType
+            ? (int) $conn->executeQuery('SELECT count(*) FROM publication'.$tWhere, $tp, $tpt)->fetchOne()
+            : (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'publication'")->fetchOne();
         $answers = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status IN ('valide','non_relu')")->fetchOne();
         $questions = (int) $conn->executeQuery('SELECT count(*) FROM question')->fetchOne();
         $treeNodes = (int) $conn->executeQuery('SELECT count(*) FROM tree_node')->fetchOne();
@@ -88,7 +91,7 @@ final class AdminDashboardController
         // NOT EXISTS (indexé sur publication_id) au lieu de NOT IN.
         $fulltextRetryable = (int) $conn->executeQuery("SELECT count(*) FROM publication p WHERE p.fulltext_fetched_at IS NOT NULL AND p.oa_url IS NOT NULL AND p.oa_url <> '' AND NOT EXISTS (SELECT 1 FROM publication_chunk pc WHERE pc.publication_id = p.id)".$tAnd, $tp, $tpt)->fetchOne();
         $fulltextGrobid = (int) $conn->executeQuery("SELECT count(*) FROM publication WHERE fulltext_source = 'grobid_self'".$tAnd, $tp, $tpt)->fetchOne();
-        $authorsCount = (int) $conn->executeQuery('SELECT count(*) FROM author')->fetchOne();
+        $authorsCount = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'author'")->fetchOne();
         $publishersCount = (int) $conn->executeQuery('SELECT count(*) FROM publisher')->fetchOne();
         $journalsCount = (int) $conn->executeQuery('SELECT count(*) FROM journal')->fetchOne();
         $topPublishers = $conn->executeQuery(
@@ -116,13 +119,17 @@ final class AdminDashboardController
         // --- Base de données ---
         $dbVersion = (string) $conn->executeQuery('SHOW server_version')->fetchOne();
         $dbSize = (int) $conn->executeQuery('SELECT pg_database_size(current_database())')->fetchOne();
+        // Aperçu volumétrie : estimations pg_class (1 requête) au lieu de 11 count(*)
+        // exacts (dont authorship = plusieurs millions) — instantané.
+        $wanted = ['publication', 'tree_node', 'tree_edge', 'question', 'answer', 'answer_revision', 'footnote', 'placement_suggestion', 'author', 'authorship', 'app_user'];
+        $estimates = $conn->executeQuery(
+            "SELECT relname, reltuples::bigint AS n FROM pg_class WHERE relkind = 'r' AND relname IN (:t)",
+            ['t' => $wanted],
+            ['t' => \Doctrine\DBAL\ArrayParameterType::STRING],
+        )->fetchAllKeyValue();
         $tables = [];
-        foreach (['publication', 'tree_node', 'tree_edge', 'question', 'answer', 'answer_revision', 'footnote', 'placement_suggestion', 'author', 'authorship', 'app_user'] as $t) {
-            try {
-                $tables[trim($t, '"')] = (int) $conn->executeQuery('SELECT count(*) FROM '.$t)->fetchOne();
-            } catch (\Throwable) {
-                // table absente : ignore
-            }
+        foreach ($wanted as $t) {
+            $tables[$t] = (int) ($estimates[$t] ?? 0);
         }
 
         // --- Système ---

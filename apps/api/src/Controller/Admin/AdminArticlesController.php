@@ -86,7 +86,10 @@ final class AdminArticlesController
         };
         $order = "$col $d NULLS LAST, p.id DESC";
 
-        $total = (int) $conn->executeQuery("SELECT count(*) FROM publication p $where", $params)->fetchOne();
+        // Sans filtre : total estimé (pg_class) — instantané sur 1,3 M publications.
+        $total = [] === $conditions
+            ? (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'publication'")->fetchOne()
+            : (int) $conn->executeQuery("SELECT count(*) FROM publication p $where", $params)->fetchOne();
 
         $rows = $conn->executeQuery(
             "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url, p.type,

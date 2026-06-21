@@ -36,7 +36,10 @@ final class AdminAuthorsController
             $params['like'] = '%'.$q.'%';
         }
 
-        $total = (int) $conn->executeQuery("SELECT count(*) FROM author a $where", $params)->fetchOne();
+        // Sans recherche : total estimé (pg_class) — instantané sur 3,2 M auteurs.
+        $total = '' === $q
+            ? (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE relname = 'author'")->fetchOne()
+            : (int) $conn->executeQuery("SELECT count(*) FROM author a $where", $params)->fetchOne();
 
         // Tri (liste blanche) par colonne + direction (en-têtes cliquables).
         $sort = (string) $request->query->get('sort', '');
@@ -45,13 +48,13 @@ final class AdminAuthorsController
             'retractions' => 'retractions',
             'eoc' => 'eoc',
             'nom' => 'a.name',
-            default => 'publications',
+            default => 'a.publication_count',
         };
         $order = 'a.name' === $col ? "a.name $d" : "$col $d, a.name ASC";
 
         $rows = $conn->executeQuery(
             "SELECT a.id, a.name, a.orcid, a.affiliation,
-                    (SELECT count(*) FROM authorship au WHERE au.author_id = a.id) AS publications,
+                    a.publication_count AS publications,
                     (SELECT count(*) FROM authorship au JOIN publication p ON p.id = au.publication_id
                        WHERE au.author_id = a.id AND p.retraction_status = 'retracted') AS retractions,
                     (SELECT count(*) FROM authorship au JOIN publication p ON p.id = au.publication_id
