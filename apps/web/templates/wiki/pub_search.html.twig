@@ -1,0 +1,52 @@
+{% extends 'base.html.twig' %}
+{% block title %}Rechercher une publication — SciencesWiki{% endblock %}
+{% block body %}
+    <h1>Rechercher une publication</h1>
+    <p class="muted">Recherche plein-texte <strong>tolérante aux fautes</strong> dans le corpus scientifique (titres &amp; résumés).</p>
+
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap; margin:1rem 0; align-items:center">
+        <input type="text" id="p-q" placeholder="Ex. : immunothérapie, trous noirs, CRISPR…" autocomplete="off"
+               style="flex:1; min-width:240px; padding:.6rem .8rem; border:1px solid #d1d5db; border-radius:9px; font:inherit">
+        <select id="p-sort" style="padding:.55rem; border:1px solid #d1d5db; border-radius:9px; font:inherit">
+            <option value="">Pertinence</option>
+            <option value="cited">Les plus cités</option>
+            <option value="recent">Les plus récents</option>
+        </select>
+        <label style="font-size:.9rem"><input type="checkbox" id="p-oa"> Accès libre</label>
+        <button id="p-go" style="background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.6rem 1.2rem; cursor:pointer; font:inherit">Rechercher</button>
+    </div>
+    <p id="p-count" class="muted" style="font-size:.85rem" role="status" aria-live="polite"></p>
+    <div id="p-results"></div>
+
+    <script>
+    (function () {
+        var q = document.getElementById('p-q'), go = document.getElementById('p-go'),
+            sortEl = document.getElementById('p-sort'), oa = document.getElementById('p-oa'),
+            results = document.getElementById('p-results'), countEl = document.getElementById('p-count');
+        function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+        function load() {
+            if (!q.value.trim()) { results.innerHTML=''; countEl.textContent=''; return; }
+            results.innerHTML = '<p class="muted">Recherche…</p>';
+            var u = '/api/search/keyword?q=' + encodeURIComponent(q.value.trim())
+                + (sortEl.value ? '&sort=' + sortEl.value : '') + (oa.checked ? '&oa=1' : '');
+            fetch(u).then(function(r){ return r.json(); }).then(function(d){
+                countEl.textContent = (d.total||0).toLocaleString('fr-FR') + ' résultat(s)';
+                if (!d.items || !d.items.length) { results.innerHTML='<p class="muted">Aucun résultat.</p>'; return; }
+                results.innerHTML = d.items.map(function(it){
+                    var meta = [it.journal, it.year].filter(Boolean).join(' · ');
+                    var badges = (it.openAccess ? '<span class="badge2 oa">Open Access</span> ' : '')
+                        + (it.citedByCount ? '<span class="pill">' + it.citedByCount.toLocaleString('fr-FR') + ' citations</span> ' : '');
+                    return '<div style="padding:.6rem 0; border-bottom:1px solid var(--line)">'
+                        + '<a class="q-title" href="' + (it.url || '#') + '" target="_blank" rel="noopener">' + esc(it.title) + '</a>'
+                        + (meta ? '<div class="muted" style="font-size:.85rem">' + esc(meta) + '</div>' : '')
+                        + '<div style="margin-top:.2rem">' + badges + '</div></div>';
+                }).join('');
+            }).catch(function(){ results.innerHTML='<p class="muted">Erreur de recherche.</p>'; });
+        }
+        go.addEventListener('click', load);
+        sortEl.addEventListener('change', load);
+        oa.addEventListener('change', load);
+        q.addEventListener('keydown', function(e){ if (e.key==='Enter') load(); });
+    })();
+    </script>
+{% endblock %}

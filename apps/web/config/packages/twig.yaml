@@ -5,7 +5,7 @@ twig:
         admin_session: '@App\Service\AdminApiClient'
         current_user: '@App\Service\UserApiClient'
         # Tag de version affiché en pied de page. À BUMPER à chaque livraison.
-        app_version: 'v0.31 · accès dashboard admin + moisson par jour (2026-06-22)'
+        app_version: 'v0.32 · recherche publications tolérante aux fautes (Meilisearch)'
 
 when@test:
     twig:
