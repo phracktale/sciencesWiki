@@ -54,7 +54,10 @@ final class OpenAiCompatibleLlmClient implements LlmClient
         $data = $this->httpClient->request('POST', $this->chatUrl(), [
             'headers' => $headers,
             'json' => $payload,
-            'timeout' => 120,
+            // Timeout d'INACTIVITÉ : pour une réponse non streamée, le serveur
+            // n'émet rien tant que la génération n'est pas finie ⇒ il doit couvrir
+            // toute la durée de génération (modèle lent / cold-load). Surchargeable.
+            'timeout' => $options['timeout'] ?? 300,
         ])->toArray();
 
         $content = $data['choices'][0]['message']['content'] ?? null;

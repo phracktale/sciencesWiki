@@ -14,6 +14,8 @@ use App\Repository\ClaimRepository;
 use App\Repository\PublicationRepository;
 use App\Service\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 /**
  * Orchestration LLM → JSON → persistance des assertions structurées d'une
@@ -27,6 +29,11 @@ final class ClaimExtractor
 {
     private const FLUSH_EVERY = 25;
 
+    /** Timeout (s) d'un appel LLM d'extraction (génération non streamée). */
+    private const LLM_TIMEOUT = 300;
+
+    private readonly LoggerInterface $logger;
+
     public function __construct(
         private readonly LlmClient $llm,
         private readonly ClaimPromptBuilder $promptBuilder,
@@ -36,7 +43,9 @@ final class ClaimExtractor
         private readonly PublicationRepository $publications,
         private readonly EntityManagerInterface $em,
         private readonly SettingsService $settings,
+        ?LoggerInterface $logger = null,
     ) {
+        $this->logger = $logger ?? new NullLogger();
     }
 
     /**
@@ -51,7 +60,17 @@ final class ClaimExtractor
         $claims = 0;
         $done = 0;
         foreach ($publications as $i => $publication) {
-            $claims += $this->extractForPublication($publication, $node, $reextract);
+            try {
+                $claims += $this->extractForPublication($publication, $node, $reextract);
+            } catch (\Throwable $e) {
+                // Échec d'UNE publication (ex. timeout LLM) : ce n'est pas une
+                // erreur DB (l'EntityManager reste ouvert), on journalise et on
+                // poursuit — un nœud n'est pas perdu pour une publi récalcitrante.
+                $this->logger->warning('Extraction ignorée pour une publication', [
+                    'publication' => $publication->getId(),
+                    'error' => $e->getMessage(),
+                ]);
+            }
             ++$done;
             if (0 === ($i + 1) % self::FLUSH_EVERY) {
                 $this->em->flush();
@@ -111,7 +130,7 @@ final class ClaimExtractor
     private function complete(Publication $publication): ?array
     {
         $messages = $this->promptBuilder->build($publication, $this->conclusion($publication));
-        $opts = ['temperature' => 0.0, 'max_tokens' => 1500, 'model' => $this->settings->lightModel()];
+        $opts = ['temperature' => 0.0, 'max_tokens' => 1500, 'model' => $this->settings->lightModel(), 'timeout' => self::LLM_TIMEOUT];
 
         $parsed = $this->parser->parse($this->llm->complete($messages, $opts)->content);
         if (null === $parsed) {
