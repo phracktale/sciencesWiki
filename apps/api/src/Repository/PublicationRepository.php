@@ -213,20 +213,21 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
-     * Publications placées (validées) dans un nœud — périmètre de l'analyse de
-     * controverses (cf. spec controverses §0.1 / §6.1). Une placement_suggestion
-     * « accepted » fait foi du placement validé. Hors rétractations.
+     * Publications placées dans un nœud — périmètre de l'analyse de controverses
+     * (cf. spec controverses §0.1 / §6.1). On retient tout placement NON rejeté
+     * (les suggestions kNN restent « proposed » tant qu'un humain ne tranche pas ;
+     * c'est aussi le périmètre de searchInSubtree). Hors rétractations.
      *
      * @return list<Publication>
      */
-    public function findAcceptedInNode(int $nodeId, int $limit): array
+    public function findPlacedInNode(int $nodeId, int $limit): array
     {
         $ids = $this->getEntityManager()->getConnection()->executeQuery(
             \sprintf(
                 "SELECT p.id
                  FROM publication p
                  JOIN placement_suggestion ps ON ps.publication_id = p.id
-                 WHERE ps.tree_node_id = :node AND ps.status = 'accepted'
+                 WHERE ps.tree_node_id = :node AND ps.status <> 'rejected'
                    AND p.retraction_status = 'none'
                  ORDER BY p.cited_by_count DESC, p.id DESC
                  LIMIT %d",
@@ -246,14 +247,14 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         return $out;
     }
 
-    /** Nombre de publications validées (placées) directement dans un nœud. */
-    public function countAcceptedInNode(int $nodeId): int
+    /** Nombre de publications placées (non rejetées) directement dans un nœud. */
+    public function countPlacedInNode(int $nodeId): int
     {
         return (int) $this->getEntityManager()->getConnection()->executeQuery(
             "SELECT count(*)
              FROM placement_suggestion ps
              JOIN publication p ON p.id = ps.publication_id
-             WHERE ps.tree_node_id = :node AND ps.status = 'accepted'
+             WHERE ps.tree_node_id = :node AND ps.status <> 'rejected'
                AND p.retraction_status = 'none'",
             ['node' => $nodeId],
         )->fetchOne();

@@ -11,7 +11,6 @@ use App\Repository\ControversyRepository;
 use App\Repository\PublicationRepository;
 use App\Repository\TreeNodeRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -42,7 +41,7 @@ final class ControversyController
             return new JsonResponse(['error' => 'Nœud introuvable.'], 404);
         }
 
-        $analysable = $this->publications->countAcceptedInNode((int) $node->getId());
+        $analysable = $this->publications->countPlacedInNode((int) $node->getId());
 
         return new JsonResponse([
             'node' => [
@@ -61,7 +60,7 @@ final class ControversyController
     }
 
     #[Route('/api/tree_nodes/{slug}/analyze', name: 'api_node_analyze', methods: ['POST'])]
-    public function analyze(string $slug, Request $request): JsonResponse
+    public function analyze(string $slug): JsonResponse
     {
         $node = $this->nodes->findOneBy(['slug' => $slug]);
         if (null === $node) {

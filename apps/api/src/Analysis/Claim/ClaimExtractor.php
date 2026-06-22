@@ -45,7 +45,7 @@ final class ClaimExtractor
      */
     public function extractForNode(TreeNode $node, int $limit = 1000, bool $reextract = false): array
     {
-        $publications = $this->publications->findAcceptedInNode((int) $node->getId(), $limit);
+        $publications = $this->publications->findPlacedInNode((int) $node->getId(), $limit);
 
         $claims = 0;
         $done = 0;
