@@ -166,7 +166,7 @@ final class LiteratureReviewController
         }
 
         return [
-            LlmMessage::system(self::SYSTEM_PROMPT),
+            LlmMessage::system(self::SYSTEM_PROMPT."\n\n".SettingsService::GEO_SCOPE_GUARD),
             LlmMessage::user(implode("\n", $lines)),
         ];
     }

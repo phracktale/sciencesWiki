@@ -66,6 +66,30 @@ final class SettingsService
         <les faits établis sourcés avec des notes de bas de page qui renvoient aux sources et à la page ou trouver l'info ; laisse vide si aucune source pertinente>
         TXT;
 
+    /**
+     * Garde-fou IMPÉRATIF appliqué à TOUTE génération IA de la plateforme (ajouté
+     * au prompt système au moment de l'exécution, donc inamovible). Objectif :
+     * ne jamais présenter comme universel ce qui dépend d'un périmètre particulier.
+     */
+    public const GEO_SCOPE_GUARD = <<<'TXT'
+        RÈGLE IMPÉRATIVE — PÉRIMÈTRE D'APPLICATION.
+        Beaucoup de faits ne sont PAS universels : ils dépendent d'un périmètre
+        particulier — pays, région, juridiction, système de santé, organisme,
+        cadre réglementaire ou législatif, devise, unité de mesure, période,
+        population étudiée ou contexte institutionnel. Dès qu'une affirmation, une
+        étude, une statistique, une loi, une recommandation, un dispositif
+        (financement, organisation, autorité, programme…) ou une pratique ne vaut
+        que dans un tel cadre, tu DOIS indiquer EXPLICITEMENT le périmètre concerné
+        (ex. « aux États-Unis », « dans l'Union européenne », « selon le système de
+        santé britannique », « d'après une cohorte japonaise de 2021 »).
+        N'emploie JAMAIS de référence implicite à un cadre national ou institutionnel
+        — par exemple « la coordination fédérale », « la sécurité sociale »,
+        « l'agence du médicament », « le gouvernement » — sans nommer le pays ou la
+        juridiction. Ne généralise jamais un résultat propre à un contexte. Si le
+        périmètre est inconnu ou ambigu dans les sources, signale-le explicitement
+        plutôt que de laisser croire à une portée universelle.
+        TXT;
+
     private const DEFAULTS = [
         self::RAG_TEMPERATURE => '0.6',
         self::RAG_MAX_TOKENS => '10000',
@@ -99,8 +123,10 @@ final class SettingsService
     public function systemPrompt(): string
     {
         $v = $this->get(self::RAG_SYSTEM_PROMPT);
+        $base = null !== $v && '' !== trim($v) ? $v : self::DEFAULT_SYSTEM_PROMPT;
 
-        return null !== $v && '' !== trim($v) ? $v : self::DEFAULT_SYSTEM_PROMPT;
+        // Garde-fou périmètre toujours ajouté (inamovible, même si prompt personnalisé).
+        return $base."\n\n".self::GEO_SCOPE_GUARD;
     }
 
     public function temperature(): float

@@ -292,6 +292,6 @@ final class GenerateWikiArticlesCommand extends Command
             (liste des applications concrètes majeures), puis « ## Références ». Vise au moins 20 000 signes.
             TXT;
 
-        return [LlmMessage::system($system), LlmMessage::user($user)];
+        return [LlmMessage::system($system."\n\n".\App\Service\SettingsService::GEO_SCOPE_GUARD), LlmMessage::user($user)];
     }
 }
