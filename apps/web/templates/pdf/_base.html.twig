@@ -1,0 +1,64 @@
+{#
+  Gabarit PDF commun (dompdf). En-tête (logo + slogan) et pied de page (ligne,
+  scienceswiki.eu + date à gauche, numéro de page à droite) RÉPÉTÉS sur chaque
+  page via position:fixed. Les PDF concrets étendent ce gabarit et remplissent
+  {% block content %}. Variable attendue : `date` (jj/mm/aaaa).
+#}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { margin: 132px 56px 84px 56px; }
+        body { font-family: 'DejaVu Sans', sans-serif; font-size: 11pt; line-height: 1.5; color: #1f2937; }
+
+        /* En-tête répété */
+        .pdf-header { position: fixed; top: -104px; left: 0; right: 0; height: 80px; }
+        .pdf-header table { width: 100%; border: 0; border-collapse: collapse; }
+        .pdf-header img { height: 46px; }
+        .pdf-header .slogan { color: #02356c; font-size: 10pt; font-style: italic; padding-left: 14px; vertical-align: middle; }
+        .pdf-header .rule { border-bottom: 2px solid #019fb9; height: 8px; }
+
+        /* Pied de page répété */
+        .pdf-footer { position: fixed; bottom: -56px; left: 0; right: 0; height: 40px;
+            border-top: 1px solid #cbd5e1; padding-top: 6px; color: #64748b; font-size: 8.5pt; }
+        .pdf-footer table { width: 100%; border: 0; border-collapse: collapse; }
+        .pdf-footer .right { text-align: right; }
+        .pdf-footer .page:after { content: "page " counter(page) " / " counter(pages); }
+
+        /* Contenu — styles communs (titres, sauts de page, bibliographie) */
+        h1 { font-size: 18pt; color: #02356c; margin: 0 0 4pt; }
+        h2 { font-size: 13pt; color: #019fb9; margin: 14pt 0 4pt; page-break-after: avoid; }
+        h3 { font-size: 11.5pt; color: #02356c; margin: 10pt 0 3pt; page-break-after: avoid; }
+        p, li { page-break-inside: avoid; margin: 4pt 0; }
+        ul, ol { margin: 4pt 0 4pt 10pt; }
+        strong { color: #111827; }
+        .meta { color: #555; font-size: 9.5pt; margin-bottom: 16pt; }
+        .biblio { margin-top: 18pt; border-top: 1px solid #ccc; padding-top: 8pt; }
+        .ref { page-break-inside: avoid; margin: 6pt 0; font-size: 10pt; }
+        .ref .url { color: #02356c; }
+    </style>
+</head>
+<body>
+    <header class="pdf-header">
+        <table><tr>
+            <td style="width: 1%; white-space: nowrap; vertical-align: middle;">
+                {% if pdf_assets.logo %}<img src="{{ pdf_assets.logo }}" alt="SciencesWiki">{% endif %}
+            </td>
+            <td class="slogan">— le savoir scientifique, libre et vulgarisé</td>
+        </tr></table>
+        <div class="rule"></div>
+    </header>
+
+    <footer class="pdf-footer">
+        <table><tr>
+            <td>scienceswiki.eu · {{ date }}</td>
+            <td class="right page"></td>
+        </tr></table>
+    </footer>
+
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
