@@ -282,6 +282,7 @@ class Answer
         return $this->generatedByAi;
     }
 
+    #[Groups(['answer:read'])]
     public function getGenerationModel(): ?string
     {
         return $this->generationModel;
@@ -294,6 +295,7 @@ class Answer
         return $this;
     }
 
+    #[Groups(['answer:read'])]
     public function getGenerationMs(): ?int
     {
         return $this->generationMs;
