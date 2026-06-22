@@ -25,6 +25,9 @@ final class ControversyController
     /** Seuil minimal de publications validées pour qu'un nœud soit « analysable » (§0.1). */
     private const ANALYSABLE_THRESHOLD = 30;
 
+    /** Estimation indicative du temps d'extraction par publication (modèle léger). */
+    private const SECONDS_PER_PUBLICATION = 25;
+
     public function __construct(
         private readonly ControversyRepository $controversies,
         private readonly TreeNodeRepository $nodes,
@@ -51,6 +54,9 @@ final class ControversyController
                 'threshold' => self::ANALYSABLE_THRESHOLD,
                 'isAnalysable' => $analysable >= self::ANALYSABLE_THRESHOLD,
                 'analyzedAt' => $node->getAnalyzedAt()?->format(\DateTimeInterface::ATOM),
+                'analysisStartedAt' => $node->getAnalysisStartedAt()?->format(\DateTimeInterface::ATOM),
+                // Estimation indicative pour l'ETA côté UI (s/publi, modèle léger).
+                'secondsPerPublication' => self::SECONDS_PER_PUBLICATION,
             ],
             'controversies' => array_map(
                 fn (Controversy $c): array => $this->serialize($c),

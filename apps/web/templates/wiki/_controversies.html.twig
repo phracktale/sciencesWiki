@@ -76,8 +76,12 @@
         {% endfor %}
     {% endif %}
 {% elseif status == 'analyzing' %}
-    <div class="cv-state" id="cv-progress" data-slug="{{ node.slug }}">
+    <div class="cv-state" id="cv-progress" data-slug="{{ node.slug }}"
+         data-started="{{ analysis.analysisStartedAt|default('') }}"
+         data-count="{{ analysis.analysable|default(0) }}"
+         data-perpub="{{ analysis.secondsPerPublication|default(25) }}">
         <p><span class="loader"></span> <strong>Analyse en cours…</strong></p>
+        <p class="cv-meta" id="cv-chrono" aria-live="polite">Préparation…</p>
         <p class="muted" style="font-size:.9rem">Extraction des assertions puis détection des désaccords. Vous pouvez quitter la page : le résultat est mis en cache pour tous les visiteurs.</p>
     </div>
 {% else %}
@@ -121,6 +125,32 @@
             .catch(function () { setTimeout(poll, 8000); });
     }
     if (progress) { setTimeout(poll, 4000); }
+
+    // Chrono live + durée estimée pendant l'analyse (rafraîchi chaque seconde).
+    if (progress) {
+        var startedRaw = progress.dataset.started || '';
+        var count = parseInt(progress.dataset.count || '0', 10);
+        var perPub = parseInt(progress.dataset.perpub || '25', 10);
+        var chrono = document.getElementById('cv-chrono');
+        var started = startedRaw ? new Date(startedRaw) : null;
+        function fmt(sec) {
+            sec = Math.max(0, Math.round(sec));
+            var m = Math.floor(sec / 60), s = sec % 60;
+            return m > 0 ? (m + ' min ' + (s < 10 ? '0' : '') + s + ' s') : (s + ' s');
+        }
+        function tick() {
+            if (!chrono) { return; }
+            var parts = [];
+            if (started && !isNaN(started.getTime())) {
+                parts.push('Démarrée à ' + started.toLocaleTimeString());
+                parts.push('écoulé ' + fmt((Date.now() - started.getTime()) / 1000));
+            }
+            if (count > 0) { parts.push('durée estimée ~' + fmt(count * perPub) + ' (' + count + ' publis)'); }
+            chrono.textContent = parts.join(' · ') || 'Analyse en cours…';
+        }
+        tick();
+        setInterval(tick, 1000);
+    }
 
     var btn = document.getElementById('cv-analyze-btn');
     if (btn) {
