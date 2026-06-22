@@ -70,7 +70,7 @@
         <div class="node-main">
             {% set editBtn %}
                 {% if current_user.canEdit and node.id %}
-                    <button type="button" class="art-edit-btn" onclick="var e=document.getElementById('art-edit');e.hidden=!e.hidden;if(!e.hidden){e.scrollIntoView({block:'nearest'});}">✏️ {{ node.articleMd ? 'Éditer' : 'Rédiger' }} l'article</button>
+                    <button type="button" class="art-edit-btn" data-toggle="art-edit" data-scroll>✏️ {{ node.articleMd ? 'Éditer' : 'Rédiger' }} l'article</button>
                 {% else %}
                     <a class="art-edit-btn" href="{{ path('login', { back: app.request.uri }) }}">✏️ Proposer une modification</a>
                 {% endif %}
@@ -85,7 +85,7 @@
                             <strong>⚠️ Contenu assisté par IA — non garanti par le comité scientifique.</strong>
                             Cet article a été {{ node.articleModel ? 'rédigé par une intelligence artificielle (' ~ node.articleModel ~ ')' : 'généré automatiquement' }} et peut comporter des imprécisions. Sa fiabilité n'engage pas le comité tant qu'il n'est pas validé.
                             {% if current_user.canEdit %}
-                                <a href="#art-edit" onclick="var e=document.getElementById('art-edit');if(e){e.hidden=false;e.scrollIntoView();}">✏️ Relire et corriger cet article</a>.
+                                <a href="#art-edit" data-show="art-edit" data-scroll>✏️ Relire et corriger cet article</a>.
                             {% else %}
                                 Vous êtes chercheur·e ou contributeur·rice&nbsp;? <a href="{{ path('login', { back: app.request.uri }) }}">Connectez-vous pour le relire et le corriger</a>.
                             {% endif %}
@@ -223,7 +223,7 @@
         </section>
     {% endif %}
 
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         // --- Onglets accessibles (ARIA APG : flèches, Origine/Fin, tabindex mobile) ---
         var tabs = Array.prototype.slice.call(document.querySelectorAll('.qtabs [role="tab"]'));

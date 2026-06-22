@@ -50,7 +50,7 @@
         <div class="rs-card"><span class="rs-soon">à venir</span><h3>⚙️ Profil &amp; e-mails</h3><p class="muted" style="font-size:.88rem">Domaines d'expertise, préférences de réception d'e-mails.</p></div>
     </div>
 
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         var q = document.getElementById('rs-q'), go = document.getElementById('rs-go'),
             results = document.getElementById('rs-results'), countEl = document.getElementById('rs-count'),

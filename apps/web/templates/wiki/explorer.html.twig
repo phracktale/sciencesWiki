@@ -66,7 +66,7 @@
         </aside>
     </div>
 
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         var SLUG = {{ slug|json_encode|raw }};
         var state = { q: '', stemming: true, sort: '', dir: 'asc', page: 1, selected: null, types: [] };

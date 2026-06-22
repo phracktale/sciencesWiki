@@ -38,7 +38,7 @@
         <button type="button" id="cmp" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1.1rem; cursor:pointer; margin-bottom:.6rem">Comparer</button>
         <div id="diff" style="border:1px solid var(--line); border-radius:8px; font-family:ui-monospace,monospace; font-size:.82rem; line-height:1.5; max-height:60vh; overflow:auto"></div>
 
-        <script>
+        <script nonce="{{ csp_nonce.value }}">
         (function () {
             var REV = {{ article.revisions|json_encode|raw }};
             function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }

@@ -12,7 +12,7 @@
     <p id="w-count" class="muted" style="font-size:.85rem"></p>
     <div id="w-results"></div>
 
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         var LEVELS = ['domaine', 'champ', 'sous-domaine', 'sujet'];
         var q = document.getElementById('w-q');

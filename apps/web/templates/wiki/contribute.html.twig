@@ -27,7 +27,7 @@
         <div id="ct-result" style="margin-top:1rem"></div>
     </div>
 
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         var TOKEN = {{ token|json_encode|raw }};
         var stateEl = document.getElementById('ct-state');

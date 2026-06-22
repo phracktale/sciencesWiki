@@ -52,7 +52,7 @@
     <p class="muted" style="font-size:.82rem; margin-top:.6rem">Modèle d'embeddings utilisé : <strong id="emb-model">{{ status.embeddingModel ?? '—' }}</strong>.</p>
 
     <script type="application/json" id="bootstrap">{{ status|json_encode|raw }}</script>
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         var tbody = document.getElementById('jobs');
         if (!tbody) return;

@@ -58,12 +58,12 @@
                 <button type="submit" style="align-self:flex-start; background:var(--accent); color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">💾 Enregistrer l'intitulé</button>
             </form>
             <div style="display:flex; gap:.5rem; margin-top:.6rem">
-                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'regenerate' }) }}" onsubmit="this.querySelector('button').disabled=true; this.querySelector('button').textContent='⏳ Génération…'">
+                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'regenerate' }) }}" data-busy="⏳ Génération…">
                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                     <input type="hidden" name="back" value="{{ answer.id }}">
                     <button type="submit" style="background:#0f172a; color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">🔄 Régénérer la réponse</button>
                 </form>
-                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'delete' }) }}" onsubmit="return confirm('Supprimer définitivement cette question et ses réponses ?')">
+                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'delete' }) }}" data-confirm="Supprimer définitivement cette question et ses réponses ?">
                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                     <button type="submit" style="background:#7f1d1d; color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">🗑 Supprimer</button>
                 </form>
@@ -87,7 +87,7 @@
 
     {% if current_user.canEdit and answer.id %}
         <div style="margin:1rem 0">
-            <button type="button" onclick="var e=document.getElementById('ans-edit');e.hidden=!e.hidden" style="background:#fff;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:.5rem 1rem;cursor:pointer;font:inherit;font-weight:600">✏️ Réviser cette réponse</button>
+            <button type="button" data-toggle="ans-edit" style="background:#fff;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:.5rem 1rem;cursor:pointer;font:inherit;font-weight:600">✏️ Réviser cette réponse</button>
             <div id="ans-edit" hidden style="margin-top:.7rem; border:1px solid var(--line); border-radius:10px; padding:1rem; background:#fafafa">
                 <form method="post" action="{{ path('answer_edit', { id: answer.id }) }}">
                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">

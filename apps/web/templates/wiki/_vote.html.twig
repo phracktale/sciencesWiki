@@ -26,7 +26,7 @@
         .vote-no.on { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
         .vote-appr { font-size:.82rem; }
     </style>
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         if (window.__voteWired) return; window.__voteWired = true;
         function pct(d){

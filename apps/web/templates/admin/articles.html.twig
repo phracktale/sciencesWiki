@@ -121,7 +121,7 @@
         </p>
     {% endif %}
 
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
         (function () {
             var input = document.getElementById('journal-input');
             var idField = document.getElementById('journal-id');

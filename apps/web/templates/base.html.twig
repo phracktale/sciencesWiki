@@ -6,7 +6,7 @@
     <title>{% block title %}SciencesWiki{% endblock %}</title>
     <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée à des publications de recherche.{% endblock %}">
     {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}
-    <script src="/js/turbo.min.js" defer></script>
+    <script nonce="{{ csp_nonce.value }}" src="/js/turbo.min.js" defer></script>
     <style>
         :root {
             --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937;
@@ -157,10 +157,36 @@
     </style>
 
     {# Mesure d'audience respectueuse de la vie privée (Plausible auto-hébergé : sans cookies, sans données personnelles, RGPD-friendly). #}
-    <script async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
-    <script>
+    <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
+    <script nonce="{{ csp_nonce.value }}">
         window.plausible = window.plausible || function () { (plausible.q = plausible.q || []).push(arguments) }, plausible.init = plausible.init || function (i) { plausible.o = i || {} };
         plausible.init()
+    </script>
+
+    {# Comportements génériques pilotés par attributs data-* (CSP : remplace les
+       handlers inline on*=). data-confirm (submit), data-busy (désactive+texte au submit),
+       data-needs-email="0" (alerte si pas d'e-mail), data-toggle / data-show (+data-scroll). #}
+    <script nonce="{{ csp_nonce.value }}">
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            var cf = form.closest ? form.closest('[data-confirm]') : null;
+            if (cf && !window.confirm(cf.getAttribute('data-confirm'))) { e.preventDefault(); return; }
+            var ne = form.closest ? form.closest('[data-needs-email="0"]') : null;
+            if (ne) { window.alert("Cette demande n'a pas d'e-mail."); e.preventDefault(); return; }
+            var bf = form.closest ? form.closest('[data-busy]') : null;
+            if (bf) { var btn = bf.querySelector('button[type="submit"], button:not([type])'); if (btn) { btn.disabled = true; var t = bf.getAttribute('data-busy'); if (t) btn.textContent = t; } }
+        });
+        document.addEventListener('click', function (e) {
+            var tg = e.target.closest ? e.target.closest('[data-toggle],[data-show]') : null;
+            if (!tg) return;
+            var id = tg.getAttribute('data-toggle') || tg.getAttribute('data-show');
+            var el = document.getElementById(id);
+            if (el) {
+                el.hidden = tg.hasAttribute('data-show') ? false : !el.hidden;
+                if (!el.hidden && tg.hasAttribute('data-scroll')) el.scrollIntoView({ block: 'nearest' });
+            }
+            if (tg.tagName === 'A') e.preventDefault();
+        });
     </script>
 </head>
 <body>
@@ -215,7 +241,7 @@
             </span>
             <a href="{{ path('admin_logout') }}" style="color:#fca5a5; margin-left:.4rem">quitter</a>
         </div>
-        <script>
+        <script nonce="{{ csp_nonce.value }}">
         (function () {
             var txt = document.getElementById('ab-text'), bar = document.getElementById('ab-bar'), load = document.getElementById('ab-load');
             if (!txt) return;

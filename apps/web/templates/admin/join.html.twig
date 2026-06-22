@@ -46,7 +46,7 @@
                         {% if r.status == 'pending' %}
                             <div style="display:flex; gap:.4rem; align-items:flex-start; flex-wrap:wrap">
                                 <form method="post" action="{{ path('admin_join_op', { id: r.id, op: 'promote' }) }}" style="display:flex; gap:.3rem; align-items:center"
-                                      onsubmit="return {{ r.email ? 'true' : 'false' }} || (alert('Cette demande n\\'a pas d\\'e-mail.'), false)">
+                                      data-needs-email="{{ r.email ? '1' : '0' }}">
                                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                                     <select name="role" style="padding:.35rem; border:1px solid #d1d5db; border-radius:7px; font:inherit">
                                         {% for role in data.availableRoles %}
@@ -55,7 +55,7 @@
                                     </select>
                                     <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:7px; padding:.35rem .8rem; cursor:pointer">✅ Promouvoir</button>
                                 </form>
-                                <form method="post" action="{{ path('admin_join_op', { id: r.id, op: 'reject' }) }}" onsubmit="return confirm('Rejeter cette demande ?')">
+                                <form method="post" action="{{ path('admin_join_op', { id: r.id, op: 'reject' }) }}" data-confirm="Rejeter cette demande ?">
                                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                                     <button type="submit" style="background:#7f1d1d; color:#fff; border:0; border-radius:7px; padding:.35rem .8rem; cursor:pointer">Rejeter</button>
                                 </form>

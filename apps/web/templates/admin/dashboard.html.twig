@@ -57,7 +57,7 @@
             </div>
             {% if tf|length %}<span class="badge">Filtré&nbsp;: <strong>{{ tf|join(', ') }}</strong></span>{% endif %}
         </form>
-        <script>
+        <script nonce="{{ csp_nonce.value }}">
         (function () {
             document.querySelectorAll('.grp-all').forEach(function (master) {
                 var boxes = document.querySelectorAll('input.' + master.getAttribute('data-grp'));
@@ -216,7 +216,7 @@
         </div>
     </section>
 
-    <script>
+    <script nonce="{{ csp_nonce.value }}">
     (function () {
         // Onglets (mémorise l'onglet actif dans l'URL #hash).
         var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs button'));
