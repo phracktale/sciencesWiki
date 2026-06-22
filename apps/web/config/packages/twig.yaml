@@ -5,7 +5,7 @@ twig:
         admin_session: '@App\Service\AdminApiClient'
         current_user: '@App\Service\UserApiClient'
         # Tag de version affiché en pied de page. À BUMPER à chaque livraison.
-        app_version: 'v0.43 · réponses : modèle rédacteur + temps de génération figés ; bouton de validation comité rétabli (2026-06-22)'
+        app_version: 'v0.44 · mesure d audience Plausible (auto-hébergée, sans cookies) (2026-06-22)'
 
 when@test:
     twig:
