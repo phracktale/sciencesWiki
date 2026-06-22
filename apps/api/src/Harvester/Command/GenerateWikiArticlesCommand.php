@@ -50,6 +50,7 @@ final class GenerateWikiArticlesCommand extends Command
         $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Nombre d’articles à générer', '3');
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Régénère même les nœuds ayant déjà un article');
         $this->addOption('slug', null, InputOption::VALUE_REQUIRED, 'Cible un nœud précis (par slug)');
+        $this->addOption('max-level', null, InputOption::VALUE_REQUIRED, 'Limite aux nœuds de niveau ≤ N (0=domaines…)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -62,9 +63,17 @@ final class GenerateWikiArticlesCommand extends Command
             $node = $this->nodes->findOneBy(['slug' => $slug]);
             $targets = null !== $node ? [$node] : [];
         } else {
-            $criteria = $input->getOption('force') ? [] : ['articleMd' => null];
             // Domaines d'abord (niveau bas), puis on descend.
-            $targets = $this->nodes->findBy($criteria, ['level' => 'ASC', 'id' => 'ASC'], $limit);
+            $qb = $this->nodes->createQueryBuilder('n')
+                ->orderBy('n.level', 'ASC')->addOrderBy('n.id', 'ASC')
+                ->setMaxResults($limit);
+            if (!$input->getOption('force')) {
+                $qb->andWhere('n.articleMd IS NULL');
+            }
+            if (null !== ($ml = $input->getOption('max-level'))) {
+                $qb->andWhere('n.level <= :ml')->setParameter('ml', (int) $ml);
+            }
+            $targets = $qb->getQuery()->getResult();
         }
 
         if ([] === $targets) {
