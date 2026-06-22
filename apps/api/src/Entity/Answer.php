@@ -83,6 +83,7 @@ class Answer
     private ?User $validatedBy = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[Groups(['answer:read'])]
     private \DateTimeImmutable $createdAt;
 
     /** @var Collection<int,AnswerRevision> */
