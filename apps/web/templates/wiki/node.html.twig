@@ -39,8 +39,10 @@
         .qa-summary::after { content:'▸'; position:absolute; right:1rem; color:var(--accent); transition:transform .15s; }
         .qa-item[open] .qa-summary::after { transform:rotate(90deg); }
         .qa-summary { position:relative; }
-        .qa-q { font-weight:700; font-size:1.02rem; color:var(--ink); padding-right:1.5rem; }
+        .qa-q { margin:0; font-weight:700; font-size:1.05rem; line-height:1.35; color:var(--ink); padding-right:1.5rem; }
         .qa-answer { padding:.2rem 1rem 1rem; border-top:1px dashed var(--line); }
+        .qa-title { font-size:1.05rem; margin:.6rem 0 .4rem; color:var(--accent-dark); }
+        .qa-warn { border:1px solid #fcd34d; background:#fffbeb; color:#92400e; border-radius:8px; padding:.55rem .8rem; margin:1rem 0 .2rem; font-size:.85rem; }
         @media (prefers-reduced-motion: reduce){ .qa-summary::after { transition:none; } }
     </style>
 
@@ -149,7 +151,7 @@
             {% for a in answers %}
                 <details name="qa-acc" class="qa-item">
                     <summary class="qa-summary">
-                        <span class="qa-q">{{ a.title }}</span>
+                        <h2 class="qa-q">{{ a.questionText }}</h2>
                         <span class="qmeta">
                             <span class="pill author">✍️ {{ a.askerName }}</span>
                             {% if a.createdAt %}<time datetime="{{ a.createdAt }}">{{ a.createdAt|date('d/m/Y') }}</time>{% endif %}
@@ -157,6 +159,7 @@
                         </span>
                     </summary>
                     <div class="qa-answer">
+                        {% if a.title != a.questionText %}<h3 class="qa-title">{{ a.title }}</h3>{% endif %}
                         {% if a.vulgarizationContent %}<div class="md">{{ a.vulgarizationContent|md }}</div>{% endif %}
                         {% if a.academicContent %}<h3 style="font-size:1.05rem; margin-top:1rem">Faits établis (sourcés)</h3><div class="md">{{ a.academicContent|md }}</div>{% endif %}
                         {% if a.sources is not empty %}
@@ -171,6 +174,9 @@
                                 {% endfor %}
                             </ol>
                         {% endif %}
+                        <div class="qa-warn">
+                            ⚠️ <strong>Réponse générée par IA</strong> à partir des sources citées{% if a.validationStatus != 'valide' %}, <strong>non encore relue</strong> par le comité scientifique{% endif %} — elle peut comporter des imprécisions.
+                        </div>
                         <p style="margin-top:.6rem"><a href="{{ path('answer', { id: a.id }) }}">Ouvrir la page dédiée ↗</a></p>
                     </div>
                 </details>
