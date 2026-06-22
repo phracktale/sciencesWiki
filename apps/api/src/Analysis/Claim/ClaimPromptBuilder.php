@@ -22,8 +22,13 @@ final class ClaimPromptBuilder
         Règles :
         - N'invente RIEN. Si une information est absente, mets null.
         - Une entrée par couple (exposition, résultat) effectivement étudié.
+        - "exposure" et "outcome" : libellés COURTS (1 à 5 mots), en ANGLAIS, le
+          nom canonique du facteur et du résultat — PAS une phrase, PAS de méthode
+          ni de détail, et JAMAIS deux langues mélangées (ex. "vitamin D",
+          "bone fractures" ; pas "utilisation de vitamine D running supplementation").
         - "direction" décrit le signe du résultat RAPPORTÉ par les auteurs, pas ton avis.
-        - "quote" doit être une phrase EXACTE de l'article justifiant l'entrée.
+        - "quote" doit être une phrase EXACTE de l'article (verbatim, langue d'origine)
+          justifiant l'entrée.
         - Réponds UNIQUEMENT par le JSON, sans texte autour, sans bloc de code.
 
         Schéma de chaque entrée :

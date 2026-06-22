@@ -29,6 +29,15 @@
                     </select>
                 {% else %}<input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">{% endif %}
             </div>
+            <div>
+                <label>3 — Tâches légères (extraction…)</label>
+                {% if models.models is not empty %}
+                    <select name="light_model">
+                        {% for m in models.models %}<option value="{{ m }}" {{ settings['ai.light_model'] == m ? 'selected' }}>{{ m }}</option>{% endfor %}
+                    </select>
+                {% else %}<input type="text" name="light_model" value="{{ settings['ai.light_model'] }}" placeholder="ex. llama3.1:8b">{% endif %}
+                <span class="muted" style="font-size:.78rem; display:block">Petit modèle rapide pour les tâches peu exigeantes (extraction de claims).</span>
+            </div>
         </div>
 
         <h2 style="margin-top:1.4rem">Configuration de la génération (Q/R)</h2>

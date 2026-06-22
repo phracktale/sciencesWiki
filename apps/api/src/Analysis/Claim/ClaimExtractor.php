@@ -8,6 +8,7 @@ use App\Ai\Llm\LlmClient;
 use App\Entity\Claim;
 use App\Entity\Publication;
 use App\Entity\TreeNode;
+use App\Harvester\Ai\EmbeddingClient;
 use App\Harvester\Ai\EmbeddingClientFactory;
 use App\Repository\ClaimRepository;
 use App\Repository\PublicationRepository;
@@ -80,7 +81,8 @@ final class ClaimExtractor
             return 0;
         }
 
-        $model = $this->settings->model() ?? $this->llm->model();
+        // Extraction = tâche peu exigeante → modèle léger configuré (back-office).
+        $model = $this->settings->lightModel();
         $haystack = $this->normalizeText(
             $publication->getTitle().' '
             .($publication->getAbstract() ?? '').' '
@@ -109,10 +111,7 @@ final class ClaimExtractor
     private function complete(Publication $publication): ?array
     {
         $messages = $this->promptBuilder->build($publication, $this->conclusion($publication));
-        $opts = ['temperature' => 0.0, 'max_tokens' => 1500];
-        if (null !== ($m = $this->settings->model())) {
-            $opts['model'] = $m;
-        }
+        $opts = ['temperature' => 0.0, 'max_tokens' => 1500, 'model' => $this->settings->lightModel()];
 
         $parsed = $this->parser->parse($this->llm->complete($messages, $opts)->content);
         if (null === $parsed) {
@@ -126,6 +125,14 @@ final class ClaimExtractor
     {
         $exposureNorm = $this->normalizeKey($entry->exposure);
         $outcomeNorm = $this->normalizeKey($entry->outcome);
+
+        // Garde-fou : un vecteur de dimension inattendue ferait échouer l'insert
+        // pgvector vector(384) et fermerait l'EntityManager. Mieux vaut un claim
+        // sans embedding (le regroupement exact par norm fonctionne quand même).
+        $embedding = $this->embeddingFactory->create()->embed($entry->exposure.' → '.$entry->outcome);
+        if (EmbeddingClient::DIMENSIONS !== \count($embedding)) {
+            $embedding = null;
+        }
 
         $claim = (new Claim($publication, $model))
             ->setTreeNode($node)
@@ -142,7 +149,7 @@ final class ClaimExtractor
             ->setStatedLimitations($entry->statedLimitations)
             ->setFutureWork($entry->futureWork)
             ->setQuote($entry->quote)
-            ->setEmbedding($this->embeddingFactory->create()->embed($entry->exposure.' → '.$entry->outcome));
+            ->setEmbedding($embedding);
 
         $claim->setRaw([
             'exposure' => $entry->exposure,

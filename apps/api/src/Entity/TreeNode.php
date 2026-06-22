@@ -112,6 +112,11 @@ class TreeNode
     #[Groups(['node:read'])]
     private ?\DateTimeImmutable $analyzedAt = null;
 
+    /** Début du job d'analyse en cours (pour le chrono/ETA affiché côté UI). */
+    #[ORM\Column(name: 'analysis_started_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $analysisStartedAt = null;
+
     /** Article encyclopédique long (Markdown), rédigé par IA puis relu. */
     #[ORM\Column(name: 'article_md', type: Types::TEXT, nullable: true)]
     #[Groups(['node:item'])]
@@ -426,6 +431,19 @@ class TreeNode
     public function getAnalyzedAt(): ?\DateTimeImmutable
     {
         return $this->analyzedAt;
+    }
+
+    public function getAnalysisStartedAt(): ?\DateTimeImmutable
+    {
+        return $this->analysisStartedAt;
+    }
+
+    /** Début d'un job d'analyse : horodate le départ (chrono/ETA UI). */
+    public function markAnalysisStarted(): self
+    {
+        $this->analysisStartedAt = new \DateTimeImmutable();
+
+        return $this;
     }
 
     /** Fin d'une analyse réussie : passe le nœud à Ready et horodate. */

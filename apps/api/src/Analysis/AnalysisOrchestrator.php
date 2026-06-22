@@ -9,6 +9,7 @@ use App\Analysis\Controversy\ControversyDetector;
 use App\Entity\TreeNode;
 use App\Enum\AnalysisStatus;
 use Doctrine\ORM\EntityManagerInterface;
+use Doctrine\Persistence\ManagerRegistry;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
@@ -30,6 +31,7 @@ final class AnalysisOrchestrator
         private readonly ClaimExtractor $extractor,
         private readonly ControversyDetector $controversyDetector,
         private readonly EntityManagerInterface $em,
+        private readonly ManagerRegistry $registry,
         ?LoggerInterface $logger = null,
     ) {
         $this->logger = $logger ?? new NullLogger();
@@ -41,7 +43,9 @@ final class AnalysisOrchestrator
             throw new \RuntimeException(\sprintf('Une analyse est déjà en cours pour le nœud « %s ».', $node->getSlug()));
         }
 
+        $nodeId = (int) $node->getId();
         $node->setAnalysisStatus(AnalysisStatus::Analyzing);
+        $node->markAnalysisStarted();
         $this->em->flush();
         $this->logger->info('Analyse démarrée', ['node' => $node->getSlug()]);
 
@@ -66,12 +70,36 @@ final class AnalysisOrchestrator
                 controversies: \count($controversies),
             );
         } catch (\Throwable $e) {
-            // On relâche le verrou pour permettre une nouvelle tentative.
-            $node->setAnalysisStatus(AnalysisStatus::NotAnalyzed);
-            $this->em->flush();
-            $this->logger->error('Analyse échouée', ['node' => $node->getSlug(), 'error' => $e->getMessage()]);
+            // On journalise l'ERREUR RÉELLE (avec sa trace) AVANT toute autre
+            // opération DB, pour ne pas la masquer si l'EntityManager est fermé.
+            $this->logger->error('Analyse échouée', ['node' => $node->getSlug(), 'exception' => $e]);
+            $this->releaseLock($nodeId);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Relâche le verrou (repasse le nœud à NotAnalyzed) de façon robuste, même si
+     * l'EntityManager a été fermé par l'exception (flush DBAL en échec ⇒ EM clos) :
+     * on réinitialise alors le manager pour disposer d'une connexion saine.
+     */
+    private function releaseLock(int $nodeId): void
+    {
+        try {
+            $em = $this->em;
+            if (!$em->isOpen()) {
+                $this->registry->resetManager();
+                $em = $this->registry->getManager();
+            }
+            $node = $em->find(TreeNode::class, $nodeId);
+            if ($node instanceof TreeNode) {
+                $node->setAnalysisStatus(AnalysisStatus::NotAnalyzed);
+                $em->flush();
+            }
+        } catch (\Throwable $e) {
+            // Dernier recours : on ne laisse pas l'échec de reset masquer l'origine.
+            $this->logger->error('Échec du relâchement du verrou d\'analyse', ['node' => $nodeId, 'error' => $e->getMessage()]);
         }
     }
 }

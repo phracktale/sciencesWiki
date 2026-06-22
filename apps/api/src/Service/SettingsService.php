@@ -23,6 +23,13 @@ final class SettingsService
     /** Modèle dédié à la rédaction des articles encyclopédiques (distinct des Q/R). */
     public const WIKI_MODEL = 'wiki.model';
 
+    /**
+     * Modèle « léger » pour les tâches peu exigeantes en raisonnement (extraction
+     * de claims structurés, etc.) — rapide et bon marché, distinct des modèles de
+     * rédaction. Cf. docs/spec-controverses-lacunes.md §5.
+     */
+    public const LIGHT_MODEL = 'ai.light_model';
+
     // Limites d'interrogation de l'API OpenAlex (adaptables au plan/au polite pool).
     public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
     public const OPENALEX_PER_DAY = 'openalex.per_day';
@@ -97,6 +104,8 @@ final class SettingsService
         self::RAG_NEIGHBORS => '6',
         // Articles wiki : modèle le plus capable disponible localement par défaut.
         self::WIKI_MODEL => 'qwen3.6:latest',
+        // Tâches légères (extraction de claims…) : petit modèle rapide par défaut.
+        self::LIGHT_MODEL => 'llama3.1:8b',
         // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
@@ -158,6 +167,14 @@ final class SettingsService
         $v = trim((string) ($this->get(self::WIKI_MODEL) ?? ''));
 
         return '' !== $v ? $v : self::DEFAULTS[self::WIKI_MODEL];
+    }
+
+    /** Modèle léger pour les tâches peu exigeantes (extraction…), défaut rapide. */
+    public function lightModel(): string
+    {
+        $v = trim((string) ($this->get(self::LIGHT_MODEL) ?? ''));
+
+        return '' !== $v ? $v : self::DEFAULTS[self::LIGHT_MODEL];
     }
 
     /** Nombre maximal de requêtes OpenAlex par minute (≥ 1). */
@@ -232,6 +249,7 @@ final class SettingsService
             self::RAG_NEIGHBORS => (string) $this->neighbors(),
             self::RAG_MODEL => (string) ($this->model() ?? ''),
             self::WIKI_MODEL => $this->wikiModel(),
+            self::LIGHT_MODEL => $this->lightModel(),
             self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
             self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
             self::HARVEST_SORT => $this->harvestSort(),
@@ -247,7 +265,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

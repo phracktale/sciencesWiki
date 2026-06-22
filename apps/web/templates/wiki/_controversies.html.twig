@@ -16,14 +16,19 @@
     .cv-gauge { height:.7rem; border-radius:999px; background:linear-gradient(90deg,#dc2626,#f59e0b,#16a34a); position:relative; margin:.4rem 0 .2rem; }
     .cv-gauge > i { position:absolute; top:-3px; width:3px; height:calc(.7rem + 6px); background:#0f172a; border-radius:2px; }
     .cv-axis { display:inline-block; font-size:.78rem; font-weight:700; padding:.12rem .55rem; border-radius:999px; background:#eef2ff; color:#3730a3; }
-    .cv-camps { display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin:.8rem 0; }
-    .cv-camp { border:1px solid var(--line); border-radius:9px; padding:.5rem .6rem; text-align:center; }
-    .cv-camp b { display:block; font-size:1.4rem; }
-    .cv-camp.pos { background:#f0fdf4; } .cv-camp.neg { background:#fef2f2; } .cv-camp.nul { background:#f8fafc; }
     .cv-summary { border-left:3px solid var(--accent); padding:.2rem 0 .2rem .8rem; margin:.6rem 0; color:#334155; }
-    .cv-sources { font-size:.85rem; margin:.4rem 0 0; padding-left:1.1rem; }
-    .cv-sources li { margin:.25rem 0; }
     .cv-meta { font-size:.82rem; color:#64748b; }
+    .cv-stances { display:grid; grid-template-columns:1fr 1fr; gap:.8rem; margin:.9rem 0 .3rem; }
+    @media (max-width:680px){ .cv-stances { grid-template-columns:1fr; } }
+    .cv-stance { border:1px solid var(--line); border-radius:10px; padding:.6rem .75rem; }
+    .cv-stance.pos { background:#f0fdf4; border-color:#bbf7d0; }
+    .cv-stance.neg { background:#fef2f2; border-color:#fecaca; }
+    .cv-stance.nul { background:#f8fafc; }
+    .cv-stance h4 { margin:.1rem 0 .5rem; font-size:.92rem; }
+    .cv-claim { margin:.5rem 0; padding:0; }
+    .cv-claim blockquote { margin:0 0 .2rem; padding:.35rem .6rem; background:rgba(255,255,255,.7); border-left:3px solid #94a3b8; border-radius:4px; font-style:italic; font-size:.9rem; color:#1e293b; }
+    .cv-claim figcaption { font-size:.82rem; color:#475569; }
+    .cv-claim-meta { display:block; color:#64748b; font-size:.78rem; margin-top:.1rem; }
 </style>
 
 {% if status == 'ready' %}
@@ -31,34 +36,42 @@
         <p class="muted">Aucune controverse détectée : sur ce sujet, les études convergent (ou trop peu d'assertions opposées ont été extraites).</p>
     {% else %}
         <p class="muted" style="font-size:.9rem">{{ controversies|length }} relation(s) au résultat disputé. Les plus contestées d'abord. Chaque affirmation est ancrée à une publication ; ce panneau n'est pas garanti par le comité.</p>
+        {% set camps = {
+            'positive': {'label': 'En faveur', 'cls': 'pos', 'icon': '✅'},
+            'negative': {'label': 'En défaveur', 'cls': 'neg', 'icon': '❌'},
+            'null': {'label': 'Sans effet', 'cls': 'nul', 'icon': '⚪'}
+        } %}
         {% for c in controversies %}
             {% set pct = (c.consensusScore * 100)|round %}
             <article class="cv-card">
                 <h3>{{ c.exposure }} <span class="muted">vs</span> {{ c.outcome }}</h3>
-                <div class="cv-meta">Consensus {{ pct }}% · <span class="cv-axis">axe : {{ c.disagreementAxis }}</span></div>
+                <div class="cv-meta">Consensus {{ pct }}% · <span class="cv-axis">axe : {{ c.disagreementAxis }}</span> · {{ c.claims|length }} étude(s)</div>
                 <div class="cv-gauge" role="img" aria-label="Score de consensus {{ pct }}%"><i style="left:{{ pct }}%"></i></div>
-                <div class="cv-camps">
-                    <div class="cv-camp pos"><b>{{ c.countPositive }}</b>en faveur</div>
-                    <div class="cv-camp neg"><b>{{ c.countNegative }}</b>en défaveur</div>
-                    <div class="cv-camp nul"><b>{{ c.countNull }}</b>sans effet</div>
-                </div>
                 {% if c.summary %}<p class="cv-summary">{{ c.summary }}</p>{% endif %}
-                {% if c.claims is not empty %}
-                    <details>
-                        <summary style="cursor:pointer; font-weight:600">Sources ({{ c.claims|length }})</summary>
-                        <ol class="cv-sources">
-                            {% for cl in c.claims %}
-                                <li>
-                                    <strong>{{ cl.direction }}</strong>{% if cl.method %} · {{ cl.method }}{% endif %}{% if cl.population %} · {{ cl.population }}{% endif %}{% if cl.effectSize %} · {{ cl.effectSize }}{% endif %}
-                                    {% if cl.oaUrl %}— <a href="{{ cl.oaUrl }}" rel="noopener" target="_blank">{{ cl.title }}</a>
-                                    {% elseif cl.doi %}— <a href="https://doi.org/{{ cl.doi }}" rel="noopener" target="_blank">{{ cl.title }}</a>
-                                    {% else %}— {{ cl.title }}{% endif %}
-                                    {% if cl.year %}<span class="muted">({{ cl.year }})</span>{% endif %}
-                                </li>
-                            {% endfor %}
-                        </ol>
-                    </details>
-                {% endif %}
+
+                {# Camps face à face : chaque assertion en désaccord, citée verbatim, avec sa source. #}
+                <div class="cv-stances">
+                    {% for dir, meta in camps %}
+                        {% set group = c.claims|filter(cl => cl.direction == dir) %}
+                        {% if group is not empty %}
+                            <div class="cv-stance {{ meta.cls }}">
+                                <h4>{{ meta.icon }} {{ meta.label }} <span class="muted">({{ group|length }})</span></h4>
+                                {% for cl in group %}
+                                    <figure class="cv-claim">
+                                        {% if cl.quote %}<blockquote>« {{ cl.quote }} »</blockquote>{% endif %}
+                                        <figcaption>
+                                            — {% if cl.oaUrl %}<a href="{{ cl.oaUrl }}" rel="noopener" target="_blank">{{ cl.title }}</a>
+                                            {%- elseif cl.doi %}<a href="https://doi.org/{{ cl.doi }}" rel="noopener" target="_blank">{{ cl.title }}</a>
+                                            {%- else %}{{ cl.title }}{% endif %}{% if cl.year %} ({{ cl.year }}){% endif %}
+                                            {% set details = [cl.method, cl.population, cl.effectSize]|filter(v => v) %}
+                                            {% if details is not empty %}<span class="cv-claim-meta">{{ details|join(' · ') }}</span>{% endif %}
+                                        </figcaption>
+                                    </figure>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                </div>
             </article>
         {% endfor %}
     {% endif %}

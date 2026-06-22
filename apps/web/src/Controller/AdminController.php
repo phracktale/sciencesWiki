@@ -94,6 +94,7 @@ final class AdminController extends AbstractController
             'rag.neighbors' => (string) $r->request->get('neighbors'),
             'rag.model' => (string) $r->request->get('model'),
             'wiki.model' => (string) $r->request->get('wiki_model'),
+            'ai.light_model' => (string) $r->request->get('light_model'),
         ], withModels: true);
     }
 
