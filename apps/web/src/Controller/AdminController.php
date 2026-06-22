@@ -22,6 +22,7 @@ final class AdminController extends AbstractController
     public function __construct(
         private readonly ApiClient $api,
         private readonly AdminApiClient $admin,
+        private readonly \App\Service\UserApiClient $user,
         private readonly \App\Service\AdminCsrf $csrf,
         private readonly \Symfony\Contracts\HttpClient\HttpClientInterface $httpClient,
     ) {
@@ -36,11 +37,14 @@ final class AdminController extends AbstractController
 
                 return $this->redirectToRoute('admin_login');
             }
-            $ok = $this->admin->login(
-                (string) $request->request->get('email'),
-                (string) $request->request->get('password'),
-            );
+            $email = (string) $request->request->get('email');
+            $password = (string) $request->request->get('password');
+            $ok = $this->admin->login($email, $password);
             if ($ok) {
+                // Pose aussi la session front (user_jwt + /api/me) → état de connexion
+                // cohérent entre back-office et front (plus de « déconnexion » apparente).
+                $this->user->login($email, $password);
+
                 return $this->redirectToRoute('admin_dashboard');
             }
             $this->addFlash('error', 'Identifiants invalides ou compte non administrateur.');
@@ -53,6 +57,7 @@ final class AdminController extends AbstractController
     public function logout(): Response
     {
         $this->admin->logout();
+        $this->user->logout();
 
         return $this->redirectToRoute('admin_login');
     }
