@@ -126,8 +126,10 @@ services:
     # Plusieurs workers EN PARALLÈLE : plusieurs rubriques moissonnées à la fois
     # (l'insertion d'auteur est sûre en concurrence via upsert ORCID). Persistant —
     # `docker compose up` relance ce nombre sans avoir à repasser --scale.
+    # Relevé à 6 : OpenAlex est sous-exploité (~0,35 req/s pour 10 req/s permis) ;
+    # le débit est borné par le traitement DB → plus de workers = plus d'insertions.
     deploy:
-      replicas: 3
+      replicas: 6
 
   # Pool dédié à l'ingestion du TEXTE INTÉGRAL (PDF éditeur → GROBID → vecteurs),
   # en parallèle, sans bloquer la moisson. Débit ≈ replicas × ~1 article/~20 s.
