@@ -28,6 +28,10 @@ class LiteratureReview
     #[ORM\Column(length: 300)]
     private string $topic;
 
+    /** Rubrique détectée (nœud de l'arbre le plus proche), surtitre du document. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $rubric = null;
+
     #[ORM\Column(type: Types::TEXT)]
     private string $contentMd;
 
@@ -41,12 +45,13 @@ class LiteratureReview
     /**
      * @param array<int,array<string,mixed>> $sources
      */
-    public function __construct(User $user, string $topic, string $contentMd, array $sources)
+    public function __construct(User $user, string $topic, string $contentMd, array $sources, ?string $rubric = null)
     {
         $this->user = $user;
         $this->topic = mb_substr(trim($topic), 0, 300);
         $this->contentMd = $contentMd;
         $this->sources = $sources;
+        $this->rubric = null !== $rubric && '' !== trim($rubric) ? mb_substr(trim($rubric), 0, 255) : null;
         $this->createdAt = new \DateTimeImmutable();
     }
 
@@ -63,6 +68,11 @@ class LiteratureReview
     public function getTopic(): string
     {
         return $this->topic;
+    }
+
+    public function getRubric(): ?string
+    {
+        return $this->rubric;
     }
 
     public function getContentMd(): string

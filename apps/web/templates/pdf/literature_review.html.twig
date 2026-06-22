@@ -1,8 +1,9 @@
 {% extends 'pdf/_base.html.twig' %}
 
 {% block content %}
-    <h1>Revue de littérature</h1>
-    <div class="meta"><strong>Sujet :</strong> {{ topic }}</div>
+    {% if rubric is defined and rubric %}<div class="surtitle">{{ rubric }}</div>{% endif %}
+    <h1>{{ topic }}</h1>
+    <div class="meta">Revue de littérature</div>
 
     <div class="review">{{ markdown|md }}</div>
 

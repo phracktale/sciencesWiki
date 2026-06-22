@@ -54,6 +54,7 @@ final class LiteratureReviewController
     public function __construct(
         private readonly EmbeddingClientFactory $embeddingFactory,
         private readonly PublicationRepository $publications,
+        private readonly \App\Repository\TreeNodeRepository $nodes,
         private readonly LlmClientFactory $llmFactory,
         private readonly SettingsService $settings,
     ) {
@@ -89,7 +90,13 @@ final class LiteratureReviewController
                     return;
                 }
 
-                $send(['sources' => $this->sourcesPayload($sources)]);
+                // Rubrique détectée : nœud de l'arbre le plus proche du sujet.
+                $rubric = null;
+                $nearest = $this->nodes->nearestTo($embedding, 1);
+                if ([] !== $nearest) {
+                    $rubric = $nearest[0]['node']->getLabel();
+                }
+                $send(['rubric' => $rubric, 'sources' => $this->sourcesPayload($sources)]);
 
                 // Plafond raisonnable : une revue tient en ~2500 tokens ; éviter un
                 // num_predict démesuré (génération de plusieurs minutes + file Ollama).

@@ -54,7 +54,7 @@
             statusEl = document.getElementById('lr-status'), live = document.getElementById('lr-live'),
             review = document.getElementById('lr-review'), aside = document.getElementById('lr-aside'),
             biblio = document.getElementById('lr-biblio'), actions = document.getElementById('lr-actions');
-        var es = null, full = '', sources = [], topic = '';
+        var es = null, full = '', sources = [], topic = '', rubric = '';
 
         function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
         function inline(t){
@@ -101,13 +101,13 @@
             var term = q.value.trim();
             if (term.length < 3) { statusEl.textContent = 'Indiquez un sujet (3 caractères minimum).'; return; }
             if (es) es.close();
-            topic = term; full = ''; sources = [];
+            topic = term; full = ''; sources = []; rubric = '';
             live.textContent = ''; review.innerHTML = ''; biblio.innerHTML = ''; aside.hidden = true; actions.hidden = true;
             go.disabled = true; statusEl.textContent = 'Recherche des sources et rédaction…';
             es = new EventSource('/api/literature-review/stream?q=' + encodeURIComponent(term));
             es.onmessage = function (ev) {
                 var d; try { d = JSON.parse(ev.data); } catch (e) { return; }
-                if (d.sources) { sources = d.sources; renderBiblio(); statusEl.textContent = sources.length + ' sources analysées — rédaction…'; return; }
+                if (d.sources) { sources = d.sources; rubric = d.rubric || ''; renderBiblio(); statusEl.textContent = (rubric ? 'Rubrique : ' + rubric + ' · ' : '') + sources.length + ' sources analysées — rédaction…'; return; }
                 if (d.delta) { full += d.delta; live.textContent = full; return; }
                 if (d.nosource) { statusEl.textContent = d.message; go.disabled = false; es.close(); return; }
                 if (d.error) { statusEl.textContent = d.message || 'Erreur.'; go.disabled = false; es.close(); return; }
@@ -126,7 +126,7 @@
             var btn = document.getElementById('lr-save'); btn.disabled = true;
             var body = new URLSearchParams();
             body.set('topic', topic); body.set('markdown', full);
-            body.set('sources', JSON.stringify(sources));
+            body.set('sources', JSON.stringify(sources)); body.set('rubric', rubric);
             body.set('_csrf', document.getElementById('lr-csrf').value);
             fetch('{{ path('literature_review_save') }}', {
                 method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -140,7 +140,7 @@
             var btn = document.getElementById('lr-pdf'); btn.disabled = true;
             var body = new URLSearchParams();
             body.set('topic', topic); body.set('markdown', full);
-            body.set('sources', JSON.stringify(sources));
+            body.set('sources', JSON.stringify(sources)); body.set('rubric', rubric);
             body.set('_csrf', document.getElementById('lr-csrf').value);
             fetch('{{ path('literature_review_pdf') }}', {
                 method: 'POST',

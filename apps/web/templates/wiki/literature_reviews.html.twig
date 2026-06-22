@@ -23,6 +23,7 @@
         {% for r in reviews %}
             <div class="rev-item">
                 <div>
+                    {% if r.rubric %}<div class="muted" style="font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:var(--accent); font-weight:700">{{ r.rubric }}</div>{% endif %}
                     <h3>{{ r.topic }}</h3>
                     <div class="muted" style="font-size:.85rem">{{ r.createdAt|date('d/m/Y à H:i') }} · {{ r.sourceCount }} source{{ r.sourceCount > 1 ? 's' : '' }}</div>
                 </div>

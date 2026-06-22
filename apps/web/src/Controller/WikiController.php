@@ -76,6 +76,7 @@ final class WikiController extends AbstractController
             trim((string) $request->request->get('topic', '')),
             $markdown,
             \is_array($sources) ? $sources : [],
+            trim((string) $request->request->get('rubric', '')) ?: null,
         );
     }
 
@@ -94,6 +95,7 @@ final class WikiController extends AbstractController
         $utf8 = static fn (string $s): string => mb_check_encoding($s, 'UTF-8') ? $s : (string) mb_convert_encoding($s, 'UTF-8', 'UTF-8');
         $res = $this->user->send('POST', '/api/literature-reviews', [
             'topic' => $utf8((string) $request->request->get('topic', '')),
+            'rubric' => $utf8((string) $request->request->get('rubric', '')),
             'markdown' => $utf8((string) $request->request->get('markdown', '')),
             'sources' => \is_array($sources) ? $sources : [],
         ]);
@@ -126,7 +128,7 @@ final class WikiController extends AbstractController
         }
         $d = $res['data'];
 
-        return $this->reviewPdf((string) ($d['topic'] ?? ''), (string) ($d['markdown'] ?? ''), \is_array($d['sources'] ?? null) ? $d['sources'] : []);
+        return $this->reviewPdf((string) ($d['topic'] ?? ''), (string) ($d['markdown'] ?? ''), \is_array($d['sources'] ?? null) ? $d['sources'] : [], isset($d['rubric']) ? (string) $d['rubric'] : null);
     }
 
     /** Export Markdown d'une revue sauvegardée. */
@@ -190,7 +192,7 @@ final class WikiController extends AbstractController
     /**
      * @param array<int,array<string,mixed>> $sources
      */
-    private function reviewPdf(string $topic, string $markdown, array $sources): Response
+    private function reviewPdf(string $topic, string $markdown, array $sources, ?string $rubric = null): Response
     {
         // Garde-fou : CommonMark exige de l'UTF-8 valide (sinon exception).
         if (!mb_check_encoding($markdown, 'UTF-8')) {
@@ -198,6 +200,7 @@ final class WikiController extends AbstractController
         }
         $html = $this->renderView('pdf/literature_review.html.twig', [
             'topic' => '' !== trim($topic) ? $topic : 'Revue de littérature',
+            'rubric' => $rubric,
             'markdown' => $markdown,
             'sources' => $sources,
             'date' => date('d/m/Y'),

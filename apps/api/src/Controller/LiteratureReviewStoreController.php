@@ -47,8 +47,9 @@ final class LiteratureReviewStoreController
             return new JsonResponse(['error' => 'Revue trop volumineuse.'], 413);
         }
         $sources = \is_array($data['sources'] ?? null) ? $data['sources'] : [];
+        $rubric = '' !== trim((string) ($data['rubric'] ?? '')) ? (string) $data['rubric'] : null;
 
-        $review = new LiteratureReview($user, $topic, $markdown, $sources);
+        $review = new LiteratureReview($user, $topic, $markdown, $sources, $rubric);
         $this->em->persist($review);
         $this->em->flush();
 
@@ -61,6 +62,7 @@ final class LiteratureReviewStoreController
         $items = array_map(static fn (LiteratureReview $r): array => [
             'id' => $r->getId(),
             'topic' => $r->getTopic(),
+            'rubric' => $r->getRubric(),
             'createdAt' => $r->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'sourceCount' => \count($r->getSources()),
         ], $this->repository->findByUser($this->currentUser()));
@@ -76,6 +78,7 @@ final class LiteratureReviewStoreController
         return new JsonResponse([
             'id' => $review->getId(),
             'topic' => $review->getTopic(),
+            'rubric' => $review->getRubric(),
             'markdown' => $review->getContentMd(),
             'sources' => $review->getSources(),
             'createdAt' => $review->getCreatedAt()->format(\DateTimeInterface::ATOM),
