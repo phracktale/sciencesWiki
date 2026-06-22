@@ -79,17 +79,20 @@ final class GenerateWikiArticlesCommand extends Command
             $io->writeln(\sprintf('• %s (niveau %d)…', $node->getLabel(), $node->getLevel()));
             try {
                 $sources = $this->sources($node, $embedder);
-                $related = $this->relatedLinks($node);
+                $related = $this->relatedNodes($node);
                 // Streaming : la rédaction longue dépasse le timeout idle d'un appel
                 // non-streamé ; le flux remet le compteur à zéro à chaque jeton.
                 $md = '';
                 foreach ($this->llm->stream(
-                    $this->buildMessages($node, $sources, $related),
+                    $this->buildMessages($node, $sources, $this->formatRelated($related)),
                     ['temperature' => 0.3, 'max_tokens' => 8000],
                 ) as $delta) {
                     $md .= $delta;
                 }
                 $md = trim($md);
+                // Liens internes garantis (le modèle local les omet souvent) : on lie
+                // la 1re occurrence de chaque domaine voisin dans le corps de l'article.
+                $md = $this->autolink($md, $related, $node->getSlug());
                 if (mb_strlen($md) < 800) {
                     $io->warning(\sprintf('  réponse trop courte (%d car.), ignorée.', mb_strlen($md)));
                     continue;
@@ -129,18 +132,23 @@ final class GenerateWikiArticlesCommand extends Command
         return [] === $lines ? '(aucune source trouvée dans le corpus)' : implode("\n", $lines);
     }
 
-    /** Liens internes proposés (parents, enfants, frères) : label → /fr/slug. */
-    private function relatedLinks(TreeNode $node): string
+    /**
+     * Domaines liés (parents, enfants, frères) pour les liens internes.
+     *
+     * @return list<array{label:string,slug:string}>
+     */
+    private function relatedNodes(TreeNode $node): array
     {
         $seen = [];
         $out = [];
         $add = function (array $n) use (&$seen, &$out): void {
             $slug = $n['slug'] ?? null;
-            if (null === $slug || isset($seen[$slug]) || $slug === null) {
+            $label = $n['label'] ?? null;
+            if (null === $slug || null === $label || isset($seen[$slug])) {
                 return;
             }
             $seen[$slug] = true;
-            $out[] = \sprintf('- %s → /fr/%s', $n['label'] ?? $slug, $slug);
+            $out[] = ['label' => (string) $label, 'slug' => (string) $slug];
         };
         foreach ($node->getParents() as $n) {
             $add($n);
@@ -148,7 +156,6 @@ final class GenerateWikiArticlesCommand extends Command
         foreach (\array_slice($node->getChildren(), 0, 20) as $n) {
             $add($n);
         }
-        // Frères : enfants du premier parent.
         $parents = $node->getParents();
         if (isset($parents[0]['slug']) && null !== ($parent = $this->nodes->findOneBy(['slug' => $parents[0]['slug']]))) {
             foreach (\array_slice($parent->getChildren(), 0, 12) as $n) {
@@ -156,7 +163,40 @@ final class GenerateWikiArticlesCommand extends Command
             }
         }
 
-        return [] === $out ? '(aucun)' : implode("\n", \array_slice($out, 0, 30));
+        return \array_slice($out, 0, 30);
+    }
+
+    /** @param list<array{label:string,slug:string}> $related */
+    private function formatRelated(array $related): string
+    {
+        if ([] === $related) {
+            return '(aucun)';
+        }
+
+        return implode("\n", array_map(static fn (array $r): string => \sprintf('- %s → /fr/%s', $r['label'], $r['slug']), $related));
+    }
+
+    /**
+     * Lie la 1re occurrence de chaque domaine voisin dans le corps de l'article
+     * (hors liens existants), pour garantir des liens internes même si le modèle
+     * les a omis. Trie par libellé le plus long d'abord (évite les sous-chaînes).
+     *
+     * @param list<array{label:string,slug:string}> $related
+     */
+    private function autolink(string $md, array $related, string $selfSlug): string
+    {
+        usort($related, static fn (array $a, array $b): int => mb_strlen($b['label']) <=> mb_strlen($a['label']));
+        foreach ($related as $r) {
+            if ($r['slug'] === $selfSlug || mb_strlen($r['label']) < 4) {
+                continue;
+            }
+            $quoted = preg_quote($r['label'], '/');
+            // Pas précédé de [ / \w ; pas suivi de ] ou mot ; ignore casse + accents.
+            $pattern = '/(?<![\[\/\w\p{L}])('.$quoted.')(?![\w\p{L}\]])/iu';
+            $md = preg_replace($pattern, '['.'$1'.'](/fr/'.$r['slug'].')', $md, 1) ?? $md;
+        }
+
+        return $md;
     }
 
     /** @return list<LlmMessage> */
