@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
+use App\Entity\ArticleRevision;
+use App\Entity\User;
 use App\Repository\TreeNodeRepository;
 use App\Security\Voter\ArticleVoter;
 use Doctrine\ORM\EntityManagerInterface;
@@ -48,6 +50,16 @@ final class ArticleEditController
         if (true === ($data['validate'] ?? false) && $this->security->isGranted(ArticleVoter::VALIDATE, $node)) {
             $node->setArticleStatus('valide');
         }
+
+        // Révision (historique + diff) : paternité humaine.
+        $user = $this->security->getUser();
+        $isCommittee = $this->security->isGranted('ROLE_COMITE') || $this->security->isGranted('ROLE_MODERATEUR') || $this->security->isGranted('ROLE_ADMIN');
+        $revision = (new ArticleRevision($node, $md, $isCommittee ? 'comite' : 'contributeur'))
+            ->setChangeSummary(trim((string) ($data['summary'] ?? '')) ?: 'Édition');
+        if ($user instanceof User) {
+            $revision->setAuthor($user)->setAuthorLabel($user->getPseudo() ?? $user->getRealName() ?? $user->getUserIdentifier());
+        }
+        $this->em->persist($revision);
         $this->em->flush();
 
         return new JsonResponse([

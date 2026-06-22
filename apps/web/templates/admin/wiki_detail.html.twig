@@ -1,0 +1,79 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — {{ article.label }}{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <p class="crumbs muted"><a href="{{ path('admin_wiki') }}">← Articles wiki</a></p>
+    <h1>{{ article.label }}</h1>
+    <p>
+        {% if article.status == 'valide' %}<span class="badge ok">✅ relu</span>{% else %}<span class="badge warn">⚠️ non relu</span>{% endif %}
+        {% if article.model %}<span class="pill">🤖 {{ article.model }}</span>{% endif %}
+        <a href="{{ article.url }}" target="_blank" rel="noopener" style="margin-left:.5rem">voir sur le site ↗</a>
+    </p>
+
+    <h2>Historique des versions ({{ article.revisions|length }})</h2>
+    {% if article.revisions is empty %}
+        <p class="muted">Aucune révision.</p>
+    {% else %}
+        <table style="width:100%; border-collapse:collapse; font-size:.88rem; margin-bottom:1.5rem">
+            <thead><tr style="text-align:left; border-bottom:2px solid var(--line)">
+                <th style="padding:.35rem">Anc.</th><th>Nouv.</th><th>Date</th><th>Auteur</th><th>Type</th><th>Résumé</th><th style="text-align:right">Signes</th>
+            </tr></thead>
+            <tbody>
+            {% for r in article.revisions %}
+                <tr style="border-bottom:1px solid var(--line)">
+                    <td style="padding:.35rem; text-align:center"><input type="radio" name="from" value="{{ r.id }}" {{ loop.index == 2 ? 'checked' : (article.revisions|length == 1 and loop.first ? 'checked' : '') }}></td>
+                    <td style="text-align:center"><input type="radio" name="to" value="{{ r.id }}" {{ loop.first ? 'checked' : '' }}></td>
+                    <td class="muted">{{ r.createdAt }}</td>
+                    <td>{% if r.authorType == 'ia' %}🤖{% elseif r.authorType == 'comite' %}🛡️{% else %}✍️{% endif %} {{ r.author ?: '—' }}</td>
+                    <td class="muted">{{ r.authorType }}</td>
+                    <td class="muted">{{ r.summary ?: '—' }}</td>
+                    <td style="text-align:right">{{ r.length|number_format(0, ',', ' ') }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+
+        <h2>Comparaison de versions</h2>
+        <p class="muted" style="font-size:.85rem">Choisissez une version « ancienne » et une « nouvelle » dans le tableau, puis comparez. <span style="background:#dcfce7; padding:0 .3rem">ajouté</span> · <span style="background:#fee2e2; padding:0 .3rem">supprimé</span></p>
+        <button type="button" id="cmp" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1.1rem; cursor:pointer; margin-bottom:.6rem">Comparer</button>
+        <div id="diff" style="border:1px solid var(--line); border-radius:8px; font-family:ui-monospace,monospace; font-size:.82rem; line-height:1.5; max-height:60vh; overflow:auto"></div>
+
+        <script>
+        (function () {
+            var REV = {{ article.revisions|json_encode|raw }};
+            function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+            function byId(id){ for (var i=0;i<REV.length;i++) if (String(REV[i].id)===String(id)) return REV[i]; return null; }
+            function lines(s){ return (s||'').split('\n'); }
+            function diff(a, b){
+                var n=a.length, m=b.length, dp=[], i, j;
+                for (i=0;i<=n;i++){ dp.push(new Array(m+1).fill(0)); }
+                for (i=n-1;i>=0;i--) for (j=m-1;j>=0;j--) dp[i][j]= a[i]===b[j] ? dp[i+1][j+1]+1 : Math.max(dp[i+1][j], dp[i][j+1]);
+                var out=[]; i=0; j=0;
+                while (i<n && j<m){
+                    if (a[i]===b[j]){ out.push(['eq',a[i]]); i++; j++; }
+                    else if (dp[i+1][j]>=dp[i][j+1]){ out.push(['del',a[i]]); i++; }
+                    else { out.push(['add',b[j]]); j++; }
+                }
+                while (i<n){ out.push(['del',a[i++]]); }
+                while (j<m){ out.push(['add',b[j++]]); }
+                return out;
+            }
+            function sel(name){ var el=document.querySelector('input[name="'+name+'"]:checked'); return el ? el.value : null; }
+            function render(){
+                var A=byId(sel('from')), B=byId(sel('to'));
+                if (!A || !B){ document.getElementById('diff').innerHTML='<p class="muted" style="padding:.5rem">Sélectionnez deux versions.</p>'; return; }
+                var d=diff(lines(A.content), lines(B.content)), html='';
+                for (var k=0;k<d.length;k++){
+                    var t=d[k][0], v=d[k][1];
+                    var bg = t==='add'?'#dcfce7':(t==='del'?'#fee2e2':'transparent');
+                    var sign = t==='add'?'+':(t==='del'?'−':' ');
+                    html += '<div style="background:'+bg+'; white-space:pre-wrap; padding:0 .5rem"><span style="color:#94a3b8">'+sign+'</span> '+esc(v)+'</div>';
+                }
+                document.getElementById('diff').innerHTML = html || '<p class="muted" style="padding:.5rem">Versions identiques.</p>';
+            }
+            document.getElementById('cmp').addEventListener('click', render);
+            render();
+        })();
+        </script>
+    {% endif %}
+{% endblock %}

@@ -116,6 +116,12 @@ final class GenerateWikiArticlesCommand extends Command
                     ->setArticleModel($model)
                     ->setArticleStatus('non_relu')
                     ->setArticleGeneratedAt(new \DateTimeImmutable());
+                // Révision (historique + diff en back-office) — paternité IA.
+                $this->em->persist(
+                    (new \App\Entity\ArticleRevision($node, $md, 'ia'))
+                        ->setAuthorLabel($model)
+                        ->setChangeSummary('Génération IA')
+                );
                 $this->em->flush();
                 ++$done;
                 $io->writeln(\sprintf('  ✓ %d signes', mb_strlen($md)));

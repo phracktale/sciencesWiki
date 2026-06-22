@@ -119,6 +119,22 @@ final class AdminApiClient
         return $this->send('PUT', '/api/admin/settings', $values);
     }
 
+    /** @return array<string,mixed> liste des articles wiki (BO) */
+    public function wikiArticles(string $q = '', string $status = ''): array
+    {
+        $res = $this->send('GET', '/api/admin/wiki-articles?'.http_build_query(array_filter(['q' => $q, 'status' => $status])), null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'query' => $q, 'status' => $status];
+    }
+
+    /** @return array<string,mixed>|null détail d'un article wiki + révisions */
+    public function wikiArticle(int $id): ?array
+    {
+        $res = $this->send('GET', '/api/admin/wiki-articles/'.$id, null);
+
+        return $res['ok'] ? $res['data'] : null;
+    }
+
     /**
      * @param list<string> $types filtre optionnel par type(s) de publication (scope la volumétrie)
      *

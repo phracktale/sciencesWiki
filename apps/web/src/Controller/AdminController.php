@@ -116,6 +116,37 @@ final class AdminController extends AbstractController
         ]);
     }
 
+    #[Route('/admin/wiki', name: 'admin_wiki', methods: ['GET'])]
+    public function wikiList(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/wiki_list.html.twig', [
+            'data' => $this->admin->wikiArticles(
+                trim((string) $request->query->get('q', '')),
+                trim((string) $request->query->get('status', '')),
+            ),
+        ]);
+    }
+
+    #[Route('/admin/wiki/{id}', name: 'admin_wiki_detail', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function wikiDetail(int $id): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        $article = $this->admin->wikiArticle($id);
+        if (null === $article) {
+            $this->addFlash('error', 'Article introuvable.');
+
+            return $this->redirectToRoute('admin_wiki');
+        }
+
+        return $this->render('admin/wiki_detail.html.twig', ['article' => $article]);
+    }
+
     #[Route('/admin/articles', name: 'admin_articles', methods: ['GET'])]
     public function articles(Request $request): Response
     {
