@@ -6,6 +6,8 @@ namespace App\Controller;
 
 use App\Service\ApiClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -57,7 +59,7 @@ final class WikiController extends AbstractController
     }
 
     #[Route('/{_locale}/q/{id}', name: 'answer', requirements: ['id' => '\d+', '_locale' => 'fr'], methods: ['GET'])]
-    public function answer(int $id): Response
+    public function answer(int $id, Request $request): Response
     {
         $answer = $this->api->answer($id);
         if (null === $answer) {
@@ -66,11 +68,24 @@ final class WikiController extends AbstractController
 
         $slug = $answer['node']['slug'] ?? null;
         $node = \is_string($slug) ? $this->api->node($slug) : null;
+        $votes = $this->api->answerVotes([$id], $this->user->token(), $request->getClientIp());
 
         return $this->render('wiki/answer.html.twig', [
             'answer' => $answer,
             'node' => $node,
+            'votes' => $votes['tallies'],
+            'myVotes' => $votes['mine'],
         ]);
+    }
+
+    /** Proxy de vote (session → JWT) : le navigateur appelle cette route même origine. */
+    #[Route('/{_locale}/q/{id}/vote', name: 'answer_vote', requirements: ['id' => '\d+', '_locale' => 'fr'], methods: ['POST'])]
+    public function vote(int $id, Request $request): JsonResponse
+    {
+        $value = (string) ($request->request->get('value') ?? '');
+        $res = $this->api->voteAnswer($id, $value, $this->user->token(), $request->getClientIp());
+
+        return new JsonResponse($res['data'], $res['ok'] ? 200 : (0 !== $res['status'] ? $res['status'] : 502));
     }
 
     /** Moteur de recherche des articles encyclopédiques (rendu JS via /api/wiki/search). */
@@ -110,7 +125,7 @@ final class WikiController extends AbstractController
      * si le chemin ne correspond pas au chemin canonique, redirection 301 (SEO).
      */
     #[Route('/{_locale}/{path}', name: 'node', requirements: ['path' => '.+', '_locale' => 'fr'], priority: -10, methods: ['GET'])]
-    public function node(string $path, string $_locale): Response
+    public function node(string $path, string $_locale, Request $request): Response
     {
         $path = trim($path, '/');
         $segments = explode('/', $path);
@@ -127,10 +142,16 @@ final class WikiController extends AbstractController
             return $this->redirectToRoute('node', ['_locale' => $_locale, 'path' => $canonical], Response::HTTP_MOVED_PERMANENTLY);
         }
 
+        $answers = $this->api->answers($slug);
+        $ids = array_values(array_filter(array_map(static fn (array $a): int => (int) ($a['id'] ?? 0), $answers)));
+        $votes = $this->api->answerVotes($ids, $this->user->token(), $request->getClientIp());
+
         return $this->render('wiki/node.html.twig', [
             'node' => $node,
             'path' => $canonical,
-            'answers' => $this->api->answers($slug),
+            'answers' => $answers,
+            'votes' => $votes['tallies'],
+            'myVotes' => $votes['mine'],
             'corpusCount' => $this->api->nodeCorpus($slug),
             'childrenStats' => $this->api->nodeChildrenStats($slug),
         ]);

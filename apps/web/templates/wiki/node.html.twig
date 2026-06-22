@@ -8,6 +8,7 @@
 
 {% block body %}
     {% import 'wiki/_colors.html.twig' as colors %}
+    {% import 'wiki/_vote.html.twig' as vote %}
     {% set crumbs = node.breadcrumb ?? [] %}
     {% set rootSlug = (crumbs|first).slug ?? node.slug %}
     {% set qcount = answers|default([])|length %}
@@ -177,10 +178,12 @@
                         <div class="qa-warn">
                             ⚠️ <strong>Réponse générée par IA</strong> à partir des sources citées{% if a.validationStatus != 'valide' %}, <strong>non encore relue</strong> par le comité scientifique{% endif %} — elle peut comporter des imprécisions.
                         </div>
+                        {{ vote.widget(a.id, votes, myVotes) }}
                         <p style="margin-top:.6rem"><a href="{{ path('answer', { id: a.id }) }}">Ouvrir la page dédiée ↗</a></p>
                     </div>
                 </details>
             {% endfor %}
+            {{ vote.assets() }}
         {% endif %}
 
         <div class="ask" style="margin-top:1.6rem">

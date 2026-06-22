@@ -133,6 +133,69 @@ final class ApiClient
     }
 
     /**
+     * Agrégats de votes (+ vote courant) pour un lot de réponses. Transmet le JWT
+     * de session (poids/identité du votant) et l'IP réelle du client (anonymes).
+     *
+     * @param list<int> $ids
+     *
+     * @return array{tallies:array<string,mixed>,mine:array<string,mixed>}
+     */
+    public function answerVotes(array $ids, ?string $jwt, ?string $ip): array
+    {
+        if ([] === $ids) {
+            return ['tallies' => [], 'mine' => []];
+        }
+        try {
+            $data = $this->httpClient->request('GET', $this->baseUrl.'/api/answer-votes', [
+                'query' => ['ids' => implode(',', $ids)],
+                'headers' => $this->voterHeaders($jwt, $ip),
+                'timeout' => 8,
+            ])->toArray();
+
+            return ['tallies' => $data['tallies'] ?? [], 'mine' => $data['mine'] ?? []];
+        } catch (\Throwable) {
+            return ['tallies' => [], 'mine' => []];
+        }
+    }
+
+    /**
+     * Enregistre un vote OK/Pas OK (bascule si re-cliqué). Retourne les agrégats.
+     *
+     * @return array{ok:bool,status:int,data:array<string,mixed>}
+     */
+    public function voteAnswer(int $id, string $value, ?string $jwt, ?string $ip): array
+    {
+        try {
+            $response = $this->httpClient->request('POST', $this->baseUrl.'/api/answers/'.$id.'/vote', [
+                'json' => ['value' => $value],
+                'headers' => $this->voterHeaders($jwt, $ip),
+                'timeout' => 8,
+            ]);
+            $status = $response->getStatusCode();
+
+            return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'data' => $response->toArray(false)];
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'status' => 0, 'data' => ['error' => $e->getMessage()]];
+        }
+    }
+
+    /**
+     * @return array<string,string>
+     */
+    private function voterHeaders(?string $jwt, ?string $ip): array
+    {
+        $headers = ['Accept' => 'application/json'];
+        if (null !== $jwt && '' !== $jwt) {
+            $headers['Authorization'] = 'Bearer '.$jwt;
+        }
+        if (null !== $ip && '' !== $ip) {
+            $headers['X-Voter-Ip'] = $ip;
+        }
+
+        return $headers;
+    }
+
+    /**
      * @param array<string,mixed> $query
      *
      * @return array<string,mixed>

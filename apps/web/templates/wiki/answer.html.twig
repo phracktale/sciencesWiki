@@ -4,6 +4,7 @@
 {% block description %}{{ answer.vulgarizationContent|striptags|slice(0, 155) }}{% endblock %}
 
 {% block body %}
+    {% import 'wiki/_vote.html.twig' as vote %}
     {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
     {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
     {% set crumbs = (node.breadcrumb ?? []) %}
@@ -140,6 +141,8 @@ L'équipe SciencesWiki
         </div>
     {% endif %}
 
+    {{ vote.widget(answer.id, votes, myVotes) }}
+
     <div class="cartouche">
         <div class="avatar">IA</div>
         <div>
@@ -156,4 +159,5 @@ L'équipe SciencesWiki
     {% if answer.node.slug is defined %}
         <p class="muted">↩ Retour à la rubrique <a href="/{{ app.request.locale }}/{{ answer.node.slug }}">{{ answer.node.label }}</a></p>
     {% endif %}
+    {{ vote.assets() }}
 {% endblock %}

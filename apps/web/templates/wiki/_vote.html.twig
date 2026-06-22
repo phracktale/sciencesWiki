@@ -1,0 +1,61 @@
+{# Widget de vote « OK / Pas OK » pondéré sur une réponse (Q/R).
+   Usage : {% import 'wiki/_vote.html.twig' as vote %} puis {{ vote.widget(a.id, votes, myVotes) }}.
+   Appeler {{ vote.assets() }} UNE fois par page (CSS + script délégué). #}
+
+{% macro widget(id, tallies, mine) %}
+    {% set t = tallies[id] ?? {} %}
+    {% set my = mine[id] ?? 0 %}
+    {% set weighted = (t.okWeight ?? 0) + (t.notOkWeight ?? 0) > (t.okCount ?? 0) + (t.notOkCount ?? 0) %}
+    <div class="vote" data-voteurl="{{ path('answer_vote', { id: id }) }}">
+        <span class="vote-label muted">Cette réponse est-elle correcte&nbsp;?</span>
+        <button type="button" class="vote-btn vote-ok{{ my == 1 ? ' on' : '' }}" data-v="ok" aria-pressed="{{ my == 1 ? 'true' : 'false' }}" aria-label="Vote : réponse correcte">👍&nbsp;<span class="n">{{ t.okCount ?? 0 }}</span></button>
+        <button type="button" class="vote-btn vote-no{{ my == -1 ? ' on' : '' }}" data-v="notok" aria-pressed="{{ my == -1 ? 'true' : 'false' }}" aria-label="Vote : réponse à revoir">👎&nbsp;<span class="n">{{ t.notOkCount ?? 0 }}</span></button>
+        <span class="vote-appr muted" role="status" aria-live="polite">{% if t.approval is defined and t.approval is not null %}{{ t.approval }}&nbsp;% d'avis favorables{{ weighted ? ' (pondéré)' : '' }}{% endif %}</span>
+    </div>
+{% endmacro %}
+
+{% macro assets() %}
+    <style>
+        .vote { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:1rem 0 .2rem; }
+        .vote-label { font-size:.85rem; font-weight:600; }
+        .vote-btn { font:inherit; cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:999px; padding:.3rem .85rem; transition:background .12s; }
+        .vote-btn:hover { background:#f1f5f9; }
+        .vote-btn:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+        .vote-btn[disabled] { opacity:.6; cursor:wait; }
+        .vote-ok.on { background:#dcfce7; border-color:#16a34a; color:#166534; font-weight:700; }
+        .vote-no.on { background:#fee2e2; border-color:#dc2626; color:#991b1b; font-weight:700; }
+        .vote-appr { font-size:.82rem; }
+    </style>
+    <script>
+    (function () {
+        if (window.__voteWired) return; window.__voteWired = true;
+        function pct(d){
+            if (d.approval == null) return '';
+            var weighted = (d.okWeight + d.notOkWeight) > (d.okCount + d.notOkCount);
+            return d.approval + " % d'avis favorables" + (weighted ? ' (pondéré)' : '');
+        }
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('.vote-btn'); if (!btn) return;
+            var box = btn.closest('.vote'); if (!box) return;
+            box.querySelectorAll('.vote-btn').forEach(function (b) { b.disabled = true; });
+            var body = new URLSearchParams(); body.set('value', btn.dataset.v);
+            fetch(box.dataset.voteurl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.json(); }).then(function (d) {
+                if (!d || d.okCount === undefined) return;
+                box.querySelector('.vote-ok .n').textContent = d.okCount;
+                box.querySelector('.vote-no .n').textContent = d.notOkCount;
+                var ok = box.querySelector('.vote-ok'), no = box.querySelector('.vote-no');
+                ok.classList.toggle('on', d.my === 1); ok.setAttribute('aria-pressed', d.my === 1 ? 'true' : 'false');
+                no.classList.toggle('on', d.my === -1); no.setAttribute('aria-pressed', d.my === -1 ? 'true' : 'false');
+                var appr = box.querySelector('.vote-appr'); if (appr) appr.textContent = pct(d);
+            }).finally(function () {
+                box.querySelectorAll('.vote-btn').forEach(function (b) { b.disabled = false; });
+            });
+        });
+    })();
+    </script>
+{% endmacro %}
