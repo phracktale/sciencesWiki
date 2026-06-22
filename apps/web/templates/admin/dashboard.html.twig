@@ -18,6 +18,9 @@
 
     <div class="tabs" role="tablist">
         <button role="tab" aria-selected="true" data-pane="pane-corpus">Corpus &amp; progression</button>
+        <button role="tab" aria-selected="false" data-pane="pane-types">Types de publication</button>
+        <button role="tab" aria-selected="false" data-pane="pane-editeurs">Éditeurs</button>
+        <button role="tab" aria-selected="false" data-pane="pane-moisson">Moisson &amp; domaines</button>
         <button role="tab" aria-selected="false" data-pane="pane-domaines">Domaines</button>
         <button role="tab" aria-selected="false" data-pane="pane-systeme">Système &amp; base de données</button>
     </div>
@@ -95,8 +98,13 @@
             <div class="card"><strong style="font-size:1.3rem">{{ (m.questionsHuman ?? 0)|number_format(0,',',' ') }} <span class="muted">humain</span> / {{ (m.questionsAi ?? 0)|number_format(0,',',' ') }} <span class="muted">IA</span></strong><br><span class="muted">questions (humain / IA)</span></div>
         </div>
 
+    </section>
+
+    {# ===== Onglet : Types de publication ===== #}
+    <section class="tabpane" id="pane-types" hidden>
+        {% set tf = stats.typeFilter ?? [] %}
+        <h2 style="margin-top:0">Répartition par type de publication</h2>
         {% if (stats.typeBreakdown ?? [])|length > 0 %}
-            <h3>Répartition par type de publication</h3>
             <table style="width:100%; border-collapse:collapse; max-width:480px">
                 <thead><tr><th style="text-align:left; padding:.3rem 0; border-bottom:1px solid var(--line)">Type</th><th style="text-align:right; border-bottom:1px solid var(--line)">Publications</th></tr></thead>
                 <tbody>
@@ -110,10 +118,14 @@
                 {% endfor %}
                 </tbody>
             </table>
-        {% endif %}
+        {% else %}<p class="muted">Aucune donnée.</p>{% endif %}
+    </section>
 
+    {# ===== Onglet : Éditeurs ===== #}
+    <section class="tabpane" id="pane-editeurs" hidden>
+        {% set m = stats.metrics ?? {} %}
+        <h2 style="margin-top:0">Éditeurs — nombre de revues référencées</h2>
         {% if (m.topPublishers ?? [])|length > 0 %}
-            <h3>Éditeurs — nombre de revues référencées</h3>
             <table style="width:100%; border-collapse:collapse">
                 <thead><tr><th style="text-align:left; padding:.3rem 0; border-bottom:1px solid var(--line)">Éditeur</th><th style="text-align:right; border-bottom:1px solid var(--line)">Revues</th></tr></thead>
                 <tbody>
@@ -122,9 +134,13 @@
                 {% endfor %}
                 </tbody>
             </table>
-        {% endif %}
+        {% else %}<p class="muted">Aucune donnée.</p>{% endif %}
+    </section>
 
-        <h3>Publications par domaine</h3>
+    {# ===== Onglet : Moisson & domaines ===== #}
+    <section class="tabpane" id="pane-moisson" hidden>
+        {% set c = stats.corpus ?? {} %}
+        <h2 style="margin-top:0">Publications par domaine</h2>
         <div class="grid">
             {% for r in c.roots ?? [] %}
                 <a class="card" href="{{ path('admin_node', { slug: r.slug }) }}">{{ r.label }}<br><strong>{{ r.publications|number_format(0,',',' ') }}</strong> <span class="muted">publications</span></a>
@@ -133,16 +149,8 @@
 
         {% set hist = stats.history ?? [] %}
         {% if hist|length > 0 %}
-            {# Conversion cumul → moisson PAR JOUR (delta vs la veille). #}
-            {% set daily = [] %}
-            {% set prev = null %}
-            {% for h in hist %}
-                {% set d = (prev is null) ? 0 : (h.publications - prev) %}
-                {% set daily = daily|merge([{ day: h.day, harvested: (d > 0 ? d : 0) }]) %}
-                {% set prev = h.publications %}
-            {% endfor %}
             <h3>Articles moissonnés par jour</h3>
-            {% set maxPub = max(daily|map(d => d.harvested)) ?: 1 %}
+            {% set maxPub = max(hist|map(h => h.publications)) ?: 1 %}
             {% set chartH = 160 %}
             <div style="display:flex; gap:.5rem; align-items:stretch">
                 <div style="display:flex; flex-direction:column; justify-content:space-between; height:{{ chartH }}px; font-size:.7rem; color:#9ca3af; text-align:right; min-width:42px">
@@ -152,14 +160,14 @@
                 <div style="position:relative; flex:1; height:{{ chartH }}px; border-left:1px solid var(--line); border-bottom:1px solid var(--line); overflow-x:auto">
                     {% for i in 1..4 %}<div style="position:absolute; left:0; right:0; bottom:{{ (chartH * i / 4)|round }}px; border-top:1px dashed #eef2f7"></div>{% endfor %}
                     <div style="position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:flex-end; gap:6px; padding:0 6px">
-                        {% for d in daily %}
-                            <div title="{{ d.day }} : {{ d.harvested|number_format(0,',',' ') }} article(s) moissonné(s)"
-                                 style="width:32px; flex:0 0 32px; background:linear-gradient(180deg,var(--accent),var(--accent-dark)); border-radius:4px 4px 0 0; height:{{ (d.harvested / maxPub * 100)|round }}%; min-height:2px"></div>
+                        {% for h in hist %}
+                            <div title="{{ h.day }} : {{ h.publications|number_format(0,',',' ') }} article(s) moissonné(s)"
+                                 style="width:32px; flex:0 0 32px; background:linear-gradient(180deg,var(--accent),var(--accent-dark)); border-radius:4px 4px 0 0; height:{{ (h.publications / maxPub * 100)|round }}%; min-height:2px"></div>
                         {% endfor %}
                     </div>
                 </div>
             </div>
-            <p class="muted" style="font-size:.8rem; margin-top:.3rem">{{ hist|first.day }} → {{ hist|last.day }} ({{ hist|length }} jour(s)) · nouveaux articles par jour (le 1er jour sert de référence). Snapshot à chaque visite.</p>
+            <p class="muted" style="font-size:.8rem; margin-top:.3rem">{{ hist|first.day }} → {{ hist|last.day }} ({{ hist|length }} jours) · articles réellement moissonnés (insérés) chaque jour.</p>
         {% endif %}
     </section>
 

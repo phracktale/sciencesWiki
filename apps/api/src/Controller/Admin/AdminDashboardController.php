@@ -101,17 +101,17 @@ final class AdminDashboardController
         )->fetchAllAssociative();
         $openAlexTotal = (int) $conn->executeQuery("SELECT COALESCE(SUM(value::bigint),0) FROM setting WHERE name LIKE 'openalex.total.%' AND value ~ '^[0-9]+$'")->fetchOne();
 
-        // Snapshot du jour (chiffres GLOBAUX uniquement) + série 30 jours.
-        if (!$hasType) {
-            $conn->executeStatement(
-                'INSERT INTO daily_stat (day, publications, answers, questions) VALUES (CURRENT_DATE, :p, :a, :q)
-                 ON CONFLICT (day) DO UPDATE SET publications = :p, answers = :a, questions = :q',
-                ['p' => $publications, 'a' => $answers, 'q' => $questions],
-            );
-        }
-        $history = array_reverse($conn->executeQuery(
-            'SELECT day::text AS day, publications, answers, questions FROM daily_stat ORDER BY day DESC LIMIT 30'
-        )->fetchAllAssociative());
+        // Articles RÉELLEMENT moissonnés par jour = nombre d'insertions ce jour-là
+        // (DATE(created_at)). Plus de cumul : compte réel. Série 30 jours sans trou.
+        $history = $conn->executeQuery(
+            "SELECT to_char(d.day, 'YYYY-MM-DD') AS day, COALESCE(c.n, 0) AS publications
+             FROM generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, INTERVAL '1 day') AS d(day)
+             LEFT JOIN (
+                 SELECT created_at::date AS day, count(*) AS n FROM publication
+                 WHERE created_at >= CURRENT_DATE - INTERVAL '29 days' GROUP BY created_at::date
+             ) c ON c.day = d.day
+             ORDER BY d.day"
+        )->fetchAllAssociative();
 
         // Répartition par type : vue matérialisée (repli live si non peuplée).
         try {
