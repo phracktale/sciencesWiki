@@ -95,6 +95,7 @@ final class AdminController extends AbstractController
                 'rag.max_tokens' => (string) $request->request->get('max_tokens'),
                 'rag.neighbors' => (string) $request->request->get('neighbors'),
                 'rag.model' => (string) $request->request->get('model'),
+                'wiki.model' => (string) $request->request->get('wiki_model'),
                 'openalex.per_minute' => (string) $request->request->get('openalex_per_minute'),
                 'openalex.per_day' => (string) $request->request->get('openalex_per_day'),
                 'harvest.sort' => (string) $request->request->get('harvest_sort'),

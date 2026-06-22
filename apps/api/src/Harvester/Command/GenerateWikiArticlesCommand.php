@@ -11,7 +11,6 @@ use App\Harvester\Ai\EmbeddingClientFactory;
 use App\Repository\PublicationRepository;
 use App\Repository\TreeNodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -39,8 +38,7 @@ final class GenerateWikiArticlesCommand extends Command
         private readonly EmbeddingClientFactory $embeddings,
         private readonly LlmClient $llm,
         private readonly EntityManagerInterface $em,
-        #[Autowire(env: 'LLM_MODEL')]
-        private readonly string $llmModel,
+        private readonly \App\Service\SettingsService $settings,
     ) {
         parent::__construct();
     }
@@ -51,7 +49,7 @@ final class GenerateWikiArticlesCommand extends Command
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Régénère même les nœuds ayant déjà un article');
         $this->addOption('slug', null, InputOption::VALUE_REQUIRED, 'Cible un nœud précis (par slug)');
         $this->addOption('max-level', null, InputOption::VALUE_REQUIRED, 'Limite aux nœuds de niveau ≤ N (0=domaines…)');
-        $this->addOption('model', null, InputOption::VALUE_REQUIRED, 'Modèle LLM rédacteur (Ollama)', 'qwen3.6:latest');
+        $this->addOption('model', null, InputOption::VALUE_REQUIRED, 'Modèle LLM rédacteur (défaut : réglage BO « Modèle Articles WIKI »)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -59,7 +57,8 @@ final class GenerateWikiArticlesCommand extends Command
         @set_time_limit(0);
         $io = new SymfonyStyle($input, $output);
         $limit = max(1, (int) $input->getOption('limit'));
-        $model = (string) $input->getOption('model');
+        // Modèle : --model explicite, sinon réglage back-office « Modèle Articles WIKI ».
+        $model = trim((string) ($input->getOption('model') ?? '')) ?: $this->settings->wikiModel();
 
         if (null !== ($slug = $input->getOption('slug'))) {
             $node = $this->nodes->findOneBy(['slug' => $slug]);

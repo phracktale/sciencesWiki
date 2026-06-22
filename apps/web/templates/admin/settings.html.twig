@@ -24,15 +24,27 @@
                 <label>Sources récupérées (kNN)</label>
                 <input type="text" name="neighbors" value="{{ settings['rag.neighbors'] }}">
             </div>
+        </div>
+
+        <h2 style="margin-top:1.4rem">Modèles de rédaction (Ollama)</h2>
+        <p class="muted" style="font-size:.85rem">Un modèle par objet rédactionnel. Les <strong>articles wiki</strong> (rédaction longue, hors-ligne via cron) gagnent à utiliser le modèle le plus <em>capable</em> ; les <strong>questions/réponses</strong> (interactif, streaming) un modèle plus <em>rapide</em>.{% if models.error %} <span class="badge warn">serveur de modèles injoignable</span>{% endif %}</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.8rem">
             <div>
-                <label>Modèle {% if models.error %}<span class="muted">(serveur injoignable)</span>{% endif %}</label>
+                <label>1 — Articles WIKI</label>
                 {% if models.models is not empty %}
-                    {% set current = settings['rag.model'] %}
+                    <select name="wiki_model">
+                        {% for m in models.models %}<option value="{{ m }}" {{ settings['wiki.model'] == m ? 'selected' : '' }}>{{ m }}</option>{% endfor %}
+                    </select>
+                {% else %}
+                    <input type="text" name="wiki_model" value="{{ settings['wiki.model'] }}" placeholder="ex. qwen3.6:latest">
+                {% endif %}
+            </div>
+            <div>
+                <label>2 — Questions / Réponses</label>
+                {% if models.models is not empty %}
                     <select name="model">
                         <option value="">Défaut serveur{% if models.default %} ({{ models.default }}){% endif %}</option>
-                        {% for m in models.models %}
-                            <option value="{{ m }}" {{ current == m ? 'selected' : '' }}>{{ m }}</option>
-                        {% endfor %}
+                        {% for m in models.models %}<option value="{{ m }}" {{ settings['rag.model'] == m ? 'selected' : '' }}>{{ m }}</option>{% endfor %}
                     </select>
                 {% else %}
                     <input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">

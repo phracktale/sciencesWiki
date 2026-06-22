@@ -20,6 +20,9 @@ final class SettingsService
     public const RAG_MODEL = 'rag.model';
     public const RAG_NEIGHBORS = 'rag.neighbors';
 
+    /** Modèle dédié à la rédaction des articles encyclopédiques (distinct des Q/R). */
+    public const WIKI_MODEL = 'wiki.model';
+
     // Limites d'interrogation de l'API OpenAlex (adaptables au plan/au polite pool).
     public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
     public const OPENALEX_PER_DAY = 'openalex.per_day';
@@ -65,6 +68,8 @@ final class SettingsService
         self::RAG_MAX_TOKENS => '10000',
         self::RAG_MODEL => '',
         self::RAG_NEIGHBORS => '6',
+        // Articles wiki : modèle le plus capable disponible localement par défaut.
+        self::WIKI_MODEL => 'qwen3.6:latest',
         // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
@@ -109,12 +114,20 @@ final class SettingsService
         return max(1, (int) ($this->get(self::RAG_NEIGHBORS) ?? self::DEFAULTS[self::RAG_NEIGHBORS]));
     }
 
-    /** Modèle surchargé (vide = utiliser LLM_MODEL de l'environnement). */
+    /** Modèle Q/R surchargé (vide = utiliser LLM_MODEL de l'environnement). */
     public function model(): ?string
     {
         $v = $this->get(self::RAG_MODEL);
 
         return null !== $v && '' !== trim($v) ? trim($v) : null;
+    }
+
+    /** Modèle de rédaction des articles wiki (défaut : le plus capable local). */
+    public function wikiModel(): string
+    {
+        $v = trim((string) ($this->get(self::WIKI_MODEL) ?? ''));
+
+        return '' !== $v ? $v : self::DEFAULTS[self::WIKI_MODEL];
     }
 
     /** Nombre maximal de requêtes OpenAlex par minute (≥ 1). */
@@ -183,6 +196,7 @@ final class SettingsService
             self::RAG_MAX_TOKENS => (string) $this->maxTokens(),
             self::RAG_NEIGHBORS => (string) $this->neighbors(),
             self::RAG_MODEL => (string) ($this->model() ?? ''),
+            self::WIKI_MODEL => $this->wikiModel(),
             self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
             self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
             self::HARVEST_SORT => $this->harvestSort(),
@@ -197,7 +211,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;
