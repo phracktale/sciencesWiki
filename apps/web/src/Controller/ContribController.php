@@ -27,6 +27,12 @@ final class ContribController extends AbstractController
     #[Route('/{_locale}/connexion', name: 'login', requirements: ['_locale' => 'fr'], methods: ['GET', 'POST'])]
     public function login(Request $request): Response
     {
+        // Déjà connecté et on retombe sur le formulaire → on l'envoie vers son
+        // dashboard (rôle le plus élevé), ou vers la cible « back » si elle est sûre.
+        if ($request->isMethod('GET') && $this->user->isLogged()) {
+            return $this->redirect($this->postLoginTarget((string) $request->query->get('back', '')));
+        }
+
         if ($request->isMethod('POST')) {
             if (!$this->csrf->isValid($request)) {
                 $this->addFlash('error', 'Jeton de sécurité invalide.');
@@ -39,14 +45,32 @@ final class ContribController extends AbstractController
             );
             if ($ok) {
                 $this->addFlash('success', 'Connecté·e en tant que '.$this->user->displayName().'.');
-                $back = (string) $request->request->get('back', '');
 
-                return $this->redirect('' !== $back ? $back : $this->generateUrl('home'));
+                return $this->redirect($this->postLoginTarget((string) $request->request->get('back', '')));
             }
             $this->addFlash('error', 'Identifiants invalides.');
         }
 
         return $this->render('wiki/login.html.twig', ['back' => (string) $request->query->get('back', '')]);
+    }
+
+    /**
+     * Destination après authentification : la cible « back » si elle est locale et
+     * sûre, sinon le dashboard du rôle le plus élevé (admin > chercheur > accueil).
+     */
+    private function postLoginTarget(string $back): string
+    {
+        if ('' !== $back && str_starts_with($back, '/') && !str_starts_with($back, '//')) {
+            return $back;
+        }
+        if ($this->user->hasRole('ROLE_ADMIN')) {
+            return $this->generateUrl('admin_dashboard');
+        }
+        if ($this->user->hasRole('ROLE_RESEARCHER')) {
+            return $this->generateUrl('researcher_dashboard');
+        }
+
+        return $this->generateUrl('home');
     }
 
     #[Route('/{_locale}/deconnexion', name: 'logout', requirements: ['_locale' => 'fr'], methods: ['GET'])]

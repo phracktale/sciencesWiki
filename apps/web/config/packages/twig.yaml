@@ -6,7 +6,7 @@ twig:
         current_user: '@App\Service\UserApiClient'
         csp_nonce: '@App\Service\CspNonce'
         # Tag de version affiché en pied de page. À BUMPER à chaque livraison.
-        app_version: 'v0.50 · espace chercheur : bibliothèque de revues de littérature sauvegardées (PDF/MD/suppression) (2026-06-22)'
+        app_version: 'v0.51 · connexion : redirection vers le dashboard du rôle le plus élevé (2026-06-22)'
 
 when@test:
     twig:
