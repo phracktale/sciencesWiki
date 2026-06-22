@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {# Nonce CSP exposé à Turbo : il stampe ce nonce sur les scripts qu'il réinjecte
+       lors d'une navigation (sinon ils seraient bloqués par la CSP du document). #}
+    <meta name="csp-nonce" content="{{ csp_nonce.value }}">
     <title>{% block title %}SciencesWiki{% endblock %}</title>
     <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée à des publications de recherche.{% endblock %}">
     {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}

@@ -6,7 +6,7 @@ twig:
         current_user: '@App\Service\UserApiClient'
         csp_nonce: '@App\Service\CspNonce'
         # Tag de version affiché en pied de page. À BUMPER à chaque livraison.
-        app_version: 'v0.46 · espace chercheur : Revue de littérature (RAG sourcé, flux SSE, export MD/PDF) (2026-06-22)'
+        app_version: 'v0.47 · CSP nonce stable par session (compat Turbo) + meta csp-nonce — corrige les scripts inline en navigation (2026-06-22)'
 
 when@test:
     twig:
