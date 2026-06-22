@@ -1,0 +1,172 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ answer.title }} — SciencesWiki{% endblock %}
+{% block description %}{{ answer.vulgarizationContent|striptags|slice(0, 155) }}{% endblock %}
+
+{% block body %}
+    {% import 'wiki/_vote.html.twig' as vote %}
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+    {% set crumbs = (node.breadcrumb ?? []) %}
+    {% if crumbs is not empty %}
+        <p class="crumbs">
+            {% set acc = '' %}
+            {% for c in crumbs %}
+                {% set acc = (acc == '') ? c.slug : acc ~ '/' ~ c.slug %}
+                <a href="/{{ app.request.locale }}/{{ acc }}">{{ c.label }}</a>{% if not loop.last %} › {% endif %}
+            {% endfor %}
+        </p>
+    {% endif %}
+
+    <h1>{{ answer.title }}</h1>
+    <p class="qmeta">
+        <span class="pill author">✍️ {{ answer.askerName }}</span>
+        {% if answer.validationStatus == 'valide' %}
+            <span class="badge ok">✅ validé par le comité scientifique</span>
+        {% else %}
+            <span class="badge warn">⚠️ généré par IA — non encore relu par un comité</span>
+        {% endif %}
+    </p>
+
+    {% if current_user.canValidate and (answer.validationStatus != 'valide' or (answer.needsRevalidation ?? false)) %}
+        <form method="post" action="{{ path('answer_validate', { id: answer.id }) }}" style="margin:.4rem 0">
+            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+            <input type="hidden" name="back" value="{{ app.request.uri }}">
+            <button type="submit" style="background:#16a34a; color:#fff; border:0; border-radius:8px; padding:.5rem 1rem; cursor:pointer; font:inherit; font-weight:700">✅ Valider cette réponse (comité)</button>
+            <span class="muted" style="font-size:.82rem; margin-left:.5rem">Marque la réponse comme relue et validée scientifiquement.</span>
+        </form>
+    {% endif %}
+
+    {% if answer.needsRevalidation ?? false %}
+        <div style="border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:10px; padding:.8rem 1rem; margin:.8rem 0">
+            ⚠️ <strong>Source devenue non fiable.</strong> Une des publications citées dans cette réponse a été
+            <strong>rétractée</strong> ou fait l'objet d'une <strong>mise en garde</strong> depuis sa validation.
+            La réponse pourrait être partiellement altérée et <strong>nécessite une nouvelle validation humaine</strong>.
+        </div>
+    {% endif %}
+
+    <p class="muted"><strong>Question :</strong> {{ answer.questionText }}</p>
+
+    {% if admin_session.logged and answer.questionId %}
+        <div style="border:1px dashed var(--accent); border-radius:10px; padding:.8rem 1rem; margin:.8rem 0; background:rgba(1,159,185,.06)">
+            <strong style="font-size:.85rem; color:var(--accent-dark)">⚙️ Admin — gérer cette question</strong>
+            <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'edit' }) }}" style="margin-top:.6rem; display:flex; flex-direction:column; gap:.4rem">
+                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                <input type="hidden" name="back" value="{{ answer.id }}">
+                <input type="text" name="title" value="{{ answer.title }}" placeholder="Titre" style="padding:.4rem .6rem; border:1px solid #d1d5db; border-radius:7px; font:inherit">
+                <textarea name="text" rows="2" style="padding:.4rem .6rem; border:1px solid #d1d5db; border-radius:7px; font:inherit">{{ answer.questionText }}</textarea>
+                <button type="submit" style="align-self:flex-start; background:var(--accent); color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">💾 Enregistrer l'intitulé</button>
+            </form>
+            <div style="display:flex; gap:.5rem; margin-top:.6rem">
+                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'regenerate' }) }}" data-busy="⏳ Génération…">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <input type="hidden" name="back" value="{{ answer.id }}">
+                    <button type="submit" style="background:#0f172a; color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">🔄 Régénérer la réponse</button>
+                </form>
+                <form method="post" action="{{ path('admin_question_op', { id: answer.questionId, op: 'delete' }) }}" data-confirm="Supprimer définitivement cette question et ses réponses ?">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <button type="submit" style="background:#7f1d1d; color:#fff; border:0; border-radius:7px; padding:.4rem .9rem; cursor:pointer">🗑 Supprimer</button>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if answer.vulgarizationContent %}
+        <div class="block-vul">
+            <h4>Vulgarisation</h4>
+            <div class="md">{{ answer.vulgarizationContent|md }}</div>
+        </div>
+    {% endif %}
+
+    {% if answer.academicContent %}
+        <div class="block-aca">
+            <h4>Faits établis (sourcés)</h4>
+            <div class="md">{{ answer.academicContent|md }}</div>
+        </div>
+    {% endif %}
+
+    {% if current_user.canEdit and answer.id %}
+        <div style="margin:1rem 0">
+            <button type="button" data-toggle="ans-edit" style="background:#fff;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:.5rem 1rem;cursor:pointer;font:inherit;font-weight:600">✏️ Réviser cette réponse</button>
+            <div id="ans-edit" hidden style="margin-top:.7rem; border:1px solid var(--line); border-radius:10px; padding:1rem; background:#fafafa">
+                <form method="post" action="{{ path('answer_edit', { id: answer.id }) }}">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <input type="hidden" name="back" value="{{ app.request.uri }}">
+                    <label>Vulgarisation (Markdown)</label>
+                    <textarea name="vulgarization" style="width:100%; min-height:11rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ answer.vulgarizationContent }}</textarea>
+                    <label style="margin-top:.5rem; display:block">Faits établis / académique (Markdown)</label>
+                    <textarea name="academic" style="width:100%; min-height:11rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ answer.academicContent }}</textarea>
+                    <label style="margin-top:.5rem; display:block">Résumé de la modification</label>
+                    <input type="text" name="summary" placeholder="ex. : reformulation, correction d'une erreur…">
+                    <button type="submit" style="margin-top:.6rem">💾 Enregistrer la révision</button>
+                    <span class="muted" style="font-size:.8rem; margin-left:.5rem">Crée une nouvelle révision (historique conservé).</span>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if answer.sources is not empty %}
+        <div class="sources">
+            <h4>📚 Papier{{ answer.sources|length > 1 ? 's' : '' }} de recherche cité{{ answer.sources|length > 1 ? 's' : '' }}</h4>
+            <ol>
+                {% for s in answer.sources %}
+                    <li style="margin:.5rem 0">
+                        <strong>{{ s.title }}</strong>
+                        {% if s.authors is not empty %}
+                            <br><span class="muted">{{ s.authors|slice(0, 4)|join(', ') }}{% if s.authors|length > 4 %} <em>et al.</em>{% endif %}</span>
+                        {% endif %}
+                        {% if s.year or s.venue %}
+                            <span class="muted">— {% if s.venue %}{{ s.venue }}{% endif %}{% if s.year %}{% if s.venue %}, {% endif %}{{ s.year }}{% endif %}</span>
+                        {% endif %}
+                        <br>
+                        {% if s.oaUrl %}
+                            <a href="{{ s.oaUrl }}" rel="noopener" target="_blank">🔓 Lire en accès libre</a>
+                            {% if s.doi %} · <a href="https://doi.org/{{ s.doi }}" rel="noopener" target="_blank">doi:{{ s.doi }}</a>{% endif %}
+                        {% else %}
+                            <span class="badge warn">🔒 Accès payant — seul le résumé est indexé</span>
+                            {% if s.doi %} · <a href="https://doi.org/{{ s.doi }}" rel="noopener" target="_blank">doi:{{ s.doi }}</a>{% endif %}
+                            {# Invitation très polie aux auteurs à partager une version en accès ouvert. #}
+                            {% set invite_subject = 'Partage de votre article sur SciencesWiki (encyclopédie libre)' %}
+                            {%- set invite_body -%}
+Bonjour,
+
+Nous animons SciencesWiki (https://scienceswiki.eu), une encyclopédie scientifique libre, gratuite et open source, animée par des bénévoles, qui vulgarise la recherche pour le grand public — dans le strict respect du droit d'auteur et de l'accès ouvert.
+
+Votre article « {{ s.title }} » nous semble précieux pour expliquer ce sujet au public. Il n'est hélas disponible qu'en accès payant : nous ne pouvons en indexer que le résumé, ce qui limite la portée de votre travail auprès des lecteurs.
+
+Si vos droits le permettent et si vous le souhaitez, accepteriez-vous de partager une version en accès ouvert (post-print ou version auteur) ? Vous pouvez simplement répondre à ce courriel. Cela permettrait à un très large public de bénéficier de vos recherches, gratuitement et durablement.
+
+Nous mesurons la valeur de votre temps et de votre travail, et vous remercions très sincèrement, quelle que soit votre réponse. Nous œuvrons pour le bien commun et la libre diffusion du savoir.
+
+Avec toute notre considération,
+L'équipe SciencesWiki
+{% if s.doi %}Référence : https://doi.org/{{ s.doi }}{% endif %}
+                            {%- endset -%}
+                            · <a href="mailto:?subject={{ invite_subject|url_encode }}&body={{ invite_body|url_encode }}" title="Ouvre un e-mail pré-rédigé ; ajoutez l'adresse de l'auteur correspondant (visible sur la page de l'éditeur via le DOI).">✉️ Inviter les auteurs à le partager</a>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ol>
+        </div>
+    {% endif %}
+
+    {{ vote.widget(answer.id, votes, myVotes) }}
+
+    <div class="cartouche">
+        <div class="avatar">IA</div>
+        <div>
+            <div class="who">Rédigé par <strong>{{ answer.generationModel ? (answer.generationModel|split(':')|first) : 'IA' }}</strong> <span class="muted">— modèle d'IA open source auto-hébergé{% if answer.generationMs %}, généré en {{ (answer.generationMs / 1000)|round(1) }}&nbsp;s{% endif %}</span></div>
+            <div class="note">
+                ⚠️ <strong>Précaution d'usage :</strong> cette réponse est générée automatiquement à partir des
+                sources citées et n'a pas encore été relue par le comité scientifique. Elle peut comporter des
+                imprécisions. Une erreur, une nuance à ajouter ?
+                <a href="mailto:phracktale@gmail.com?subject=Correction%20%E2%80%94%20{{ answer.title|url_encode }}">Proposez une correction</a>.
+            </div>
+        </div>
+    </div>
+
+    {% if answer.node.slug is defined %}
+        <p class="muted">↩ Retour à la rubrique <a href="/{{ app.request.locale }}/{{ answer.node.slug }}">{{ answer.node.label }}</a></p>
+    {% endif %}
+    {{ vote.assets() }}
+{% endblock %}

@@ -13,17 +13,59 @@ final class StubLlmClient implements LlmClient
 {
     public function complete(array $messages, array $options = []): LlmCompletion
     {
+        $system = '';
         $lastUser = '';
         foreach ($messages as $message) {
-            if ('user' === $message->role) {
+            if ('system' === $message->role) {
+                $system = $message->content;
+            } elseif ('user' === $message->role) {
                 $lastUser = $message->content;
             }
+        }
+
+        // Extraction d'assertions (cf. spec controverses §5) : JSON déterministe,
+        // dont la quote reprend le TITRE pour passer le garde-fou anti-hallucination.
+        if (str_contains($system, 'RELATION CAUSALE')) {
+            return new LlmCompletion($this->stubClaims($lastUser), 'stub', null, null);
         }
 
         $content = "[brouillon généré par le LLM factice — non destiné à la publication]\n\n"
             .mb_substr(trim($lastUser), 0, 280);
 
         return new LlmCompletion($content, 'stub', null, null);
+    }
+
+    /** Une assertion factice ancrée sur le titre de l'article (déterministe). */
+    private function stubClaims(string $userPrompt): string
+    {
+        $title = 'résultat rapporté';
+        if (preg_match('/TITRE\s*:\s*(.+)/u', $userPrompt, $m)) {
+            $title = trim($m[1]);
+        }
+
+        return json_encode([
+            'claims' => [[
+                'exposure' => 'facteur étudié',
+                'outcome' => 'effet mesuré',
+                'direction' => 'positive',
+                'method' => 'observational',
+                'confidence' => 'moderate',
+                'population' => null,
+                'sample_size' => null,
+                'effect_size' => null,
+                'stated_limitations' => null,
+                'future_work' => [],
+                'quote' => $title,
+            ]],
+        ], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+    }
+
+    public function stream(array $messages, array $options = []): iterable
+    {
+        // Émet le contenu factice mot à mot (simule le flux pour le front).
+        foreach (explode(' ', $this->complete($messages, $options)->content) as $i => $word) {
+            yield (0 === $i ? '' : ' ').$word;
+        }
     }
 
     public function model(): string

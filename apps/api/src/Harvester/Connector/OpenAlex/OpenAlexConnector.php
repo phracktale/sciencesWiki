@@ -21,15 +21,21 @@ final class OpenAlexConnector implements SourceConnector
 {
     private const PER_PAGE = 200;
 
+    /** Nombre maximal de tentatives en cas de 429/503 (limite transitoire OpenAlex). */
+    private const MAX_ATTEMPTS = 4;
+
     private ?string $lastCursor = null;
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         private readonly OpenAlexMapper $mapper,
+        private readonly \App\Harvester\OpenAlexThrottle $throttle,
         #[Autowire(env: 'HARVESTER_CONTACT_EMAIL')]
         private readonly string $contactEmail,
         #[Autowire(env: 'OPENALEX_BASE_URL')]
         private readonly string $baseUrl = 'https://api.openalex.org',
+        #[Autowire(env: 'OPENALEX_API_KEY')]
+        private readonly string $apiKey = '',
     ) {
     }
 
@@ -45,7 +51,7 @@ final class OpenAlexConnector implements SourceConnector
         $yielded = 0;
 
         while (null !== $cursorToken) {
-            $data = $this->request($cursorToken, $cursor->since);
+            $data = $this->request($cursorToken, $cursor);
             $results = \is_array($data['results'] ?? null) ? $data['results'] : [];
 
             foreach ($results as $work) {
@@ -79,10 +85,7 @@ final class OpenAlexConnector implements SourceConnector
             return $this->mapper->map($ref->payload);
         }
 
-        $work = $this->httpClient->request('GET', $this->baseUrl.'/works/'.$ref->idInSource, [
-            'query' => ['mailto' => $this->contactEmail],
-            'headers' => ['User-Agent' => $this->userAgent()],
-        ])->toArray();
+        $work = $this->getJson($this->baseUrl.'/works/'.$ref->idInSource, ['mailto' => $this->contactEmail]);
 
         return $this->mapper->map($work);
     }
@@ -93,9 +96,26 @@ final class OpenAlexConnector implements SourceConnector
     }
 
     /**
+     * Nombre total de travaux OpenAlex correspondant à un filtre (meta.count),
+     * via une requête légère (1 résultat). Sert à connaître le volume disponible
+     * et ce qu'il reste à moissonner. Renvoie null si indéterminé.
+     */
+    public function countWorks(string $filter): ?int
+    {
+        $data = $this->getJson($this->baseUrl.'/works', [
+            'per-page' => 1,
+            'filter' => $filter,
+            'mailto' => $this->contactEmail,
+        ]);
+        $count = $data['meta']['count'] ?? null;
+
+        return is_numeric($count) ? (int) $count : null;
+    }
+
+    /**
      * @return array<string,mixed>
      */
-    private function request(string $cursor, ?\DateTimeImmutable $since): array
+    private function request(string $cursor, DiscoveryCursor $disc): array
     {
         $query = [
             'per-page' => self::PER_PAGE,
@@ -103,14 +123,101 @@ final class OpenAlexConnector implements SourceConnector
             'mailto' => $this->contactEmail,
         ];
 
-        if (null !== $since) {
-            $query['filter'] = 'from_updated_date:'.$since->format('Y-m-d');
+        // Filtres OpenAlex combinés (ET = séparés par des virgules).
+        $filters = [];
+        if (null !== $disc->since) {
+            $filters[] = 'from_updated_date:'.$disc->since->format('Y-m-d');
+        }
+        if (null !== $disc->filter && '' !== $disc->filter) {
+            $filters[] = $disc->filter;
+        }
+        if ([] !== $filters) {
+            $query['filter'] = implode(',', $filters);
+        }
+        if (null !== $disc->sort && '' !== $disc->sort) {
+            $query['sort'] = $disc->sort;
         }
 
-        return $this->httpClient->request('GET', $this->baseUrl.'/works', [
-            'query' => $query,
-            'headers' => ['User-Agent' => $this->userAgent()],
-        ])->toArray();
+        return $this->getJson($this->baseUrl.'/works', $query);
+    }
+
+    /**
+     * Requête OpenAlex avec respect du débit (throttle) et résilience aux limites
+     * transitoires : un HTTP 429 (Too Many Requests) ou 503 déclenche un nouvel
+     * essai après le délai « Retry-After » (ou un backoff exponentiel), jusqu'à
+     * {@see self::MAX_ATTEMPTS}. Au-delà, l'exception remonte (le job sera marqué
+     * en échec et l'erreur visible dans le suivi de moisson).
+     *
+     * @param array<string,mixed> $query
+     *
+     * @return array<string,mixed>
+     */
+    private function getJson(string $url, array $query): array
+    {
+        // Clé API premium (le cas échéant) : authentifie toutes les requêtes /works.
+        if ('' !== $this->apiKey && !isset($query['api_key'])) {
+            $query['api_key'] = $this->apiKey;
+        }
+
+        for ($attempt = 1; ; ++$attempt) {
+            $this->throttle->tick();
+
+            $response = $this->httpClient->request('GET', $url, [
+                'query' => $query,
+                'headers' => ['User-Agent' => $this->userAgent()],
+            ]);
+
+            $status = $response->getStatusCode();
+            if (429 !== $status && 503 !== $status) {
+                $this->recordCreditHeaders($response->getHeaders(false));
+
+                return $response->toArray(); // 2xx attendu ; sinon lève une exception explicite
+            }
+
+            if ($attempt >= self::MAX_ATTEMPTS) {
+                // On joint la raison renvoyée par OpenAlex (corps de la réponse) pour
+                // diagnostiquer (limite/seconde, quota, clé requise…) dans le suivi.
+                $reason = mb_substr(trim((string) $response->getContent(false)), 0, 300);
+                throw new \RuntimeException(\sprintf(
+                    'Limite OpenAlex atteinte : HTTP %d après %d tentatives. Réponse : %s',
+                    $status, $attempt, '' !== $reason ? $reason : '(corps vide)',
+                ));
+            }
+
+            // Délai d'attente : en-tête Retry-After si présent, sinon backoff 2^n (borné à 30 s).
+            $retryAfter = (int) ($response->getHeaders(false)['retry-after'][0] ?? 0);
+            $delay = $retryAfter > 0 ? min($retryAfter, 30) : min(2 ** $attempt, 30);
+            sleep($delay);
+        }
+    }
+
+    /**
+     * Mémorise l'état de limite/crédit OpenAlex annoncé par les en-têtes
+     * X-RateLimit-* (limite quotidienne réelle, restant, crédit USD, coût, reset).
+     * On n'utilise pas de clé API (polite pool via mailto), mais OpenAlex renvoie
+     * tout de même ces valeurs.
+     *
+     * @param array<string,list<string>> $headers (clés en minuscules)
+     */
+    private function recordCreditHeaders(array $headers): void
+    {
+        $num = static function (string $name) use ($headers) {
+            $v = $headers[$name][0] ?? null;
+
+            return is_numeric($v) ? $v + 0 : null;
+        };
+
+        $this->throttle->recordCredits([
+            // Limite quotidienne RÉELLE d'OpenAlex (nombre de requêtes) et restant.
+            'openalex.rl.limit' => $num('x-ratelimit-limit'),
+            'openalex.rl.remaining' => $num('x-ratelimit-remaining'),
+            'openalex.rl.credits_used' => $num('x-ratelimit-credits-used') ?? $num('x-ratelimit-cost-usd'),
+            'openalex.rl.reset' => $num('x-ratelimit-reset'),
+            // Budget de crédits USD (le cas échéant).
+            'openalex.credit.limit_usd' => $num('x-ratelimit-limit-usd'),
+            'openalex.credit.remaining_usd' => $num('x-ratelimit-remaining-usd'),
+            'openalex.credit.cost_usd' => $num('x-ratelimit-cost-usd'),
+        ]);
     }
 
     private function userAgent(): string

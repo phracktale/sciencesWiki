@@ -1,0 +1,55 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Le projet — SciencesWiki{% endblock %}
+{% block description %}SciencesWiki : une encyclopédie scientifique libre, gratuite et open source, qui vulgarise la recherche en s'appuyant sur des publications en accès ouvert.{% endblock %}
+
+{% block body %}
+    <h1>Le projet</h1>
+    <p class="muted" style="font-size:1.05rem">
+        <strong>SciencesWiki</strong> est une encyclopédie scientifique <strong>libre, gratuite et open source</strong>,
+        au service de l'<strong>éducation populaire</strong> : rendre le savoir scientifique compréhensible par toutes et tous,
+        sans jamais s'éloigner des sources.
+    </p>
+
+    <h2>Notre but</h2>
+    <p>
+        Répertorier les notions scientifiques dans un <strong>arbre des connaissances</strong> navigable, et
+        <strong>répondre aux questions</strong> que chacun se pose — par des explications vulgarisées
+        <strong>adossées à des publications de recherche</strong>. Chaque réponse cite ses sources (DOI, accès libre)
+        et sépare clairement les <em>faits établis</em> de la <em>vulgarisation</em>.
+    </p>
+
+    <h2>Notre philosophie</h2>
+    <ul>
+        <li><strong>Savoir libre.</strong> Contenu sous licence CC BY-SA 4.0, code open source.</li>
+        <li><strong>Sources ouvertes et légales.</strong> Nous ne nous appuyons que sur des travaux diffusés en
+            <strong>accès ouvert légal</strong> (OpenAlex, Unpaywall, arXiv, dépôts d'auteurs…). Jamais de copie illicite.</li>
+        <li><strong>Rien sans source.</strong> Une question sans publication pertinente n'obtient pas de réponse inventée :
+            mieux vaut pas de réponse qu'une réponse non fondée.</li>
+        <li><strong>Transparence.</strong> Toute réponse est signée (modèle d'IA ou auteur humain) et porte la liste de ses sources.</li>
+        <li><strong>Souveraineté technique.</strong> L'IA qui rédige et indexe tourne sur des <strong>modèles open source
+            auto-hébergés</strong>, sans dépendance à une API propriétaire.</li>
+        <li><strong>Gouvernance scientifique.</strong> Un comité par domaine relit et valide ; les réponses non relues
+            sont publiées avec un bandeau ⚠️ explicite.</li>
+    </ul>
+
+    <h2>Comment ça marche</h2>
+    <ol>
+        <li>Une <strong>moissonneuse</strong> collecte des publications en accès ouvert et les classe dans l'arbre.</li>
+        <li>Vous posez une question sur une rubrique ; une <strong>IA open source</strong> rédige une réponse
+            <strong>niveau collège</strong>, <strong>ancrée sur les sources</strong> récupérées (RAG).</li>
+        <li>La réponse est publiée avec ses sources, puis peut être <strong>relue et validée</strong> par le comité.</li>
+    </ol>
+
+    <h2>À l'origine</h2>
+    <p>
+        SciencesWiki est un projet <strong>citoyen et indépendant</strong>, initié par passion pour la science et
+        l'éducation populaire, avec la conviction que la recherche — souvent financée par l'argent public —
+        devrait être accessible à toutes et tous. Le projet est <strong>ouvert aux contributions</strong> :
+        chercheurs, vulgarisateurs et curieux y sont les bienvenus.
+    </p>
+
+    <p style="margin-top:1.5rem">
+        <a class="card" style="display:inline-block" href="{{ path('home') }}">← Explorer l'encyclopédie</a>
+    </p>
+{% endblock %}

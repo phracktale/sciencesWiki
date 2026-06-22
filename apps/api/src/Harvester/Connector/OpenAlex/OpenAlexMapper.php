@@ -7,6 +7,7 @@ namespace App\Harvester\Connector\OpenAlex;
 use App\Enum\OaStatus;
 use App\Harvester\Dto\RawAuthor;
 use App\Harvester\Dto\RawPublication;
+use App\Harvester\Dto\RawSource;
 
 /**
  * Convertit un objet « work » OpenAlex en {@see RawPublication} normalisable.
@@ -28,9 +29,19 @@ final class OpenAlexMapper
         $openAccess = \is_array($work['open_access'] ?? null) ? $work['open_access'] : [];
         $primaryLocation = \is_array($work['primary_location'] ?? null) ? $work['primary_location'] : [];
         $bestOaLocation = \is_array($work['best_oa_location'] ?? null) ? $work['best_oa_location'] : [];
+        $hasContent = \is_array($work['has_content'] ?? null) ? $work['has_content'] : [];
 
-        $oaUrl = $openAccess['oa_url'] ?? ($bestOaLocation['pdf_url'] ?? null);
+        // On privilégie le PDF DIRECT (téléchargeable + vectorisable) à la page
+        // d'atterrissage HTML (open_access.oa_url) — sinon on ne récupère pas le texte.
+        $oaUrl = $bestOaLocation['pdf_url']
+            ?? ($primaryLocation['pdf_url'] ?? null)
+            ?? ($openAccess['oa_url'] ?? null)
+            ?? ($bestOaLocation['landing_page_url'] ?? null);
         $isOa = (bool) ($openAccess['is_oa'] ?? false);
+
+        // Page canonique de l'article chez l'éditeur (humain) : distincte du PDF.
+        $landingPageUrl = $primaryLocation['landing_page_url']
+            ?? ($bestOaLocation['landing_page_url'] ?? null);
 
         return new RawPublication(
             sourceCode: self::SOURCE_CODE,
@@ -46,8 +57,46 @@ final class OpenAlexMapper
             license: $primaryLocation['license'] ?? ($bestOaLocation['license'] ?? null),
             oaStatus: OaStatus::fromApi($openAccess['oa_status'] ?? null),
             oaUrl: null !== $oaUrl ? (string) $oaUrl : null,
+            landingPageUrl: null !== $landingPageUrl ? (string) $landingPageUrl : null,
             fulltextAvailable: $isOa && null !== $oaUrl,
             authors: self::authors($work['authorships'] ?? []),
+            source: self::source($primaryLocation),
+            citedByCount: (int) ($work['cited_by_count'] ?? 0),
+            fwci: isset($work['fwci']) && is_numeric($work['fwci']) ? (float) $work['fwci'] : null,
+            typeCrossref: isset($work['type_crossref']) ? self::clip((string) $work['type_crossref'], 64) : null,
+            referencedWorksCount: (int) ($work['referenced_works_count'] ?? 0),
+            hasPdf: (bool) ($hasContent['pdf'] ?? false),
+            hasGrobidXml: (bool) ($hasContent['grobid_xml'] ?? false),
+            anyRepoFulltext: (bool) ($openAccess['any_repository_has_fulltext'] ?? false),
+        );
+    }
+
+    /**
+     * Revue/source de la publication (host = éditeur), depuis primary_location.source.
+     *
+     * @param array<string,mixed> $primaryLocation
+     */
+    private static function source(array $primaryLocation): ?RawSource
+    {
+        $source = \is_array($primaryLocation['source'] ?? null) ? $primaryLocation['source'] : [];
+        $id = isset($source['id']) ? self::shortId((string) $source['id']) : '';
+        $name = (string) ($source['display_name'] ?? '');
+        if ('' === $id || '' === $name) {
+            return null;
+        }
+
+        $hostId = isset($source['host_organization']) ? self::shortId((string) $source['host_organization']) : null;
+
+        return new RawSource(
+            openAlexId: $id,
+            name: self::clip($name, 500),
+            issnL: isset($source['issn_l']) ? self::clip((string) $source['issn_l'], 32) : null,
+            type: isset($source['type']) ? self::clip((string) $source['type'], 64) : null,
+            isOa: (bool) ($source['is_oa'] ?? false),
+            isInDoaj: (bool) ($source['is_in_doaj'] ?? false),
+            publisherOpenAlexId: '' !== (string) $hostId ? $hostId : null,
+            publisherName: isset($source['host_organization_name']) ? self::clip((string) $source['host_organization_name'], 500) : null,
+            homepageUrl: isset($source['homepage_url']) ? (string) $source['homepage_url'] : null,
         );
     }
 
@@ -89,13 +138,18 @@ final class OpenAlexMapper
             if ('' === $name) {
                 continue;
             }
+            // Bornage aux longueurs de colonnes (author.name / affiliation = varchar 512).
+            $name = self::clip($name, 500);
 
-            $orcid = isset($author['orcid']) ? self::shortId((string) $author['orcid']) : null;
+            $orcid = isset($author['orcid']) ? strtoupper(trim(self::shortId((string) $author['orcid']))) : null;
+            if (null !== $orcid && ('' === $orcid || mb_strlen($orcid) > 32)) {
+                $orcid = null; // ORCID invalide/aberrant : on ignore plutôt que de violer la contrainte
+            }
 
             $affiliation = null;
             $rawAffiliations = $authorship['raw_affiliation_strings'] ?? null;
             if (\is_array($rawAffiliations) && isset($rawAffiliations[0])) {
-                $affiliation = (string) $rawAffiliations[0];
+                $affiliation = self::clip((string) $rawAffiliations[0], 500);
             }
 
             $authors[] = new RawAuthor($name, $orcid, $affiliation, $position);
@@ -113,7 +167,13 @@ final class OpenAlexMapper
         $source = \is_array($primaryLocation['source'] ?? null) ? $primaryLocation['source'] : [];
         $name = $source['display_name'] ?? null;
 
-        return null !== $name ? (string) $name : null;
+        return null !== $name ? self::clip((string) $name, 500) : null;
+    }
+
+    /** Tronque une chaîne à une longueur max (sécurité contre les colonnes varchar). */
+    private static function clip(string $value, int $max): string
+    {
+        return mb_strlen($value) > $max ? mb_substr($value, 0, $max) : $value;
     }
 
     private static function parseDate(mixed $value): ?\DateTimeImmutable

@@ -30,6 +30,18 @@ class Question
     #[ORM\Column(type: Types::TEXT)]
     private string $text;
 
+    /** Titre court affiché (ex. « Apprentissage profond résiduel »), posé par le rédacteur IA. */
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $title = null;
+
+    /** Nom/pseudo du demandeur (obligatoire pour une question libre publique). */
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $askerName = null;
+
+    /** IP du demandeur (audit + rate-limit). Donnée personnelle : minimisation RGPD. */
+    #[ORM\Column(length: 45, nullable: true)]
+    private ?string $askerIp = null;
+
     #[ORM\Column(type: 'vector', length: 384, nullable: true)]
     private ?Vector $embedding = null;
 
@@ -60,9 +72,60 @@ class Question
         return $this->treeNode;
     }
 
+    /** Réorientation (spec §8.2) : rattacher la question au bon nœud. */
+    public function setTreeNode(TreeNode $treeNode): self
+    {
+        $this->treeNode = $treeNode;
+
+        return $this;
+    }
+
     public function getText(): string
     {
         return $this->text;
+    }
+
+    public function setText(string $text): self
+    {
+        $this->text = $text;
+
+        return $this;
+    }
+
+    public function getTitle(): ?string
+    {
+        return $this->title;
+    }
+
+    public function setTitle(?string $title): self
+    {
+        $this->title = null !== $title ? mb_substr($title, 0, 255) : null;
+
+        return $this;
+    }
+
+    public function getAskerName(): ?string
+    {
+        return $this->askerName;
+    }
+
+    public function setAskerName(?string $askerName): self
+    {
+        $this->askerName = null !== $askerName ? mb_substr($askerName, 0, 120) : null;
+
+        return $this;
+    }
+
+    public function getAskerIp(): ?string
+    {
+        return $this->askerIp;
+    }
+
+    public function setAskerIp(?string $askerIp): self
+    {
+        $this->askerIp = $askerIp;
+
+        return $this;
     }
 
     public function getEmbedding(): ?Vector

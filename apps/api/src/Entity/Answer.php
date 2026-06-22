@@ -64,6 +64,21 @@ class Answer
     #[Groups(['answer:read'])]
     private bool $generatedByAi = true;
 
+    /** Modèle d'IA ayant rédigé la réponse, figé à la génération (immuable ensuite). */
+    #[ORM\Column(length: 120, nullable: true)]
+    #[Groups(['answer:read'])]
+    private ?string $generationModel = null;
+
+    /** Durée de génération en millisecondes (rédaction LLM). */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['answer:read'])]
+    private ?int $generationMs = null;
+
+    /** Vrai si une source citée a été rétractée/signalée après validation : à revalider. */
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['answer:read'])]
+    private bool $needsRevalidation = false;
+
     #[ORM\Column]
     #[Groups(['answer:read'])]
     private bool $academicBlockValidated = false;
@@ -78,6 +93,7 @@ class Answer
     private ?User $validatedBy = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[Groups(['answer:read'])]
     private \DateTimeImmutable $createdAt;
 
     /** @var Collection<int,AnswerRevision> */
@@ -98,6 +114,7 @@ class Answer
         $this->revisions = new ArrayCollection();
     }
 
+    #[Groups(['answer:read'])]
     public function getId(): ?int
     {
         return $this->id;
@@ -107,6 +124,26 @@ class Answer
     public function getQuestionText(): string
     {
         return $this->question->getText();
+    }
+
+    #[Groups(['answer:read'])]
+    public function getQuestionId(): ?int
+    {
+        return $this->question->getId();
+    }
+
+    /** Titre court affiché (sinon, à défaut, le texte de la question). */
+    #[Groups(['answer:read'])]
+    public function getTitle(): string
+    {
+        return $this->question->getTitle() ?? $this->question->getText();
+    }
+
+    /** Nom/pseudo du demandeur (pour la pastille auteur). */
+    #[Groups(['answer:read'])]
+    public function getAskerName(): string
+    {
+        return $this->question->getAskerName() ?? 'SciencesWiki';
     }
 
     /**
@@ -131,9 +168,12 @@ class Answer
     }
 
     /**
-     * Notes de bas de page (sources) de la dernière révision.
+     * Notes de bas de page (sources) de la dernière révision : métadonnées
+     * complètes du papier (auteurs, date, revue) + lien vers l'accès ouvert/DOI.
+     * Une réponse peut citer plusieurs papiers ; un papier peut servir plusieurs
+     * réponses (relation N:N côté contenu).
      *
-     * @return list<array{marker:int,doi:?string,title:string}>
+     * @return list<array{marker:int,doi:?string,title:string,authors:list<string>,year:?string,venue:?string,oaUrl:?string}>
      */
     #[Groups(['answer:read'])]
     public function getSources(): array
@@ -145,10 +185,15 @@ class Answer
 
         $sources = [];
         foreach ($revision->getFootnotes() as $footnote) {
+            $pub = $footnote->getPublication();
             $sources[] = [
                 'marker' => $footnote->getMarker(),
                 'doi' => $footnote->getDoi(),
-                'title' => $footnote->getPublication()->getTitle(),
+                'title' => $pub->getTitle(),
+                'authors' => array_map(static fn (array $a): string => $a['name'], $pub->getAuthors()),
+                'year' => $pub->getPublicationDate()?->format('Y'),
+                'venue' => $pub->getVenue(),
+                'oaUrl' => $pub->getOaUrl(),
             ];
         }
 
@@ -165,6 +210,13 @@ class Answer
         return $this->treeNode;
     }
 
+    public function setTreeNode(TreeNode $treeNode): self
+    {
+        $this->treeNode = $treeNode;
+
+        return $this;
+    }
+
     public function getLanguage(): string
     {
         return $this->language;
@@ -173,6 +225,18 @@ class Answer
     public function getValidationStatus(): AnswerValidationStatus
     {
         return $this->validationStatus;
+    }
+
+    public function needsRevalidation(): bool
+    {
+        return $this->needsRevalidation;
+    }
+
+    public function setNeedsRevalidation(bool $v): self
+    {
+        $this->needsRevalidation = $v;
+
+        return $this;
     }
 
     public function setValidationStatus(AnswerValidationStatus $status): self
@@ -216,6 +280,32 @@ class Answer
     public function isGeneratedByAi(): bool
     {
         return $this->generatedByAi;
+    }
+
+    #[Groups(['answer:read'])]
+    public function getGenerationModel(): ?string
+    {
+        return $this->generationModel;
+    }
+
+    public function setGenerationModel(?string $generationModel): self
+    {
+        $this->generationModel = $generationModel;
+
+        return $this;
+    }
+
+    #[Groups(['answer:read'])]
+    public function getGenerationMs(): ?int
+    {
+        return $this->generationMs;
+    }
+
+    public function setGenerationMs(?int $generationMs): self
+    {
+        $this->generationMs = null !== $generationMs ? max(0, $generationMs) : null;
+
+        return $this;
     }
 
     public function isAcademicBlockValidated(): bool

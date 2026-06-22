@@ -1,0 +1,45 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Paramètres › IA{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>Paramètres › Configuration IA</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <form class="ask" method="post" action="{{ path('admin_settings_ai') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+
+        <h2 style="margin-top:0">Modèles de rédaction (Ollama)</h2>
+        <p class="muted" style="font-size:.85rem">Un modèle par objet rédactionnel.{% if models.error %} <span class="badge warn">serveur de modèles injoignable</span>{% endif %}</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.8rem">
+            <div>
+                <label>1 — Articles WIKI</label>
+                {% if models.models is not empty %}
+                    <select name="wiki_model">
+                        {% for m in models.models %}<option value="{{ m }}" {{ settings['wiki.model'] == m ? 'selected' }}>{{ m }}</option>{% endfor %}
+                    </select>
+                {% else %}<input type="text" name="wiki_model" value="{{ settings['wiki.model'] }}" placeholder="ex. qwen3.6:latest">{% endif %}
+            </div>
+            <div>
+                <label>2 — Questions / Réponses</label>
+                {% if models.models is not empty %}
+                    <select name="model">
+                        <option value="">Défaut serveur{% if models.default %} ({{ models.default }}){% endif %}</option>
+                        {% for m in models.models %}<option value="{{ m }}" {{ settings['rag.model'] == m ? 'selected' }}>{{ m }}</option>{% endfor %}
+                    </select>
+                {% else %}<input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">{% endif %}
+            </div>
+        </div>
+
+        <h2 style="margin-top:1.4rem">Configuration de la génération (Q/R)</h2>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem">
+            <div><label>Longueur max (tokens)</label><input type="text" name="max_tokens" value="{{ settings['rag.max_tokens'] }}"></div>
+            <div><label>Température (0–1)</label><input type="text" name="temperature" value="{{ settings['rag.temperature'] }}"></div>
+            <div><label>Sources récupérées (kNN)</label><input type="text" name="neighbors" value="{{ settings['rag.neighbors'] }}"></div>
+        </div>
+        <label style="margin-top:.6rem; display:block">Prompt système (rédaction RAG)</label>
+        <textarea name="system_prompt" style="min-height:16rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ settings['rag.system_prompt'] }}</textarea>
+
+        <button type="submit" style="margin-top:1rem">Enregistrer</button>
+    </form>
+{% endblock %}

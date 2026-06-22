@@ -3,32 +3,293 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    {# Nonce CSP exposé à Turbo : il stampe ce nonce sur les scripts qu'il réinjecte
+       lors d'une navigation (sinon ils seraient bloqués par la CSP du document). #}
+    <meta name="csp-nonce" content="{{ csp_nonce.value }}">
     <title>{% block title %}SciencesWiki{% endblock %}</title>
+    <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée à des publications de recherche.{% endblock %}">
+    {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}
+    <script nonce="{{ csp_nonce.value }}" src="/js/turbo.min.js" defer></script>
     <style>
-        :root { --accent:#1a5; --aca:#2563eb; --vul:#b45309; }
+        :root {
+            --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937;
+            /* Roboto Mono = base + structure (titres, menus, boutons, en-têtes de tables). */
+            --font-base: 'Roboto Mono', ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+            /* Monofur = contenu des listes/articles + texte secondaire des cartes + badges. */
+            --font-content: 'Monofur', ui-monospace, monospace;
+        }
+        @font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+        @font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
+        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/MonofurNerdFont-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/MonofurNerdFont-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
         * { box-sizing: border-box; }
-        body { font-family: system-ui, sans-serif; max-width: 880px; margin: 0 auto; padding: 1.5rem; color:#1f2937; line-height:1.55; }
-        header a { color: var(--accent); text-decoration: none; font-weight: 700; }
-        h1 { margin: .2rem 0; }
-        a { color: var(--aca); }
+        /* Classes utilitaires explicites (cf. usage dans les templates). */
+        .font-roboto { font-family: var(--font-base); }
+        .font-monofur { font-family: var(--font-content); }
+        /* Base + structure = Roboto Mono. */
+        body, button, input, select, textarea { font-family: var(--font-base); }
+        body { max-width: 1200px; margin: 0 auto; padding: 1.5rem; color:var(--ink); line-height:1.6; }
+        h1, h2, h3, h4, .brand, header nav, footer, table th { font-family: var(--font-base); }
+        /* Contenu (listes/articles) + secondaire des cartes + badges = Monofur. */
+        table td, .badge, .pill, .qlist, .card .muted,
+        .block-vul, .block-aca, .sources, .xp-detail, table.xp td { font-family: var(--font-content); }
+        /* Accueil : 2 colonnes (principal + barre latérale). */
+        .home-grid { display:grid; grid-template-columns: 1.7fr 1fr; gap:1.6rem; align-items:start; }
+        @media (max-width:880px) { .home-grid { grid-template-columns:1fr; } }
+        .side-block { border:1px solid var(--line); border-radius:14px; padding:1rem 1.1rem; margin-bottom:1.2rem; }
+        .side-block h2 { margin:.1rem 0 .7rem; font-size:1.1rem; }
+        /* Lanceurs de domaines colorés. */
+        .domains { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.8rem; }
+        .domain-card { position:relative; overflow:hidden; display:block; border-radius:14px; padding:1.1rem; min-height:120px;
+            color:#fff; text-decoration:none; border:2px solid #fff; box-shadow:0 1px 3px rgba(0,0,0,.4); transition:transform .18s ease, box-shadow .18s ease; }
+        .domain-card::after { content:''; position:absolute; inset:0; background:rgba(0,0,0,.15); transition:background .18s ease; z-index:0; }
+        .domain-card:hover { transform:scale(1.03); box-shadow:0 6px 18px rgba(0,0,0,.28); }
+        .domain-card:hover::after { background:rgba(0,0,0,.25); }
+        .domain-card > * { position:relative; z-index:1; }
+        .domain-card .d-label { font-weight:800; font-size:1.05rem; text-shadow:0 1px 3px rgba(0,0,0,.4); }
+        .domain-card .d-sub { font-size:.82rem; opacity:.95; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+        /* Onglets « Nous rejoindre ». */
+        .join-tabs { display:flex; gap:.2rem; border-bottom:2px solid var(--line); margin-bottom:.8rem; flex-wrap:wrap; }
+        .join-tabs button { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px; padding:.45rem .7rem; font:inherit; font-weight:600; color:#6b7280; cursor:pointer; }
+        .join-tabs button[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent); }
+        .join-pane[hidden] { display:none; }
+        .join-pane label { display:block; font-size:.82rem; font-weight:600; margin:.4rem 0 .15rem; }
+        .join-pane input[type=text], .join-pane input[type=email], .join-pane textarea, .join-pane select { width:100%; padding:.45rem .6rem; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
+        .join-pane button[type=submit] { margin-top:.7rem; background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1rem; font:inherit; font-weight:600; cursor:pointer; }
+        .stat-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+        .stat-grid .s { border:1px solid var(--line); border-radius:10px; padding:.6rem .7rem; }
+        .stat-grid .s strong { font-size:1.3rem; display:block; }
+        header { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; border-bottom:1px solid var(--line); padding-bottom:.8rem; margin-bottom:1.2rem; }
+        header .brand { color: var(--accent); text-decoration: none; font-weight: 800; font-size:1.2rem; display:inline-flex; align-items:center; }
+        header .brand img { height:64px; width:auto; display:block; }
+        header nav { margin-left:auto; display:flex; gap:.25rem; font-size:.92rem; align-items:flex-start; }
+        header nav a { color:var(--ink); text-decoration:none; font-weight:600; padding:.5rem .9rem; border-radius:9px; position:relative; transition:background .15s, color .15s; }
+        header nav a:hover { background:rgba(1,159,185,.12); color:var(--accent-dark); }
+        header nav a.is-active { color:var(--accent-dark); }
+        header nav a.is-active::after { content:''; position:absolute; left:.9rem; right:.9rem; bottom:.28rem; height:2px; background:var(--accent); border-radius:2px; }
+        /* Menu déroulant « Mon compte » (front). */
+        .nav-dd { position:relative; }
+        .nav-dd-top { font:inherit; font-weight:600; color:var(--ink); background:rgba(1,159,185,.08); border:1px solid var(--line); border-radius:9px; padding:.35rem .9rem; cursor:pointer; text-align:left; line-height:1.15; }
+        .nav-dd-top:hover, .nav-dd:focus-within .nav-dd-top { background:rgba(1,159,185,.16); }
+        .nav-dd-top .nav-email { display:block; font-weight:400; font-size:.76rem; color:var(--muted, #64748b); }
+        .nav-dd-menu { position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,.12); min-width:210px; padding:.3rem; display:none; z-index:50; }
+        .nav-dd-menu::before { content:''; position:absolute; left:0; right:0; top:-8px; height:8px; }
+        .nav-dd:hover .nav-dd-menu, .nav-dd:focus-within .nav-dd-menu { display:block; }
+        .nav-dd-menu a { display:block; }
+        .nav-dd-logout { border-top:1px solid var(--line); margin-top:.2rem; color:#b91c1c !important; }
+        h1 { margin: .3rem 0; font-size:1.7rem; }
+        h2 { margin-top:1.6rem; }
+        /* Pas de souligné par défaut (boutons, blocs, menus, nav…). Le souligné est
+           réservé aux liens INLINE du contenu rédactionnel (cf. .md a plus bas). */
+        a { color: var(--accent); text-decoration:none; }
+        a:focus { color:#792424; font-weight:bold; }
         .muted { color:#6b7280; }
-        .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:.6rem; }
-        .card { display:block; border:1px solid #e5e7eb; border-radius:10px; padding:.8rem; text-decoration:none; color:#111827; }
+        .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:.6rem; }
+        .card { display:block; border:1px solid var(--line); border-radius:10px; padding:.8rem; text-decoration:none; color:#111827; transition:border-color .15s; }
         .card:hover { border-color: var(--accent); }
         .crumbs { font-size:.9rem; }
-        .qa { border:1px solid #e5e7eb; border-radius:12px; padding:1rem; margin:1rem 0; }
-        .badge { display:inline-block; font-size:.78rem; padding:.1rem .5rem; border-radius:999px; }
+        .crumbs a { color:#6b7280; text-decoration:none; }
+        .crumbs a:hover { color:var(--accent); }
+        .pill { display:inline-block; font-size:.72rem; padding:.12rem .55rem; border-radius:999px; background:#f1f5f9; color:#475569; border:1px solid var(--line); }
+        .pill.author { background:#eef2ff; color:#3730a3; border-color:#e0e7ff; }
+        .pill.node { background:#ecfdf5; color:#065f46; border-color:#d1fae5; }
+        .badge { display:inline-block; font-size:.78rem; padding:.1rem .55rem; border-radius:8px; }
         .badge.ok { background:#dcfce7; color:#166534; }
         .badge.warn { background:#fef3c7; color:#92400e; }
-        .block-aca { border-left:3px solid var(--aca); padding-left:.8rem; }
-        .block-vul { border-left:3px solid var(--vul); padding-left:.8rem; }
-        .sources { font-size:.85rem; }
-        footer { margin-top:3rem; font-size:.8rem; color:#9ca3af; }
+        .qlist { list-style:none; padding:0; margin:0; }
+        .qlist li { border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; margin:.5rem 0; }
+        .qlist a.q-title { font-weight:600; text-decoration:none; color:#111827; font-size:1.05rem; }
+        .qlist a.q-title:hover { color:var(--accent); }
+        .qmeta { margin-top:.35rem; display:flex; gap:.45rem; align-items:center; flex-wrap:wrap; font-size:.8rem; }
+        .qmeta time { color:#9ca3af; }
+        .block-aca { border-left:3px solid var(--aca); padding-left:.9rem; }
+        .block-vul { border-left:3px solid var(--vul); padding-left:.9rem; }
+        .sources { font-size:.88rem; }
+        .ask { border:1px solid var(--line); border-radius:12px; padding:1rem 1.1rem; margin:1.2rem 0; background:#fafafa; }
+        .ask label { display:block; font-size:.85rem; font-weight:600; margin:.5rem 0 .2rem; }
+        .ask input[type=text], .ask textarea { width:100%; padding:.55rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit; }
+        .ask textarea { min-height:4.5rem; resize:vertical; }
+        .ask button { margin-top:.8rem; background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.6rem 1.1rem; font:inherit; font-weight:600; cursor:pointer; }
+        .ask button:disabled { opacity:.5; cursor:not-allowed; }
+        .loader { display:inline-block; width:1rem; height:1rem; border:2px solid #cbd5e1; border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; vertical-align:-2px; }
+        @keyframes spin { to { transform:rotate(360deg); } }
+        td { vertical-align: top; padding: 0.54rem; border-bottom: 1px solid #b5d6f2; }
+        #stream-out { white-space:pre-wrap; margin-top:1rem; padding:1rem; border:1px dashed #cbd5e1; border-radius:10px; min-height:2rem; }
+        #stream-out h4 { color:var(--vul); margin:.6rem 0 .2rem; font-size:.95rem; text-transform:uppercase; letter-spacing:.04em; }
+        .cartouche { display:flex; gap:.8rem; align-items:flex-start; border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fbfdff; margin:1rem 0; }
+        .cartouche .avatar { width:42px; height:42px; border-radius:10px; background:linear-gradient(135deg,var(--accent),var(--accent-dark)); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; flex:0 0 auto; }
+        .cartouche .who { font-weight:700; }
+        .cartouche .note { font-size:.85rem; color:#6b7280; }
+        footer { margin-top:3rem; border-top:1px solid var(--line); padding-top:1rem; font-size:.8rem; color:#9ca3af; }
+        footer a { color:#6b7280; }
+        /* Menu back-office */
+        .admin-nav { display:flex; flex-wrap:wrap; align-items:center; gap:.25rem; padding:.5rem .6rem; margin-bottom:1.4rem;
+            background:#0f172a; border-radius:12px; }
+        .admin-nav-brand { color:#fff; font-weight:700; font-size:.92rem; padding:.35rem .7rem; margin-right:.3rem; }
+        .admin-nav a { color:#cbd5e1; text-decoration:none; font-size:.88rem; font-weight:600; padding:.4rem .8rem; border-radius:8px; transition:background .15s, color .15s; }
+        .admin-nav a:hover { background:#1e293b; color:#fff; }
+        .admin-nav a.active { background:var(--accent); color:#fff; }
+        .admin-nav-logout { margin-left:auto; color:#fca5a5 !important; }
+        .admin-nav-logout:hover { background:#7f1d1d !important; color:#fff !important; }
+        .admin-nav .dd { position:relative; }
+        .admin-nav .dd-top { color:#cbd5e1; font-size:.88rem; font-weight:600; padding:.4rem .8rem; border-radius:8px; cursor:pointer; display:inline-block; user-select:none; }
+        .admin-nav .dd-top:hover, .admin-nav .dd:focus-within .dd-top { background:#1e293b; color:#fff; }
+        .admin-nav .dd-top.active { background:var(--accent); color:#fff; }
+        .admin-nav .dd-menu { position:absolute; top:calc(100% + 6px); left:0; background:#0f172a; border:1px solid #334155; border-radius:8px; min-width:210px; padding:.3rem; display:none; z-index:50; box-shadow:0 10px 28px rgba(0,0,0,.35); }
+        /* Pont invisible collé au lanceur : couvre l'espace visuel, le survol ne « tombe » jamais dans le vide. */
+        .admin-nav .dd-menu::before { content:''; position:absolute; left:0; right:0; top:-8px; height:8px; }
+        .admin-nav .dd:hover .dd-menu, .admin-nav .dd:focus-within .dd-menu { display:block; }
+        .admin-nav .dd-menu a { display:block; white-space:nowrap; }
+        /* Rendu Markdown (articles wiki + réponses) */
+        .md { line-height:1.7; }
+        .md h2 { margin:1.8rem 0 .6rem; font-size:1.5rem; border-bottom:2px solid var(--line); padding-bottom:.25rem; }
+        .md h3 { margin:1.3rem 0 .4rem; font-size:1.2rem; }
+        .md h4 { margin:1.1rem 0 .3rem; font-size:1.05rem; }
+        .md p { margin:.7rem 0; }
+        .md ul, .md ol { margin:.6rem 0 .6rem 1.4rem; }
+        .md li { margin:.25rem 0; }
+        /* Liens INLINE du contenu rédactionnel : soulignés (lisibilité/repérage). */
+        .md a { color:var(--accent); text-decoration:underline; text-decoration-color:rgba(1,159,185,.45); text-underline-offset:2px; }
+        .md a:hover { text-decoration-color:var(--accent); text-decoration-thickness:2px; }
+        .md blockquote { border-left:4px solid var(--line); margin:.8rem 0; padding:.2rem 0 .2rem 1rem; color:#475569; }
+        .md table { border-collapse:collapse; margin:.8rem 0; width:100%; }
+        .md th, .md td { border:1px solid var(--line); padding:.4rem .6rem; text-align:left; }
+        .md code { background:#f1f5f9; padding:.1rem .35rem; border-radius:6px; font-size:.9em; }
+        .md pre { background:#f1f5f9; padding:.8rem; border-radius:8px; overflow:auto; }
+        .wiki-article { margin:1.5rem 0 2rem; max-width:80ch; }
+        .article-paternity { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:.3rem 0 1.2rem; }
+        .ai-banner { margin:2rem 0 .5rem; padding:.9rem 1.1rem; border:1px solid #fcd34d; background:#fffbeb; border-radius:10px; font-size:.92rem; line-height:1.6; color:#78350f; }
+        .ai-banner a { color:var(--accent-dark); font-weight:600; }
     </style>
+
+    {# Mesure d'audience respectueuse de la vie privée (Plausible auto-hébergé : sans cookies, sans données personnelles, RGPD-friendly). #}
+    <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
+    <script nonce="{{ csp_nonce.value }}">
+        window.plausible = window.plausible || function () { (plausible.q = plausible.q || []).push(arguments) }, plausible.init = plausible.init || function (i) { plausible.o = i || {} };
+        plausible.init()
+    </script>
+
+    {# Comportements génériques pilotés par attributs data-* (CSP : remplace les
+       handlers inline on*=). data-confirm (submit), data-busy (désactive+texte au submit),
+       data-needs-email="0" (alerte si pas d'e-mail), data-toggle / data-show (+data-scroll). #}
+    <script nonce="{{ csp_nonce.value }}">
+        document.addEventListener('submit', function (e) {
+            var form = e.target;
+            var cf = form.closest ? form.closest('[data-confirm]') : null;
+            if (cf && !window.confirm(cf.getAttribute('data-confirm'))) { e.preventDefault(); return; }
+            var ne = form.closest ? form.closest('[data-needs-email="0"]') : null;
+            if (ne) { window.alert("Cette demande n'a pas d'e-mail."); e.preventDefault(); return; }
+            var bf = form.closest ? form.closest('[data-busy]') : null;
+            if (bf) { var btn = bf.querySelector('button[type="submit"], button:not([type])'); if (btn) { btn.disabled = true; var t = bf.getAttribute('data-busy'); if (t) btn.textContent = t; } }
+        });
+        document.addEventListener('click', function (e) {
+            var tg = e.target.closest ? e.target.closest('[data-toggle],[data-show]') : null;
+            if (!tg) return;
+            var id = tg.getAttribute('data-toggle') || tg.getAttribute('data-show');
+            var el = document.getElementById(id);
+            if (el) {
+                el.hidden = tg.hasAttribute('data-show') ? false : !el.hidden;
+                if (!el.hidden && tg.hasAttribute('data-scroll')) el.scrollIntoView({ block: 'nearest' });
+            }
+            if (tg.tagName === 'A') e.preventDefault();
+        });
+    </script>
 </head>
 <body>
-    <header><a href="{{ path('home') }}">SciencesWiki</a> <span class="muted">— le savoir scientifique, libre et vulgarisé</span></header>
-    <main>{% block body %}{% endblock %}</main>
-    <footer>Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique.</footer>
+    <header>
+        <a class="brand" href="{{ path('home') }}"><img src="/logo.svg" alt="SciencesWiki"></a>
+        <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
+        {% set route = app.request.attributes.get('_route') %}
+        <nav>
+            <a href="{{ path('home') }}"{{ route in ['home','node'] ? ' class="is-active"' : '' }}>Accueil</a>
+            <a href="{{ path('wiki_search') }}"{{ route == 'wiki_search' ? ' class="is-active"' : '' }}>Rechercher</a>
+            <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
+            <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
+            {% if current_user.isLogged %}
+                <div class="nav-dd">
+                    <button type="button" class="nav-dd-top" aria-haspopup="true">Mon compte<span class="nav-email">{{ current_user.displayName }}</span></button>
+                    <div class="nav-dd-menu">
+                        {% if current_user.canResearch %}<a href="{{ path('researcher_dashboard') }}"{{ route == 'researcher_dashboard' ? ' class="is-active"' : '' }}>🔬 Espace chercheur</a>{% endif %}
+                        {% if current_user.hasRole('ROLE_ADMIN') %}<a href="{{ path('admin_dashboard') }}">⚙️ Tableau de bord</a>{% endif %}
+                        <a href="{{ path('logout') }}" class="nav-dd-logout">⏻ Déconnexion</a>
+                    </div>
+                </div>
+            {% else %}
+                <a href="{{ path('login') }}"{{ route == 'login' ? ' class="is-active"' : '' }}>Connexion</a>
+            {% endif %}
+        </nav>
+    </header>
+    <main>
+        {% for t in ['success', 'error'] %}{% for m in app.flashes(t) %}<p class="badge {{ t == 'success' ? 'ok' : 'warn' }}">{{ m }}</p>{% endfor %}{% endfor %}
+        {% block body %}{% endblock %}
+    </main>
+    <footer>
+        Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique ·
+        projet libre, gratuit et open source. <a href="{{ path('project') }}">En savoir plus</a>
+        <br><span class="muted" style="font-size:.78rem">SciencesWiki · {{ app_version }}</span>
+    </footer>
+
+    {% if admin_session.logged %}
+        <div style="height:46px"></div>{# espace pour ne pas masquer le footer #}
+        <div id="admin-bar" style="position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#0f172a; color:#e2e8f0; font:13px/1.4 system-ui,sans-serif; display:flex; align-items:center; gap:.5rem; padding:.35rem .7rem; box-shadow:0 -2px 8px rgba(0,0,0,.2)">
+            <strong style="background:var(--accent); color:#fff; padding:.1rem .5rem; border-radius:5px">ADMIN</strong>
+            <a href="{{ path('admin_dashboard') }}" style="color:#93c5fd">Tableau de bord</a>
+            <a href="{{ path('admin_harvest') }}" style="color:#93c5fd">Moisson</a>
+            <a href="{{ path('admin_activity') }}" style="color:#93c5fd">Journal</a>
+            <a href="{{ path('admin_articles') }}" style="color:#93c5fd">Articles</a>
+            <a href="{{ path('admin_settings') }}" style="color:#93c5fd">Paramètres</a>
+            {% block admin_context %}{% endblock %}
+            <span id="ab-load" style="margin-left:auto; display:flex; align-items:center; gap:.7rem; font-size:12px; color:#94a3b8" title="Charge CPU (loadavg/cœurs) · RAM">—</span>
+            <span id="ab-harvest" style="display:flex; align-items:center; gap:.5rem">
+                <span class="muted" style="color:#94a3b8">moisson :</span>
+                <span id="ab-text" style="color:#cbd5e1">—</span>
+                <span style="width:90px; height:7px; background:#334155; border-radius:4px; overflow:hidden"><span id="ab-bar" style="display:block; height:100%; width:0; background:var(--accent)"></span></span>
+            </span>
+            <a href="{{ path('admin_logout') }}" style="color:#fca5a5; margin-left:.4rem">quitter</a>
+        </div>
+        <script nonce="{{ csp_nonce.value }}">
+        (function () {
+            var txt = document.getElementById('ab-text'), bar = document.getElementById('ab-bar'), load = document.getElementById('ab-load');
+            if (!txt) return;
+            function host(name, s) {
+                if (!s) return name + ' <span style="color:#64748b">n/d</span>';
+                var lp = s.loadPct == null ? '?' : s.loadPct, mp = s.memPct == null ? '?' : s.memPct;
+                var col = (lp >= 90 || mp >= 90) ? '#f87171' : (lp >= 70 || mp >= 70) ? '#fbbf24' : '#86efac';
+                return name + ' <span style="color:' + col + '">' + lp + '%</span>·<span style="color:' + col + '">' + mp + '%</span>';
+            }
+            function poll() {
+                fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.ok ? r.json() : null; })
+                    .then(function (d) {
+                        if (!d) return;
+                        if (load && d.system) {
+                            load.innerHTML = '🖥 ' + host('Thor', d.system.thor) + ' &nbsp; ' + host('Marvin', d.system.marvin);
+                        }
+                        var running = (d.running || []).length, queued = d.queued || 0;
+                        var run = (d.jobs || []).filter(function (j) { return j.status === 'running' && !j.stale; })[0];
+                        if (run) {
+                            txt.textContent = '⏳ ' + (run.label || run.rubric) + ' — ' + run.processed + ' traité(s)' + (queued ? ' · ' + queued + ' en file' : '');
+                            bar.style.width = Math.min(100, Math.round(run.processed / 500 * 100)) + '%';
+                        } else if (queued) {
+                            txt.textContent = '⏳ ' + queued + ' moisson(s) en file';
+                            bar.style.width = '5%';
+                        } else {
+                            txt.textContent = 'au repos'; bar.style.width = '0';
+                        }
+                    }).catch(function () {});
+            }
+            poll();
+            var t = setInterval(poll, 5000);
+            // Temps réel via Mercure : un « tick » (job moisson/texte intégral) déclenche
+            // un re-fetch immédiat (débattu). Le polling 5 s reste le filet si le hub tombe.
+            var es = null, deb = null;
+            try {
+                es = new EventSource('/.well-known/mercure?topic=' + encodeURIComponent('sciences/harvest'));
+                es.onmessage = function () { clearTimeout(deb); deb = setTimeout(poll, 800); };
+            } catch (e) {}
+            document.addEventListener('turbo:before-cache', function () { clearInterval(t); if (es) es.close(); }, { once: true });
+        })();
+        </script>
+    {% endif %}
 </body>
 </html>

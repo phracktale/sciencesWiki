@@ -1,0 +1,12 @@
+.git
+.gitignore
+/vendor/
+/var/
+/.env.local
+/.env.*.local
+/.env.local.php
+/config/jwt/*.pem
+/phpunit.xml
+/.phpunit.cache/
+compose.yaml
+compose.override.yaml

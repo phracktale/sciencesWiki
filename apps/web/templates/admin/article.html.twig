@@ -1,0 +1,86 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — {{ pub.title }}{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.7rem 1rem; word-break:break-all">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.7rem 1rem">{{ msg }}</p>{% endfor %}
+
+    <h1 style="font-size:1.35rem">{{ pub.title }}</h1>
+    <p class="qmeta">
+        {% if pub.authors is not empty %}<span class="pill author">✍️ {{ pub.authors|slice(0,6)|join(', ') }}{% if pub.authors|length > 6 %} et al.{% endif %}</span>{% endif %}
+        {% if pub.date %}<span class="muted">{{ pub.date }}</span>{% endif %}
+        {% if pub.venue %}<span class="muted">· {{ pub.venue }}</span>{% endif %}
+        {% if pub.access == 'libre' %}<span class="badge ok">accès libre</span>
+        {% elseif pub.access == 'payant' %}<span class="badge warn">accès payant</span>
+        {% else %}<span class="pill">accès inconnu</span>{% endif %}
+        {% if pub.retractionStatus == 'retracted' %}<span class="badge warn">⛔ rétractée</span>
+        {% elseif pub.retractionStatus == 'concern' %}<span class="badge warn">⚠️ mise en garde (EoC)</span>{% endif %}
+        {% if pub.language %}<span class="pill">langue : {{ pub.language }}</span>{% endif %}
+    </p>
+    <p class="muted" style="font-size:.85rem">
+        {% if pub.doiUrl %}<a href="{{ pub.doiUrl }}" target="_blank" rel="noopener">doi:{{ pub.doi }}</a>{% endif %}
+        {% if pub.oaUrl %} · <a href="{{ pub.oaUrl }}" target="_blank" rel="noopener">source en accès libre ↗</a>{% endif %}
+    </p>
+
+    {% if pub.abstract %}
+        <h2>Résumé</h2>
+        <p>{{ pub.abstract }}</p>
+    {% endif %}
+
+    {% if pub.oaUrl %}
+        {% set pdfProxy = path('admin_article_pdf', { id: pub.id }) %}
+        <h2 style="display:flex; align-items:center; gap:.8rem; flex-wrap:wrap">
+            PDF
+            <span style="font-size:.85rem; font-weight:400; display:flex; gap:.5rem">
+                <a class="pill" href="{{ pdfProxy }}?dl=1">⬇ Télécharger</a>
+                <a class="pill" href="{{ pdfProxy }}" target="_blank" rel="noopener">🖨 Imprimer / plein écran</a>
+                <button type="button" id="share-btn" class="pill" style="cursor:pointer; border:1px solid var(--line)">🔗 Partager</button>
+            </span>
+        </h2>
+        {# Visualiseur PDF.js auto-hébergé ; repli sur le rendu natif si absent. #}
+        <iframe id="pdf-frame"
+                src="/pdfjs/web/viewer.html?file={{ pdfProxy|url_encode }}"
+                style="width:100%; height:78vh; border:1px solid var(--line); border-radius:10px"
+                title="Visualiseur PDF"></iframe>
+        <p class="muted" style="font-size:.8rem">Si le PDF ne s'affiche pas, la source est probablement une page éditeur (et non un PDF direct) : utilisez le lien « source en accès libre » ci-dessus.</p>
+        <script nonce="{{ csp_nonce.value }}">
+        (function () {
+            var btn = document.getElementById('share-btn');
+            var shareUrl = {{ (pub.doiUrl ?? pub.oaUrl)|json_encode|raw }};
+            btn && btn.addEventListener('click', function () {
+                if (navigator.share) { navigator.share({ title: {{ pub.title|json_encode|raw }}, url: shareUrl }).catch(function(){}); return; }
+                navigator.clipboard.writeText(shareUrl).then(function () { btn.textContent = '✓ Lien copié'; setTimeout(function(){ btn.textContent = '🔗 Partager'; }, 2000); });
+            });
+            // Repli : si le viewer PDF.js n'est pas vendoré (404), bascule sur le rendu natif.
+            var frame = document.getElementById('pdf-frame');
+            frame && frame.addEventListener('load', function () {
+                try {
+                    if (frame.contentDocument && /404|not found/i.test(frame.contentDocument.title || '')) {
+                        frame.src = {{ pdfProxy|json_encode|raw }};
+                    }
+                } catch (e) { /* cross-origin une fois le PDF chargé : normal */ }
+            });
+        })();
+        </script>
+    {% else %}
+        <p class="badge warn">Aucun PDF en accès libre pour cet article — seul le résumé est indexé.</p>
+        {% if not pub.fulltext %}
+            <div style="border:1px solid var(--line); border-radius:10px; padding:1rem; margin-top:.6rem">
+                <p style="margin:.2rem 0"><strong>Solliciter la version auteur</strong></p>
+                <p class="muted" style="font-size:.88rem; margin:.2rem 0 .7rem">Génère un lien sécurisé (usage unique, 90 j) à transmettre aux auteurs pour qu'ils déposent leur PDF (postprint), qui sera alors indexé dans le RAG.</p>
+                <form method="post" action="{{ path('admin_article_contribution', { id: pub.id }) }}">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1rem; cursor:pointer">🔗 Générer un lien de dépôt auteur</button>
+                </form>
+            </div>
+        {% endif %}
+    {% endif %}
+
+    {% if pub.fulltext %}
+        <h2>Texte intégral indexé <span class="muted" style="font-size:.85rem; font-weight:400">({{ pub.fulltextChunks }} fragment(s) vectorisé(s))</span></h2>
+        <details>
+            <summary style="cursor:pointer">Afficher le texte extrait</summary>
+            <div style="white-space:pre-wrap; max-height:50vh; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:1rem; margin-top:.6rem; font-size:.9rem">{{ pub.fulltext }}</div>
+        </details>
+    {% endif %}
+{% endblock %}

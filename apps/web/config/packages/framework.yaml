@@ -1,9 +1,32 @@
 # see https://symfony.com/doc/current/reference/configuration/framework.html
+parameters:
+    # Défaut inoffensif si la variable n'est pas fournie (build, dev) ; en prod
+    # le compose injecte les plages privées du homelab (proxy nginx Heimdall).
+    env(TRUSTED_PROXIES): '127.0.0.1'
+
 framework:
     secret: '%env(APP_SECRET)%'
 
-    # Note that the session will be started ONLY if you read or write from it.
-    session: true
+    # Multilingue : seul le français a du contenu pour l'instant ; la structure
+    # d'URL /{_locale} est prête pour ajouter d'autres langues (ajouter ici + traductions).
+    default_locale: fr
+    enabled_locales: ['fr']
+
+    # Derrière le reverse-proxy nginx (Heimdall) qui termine le TLS.
+    trusted_proxies: '%env(TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
+
+    # Session du back-office : 8 h (journée de travail) pour ne pas redemander le
+    # login toutes les ~20 min (défaut PHP gc_maxlifetime), sans session interminable.
+    session:
+        # Stockage des sessions dans un répertoire dédié (monté en volume Docker)
+        # pour qu'elles SURVIVENT aux rebuilds du conteneur (sinon /tmp éphémère →
+        # déconnexion à chaque déploiement).
+        save_path: '%kernel.project_dir%/var/sessions'
+        cookie_lifetime: 28800
+        gc_maxlifetime: 28800
+        cookie_secure: auto
+        cookie_samesite: lax
 
     #esi: true
     #fragments: true

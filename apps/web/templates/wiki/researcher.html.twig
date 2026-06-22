@@ -1,0 +1,126 @@
+{% extends 'base.html.twig' %}
+{% block title %}Espace chercheur — SciencesWiki{% endblock %}
+{% block body %}
+    <h1>Espace chercheur</h1>
+    <p class="muted">Outils de recherche sur le corpus scientifique ({{ current_user.displayName }}).</p>
+
+    <style>
+        .rs-search { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:1rem 0 .4rem }
+        .rs-modes { display:flex; gap:.3rem; font-size:.85rem; margin-bottom:.6rem }
+        .rs-modes label { border:1px solid var(--line); border-radius:999px; padding:.25rem .7rem; cursor:pointer }
+        .rs-tools { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.8rem; margin-top:1.5rem }
+        .rs-card { border:1px solid var(--line); border-radius:12px; padding:1rem; background:#fafcff }
+        .rs-card h3 { margin:.2rem 0 .4rem; font-size:1.05rem }
+        .rs-soon { font-size:.72rem; background:#e2e8f0; color:#475569; border-radius:999px; padding:.05rem .5rem }
+        .rs-ok { font-size:.72rem; background:#dcfce7; color:#166534; border-radius:999px; padding:.05rem .5rem }
+    </style>
+
+    <h2>Recherche sémantique du corpus</h2>
+    <p class="muted" style="font-size:.88rem">Recherche <strong>par le sens</strong> (et non par mots-clés) : trouvez les articles pertinents même hors de votre discipline.</p>
+    <div class="rs-search">
+        <input type="text" id="rs-q" placeholder="Ex. : jeûne intermittent mortalité…" autocomplete="off"
+               style="flex:1; min-width:260px; padding:.6rem .8rem; border:1px solid #d1d5db; border-radius:9px; font:inherit">
+        <button id="rs-go" style="background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.6rem 1.2rem; cursor:pointer; font:inherit">Rechercher</button>
+    </div>
+    <div class="rs-filters" style="display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center; font-size:.88rem; margin:.1rem 0 .6rem">
+        <label style="cursor:pointer"><input type="checkbox" id="rs-t-article" checked> Articles</label>
+        <label style="cursor:pointer"><input type="checkbox" id="rs-t-preprint" checked> Preprints</label>
+        <label style="cursor:pointer">Trier&nbsp;:
+            <select id="rs-sort" style="font:inherit; padding:.2rem .4rem; border:1px solid #d1d5db; border-radius:7px">
+                <option value="relevance">Pertinence</option>
+                <option value="cited">🎯 Les plus cités</option>
+                <option value="recent">📅 Les plus récents</option>
+            </select>
+        </label>
+    </div>
+    <p id="rs-count" class="muted" style="font-size:.85rem" role="status" aria-live="polite"></p>
+    <div id="rs-results"></div>
+    <nav id="rs-pager" aria-label="Pagination des résultats" style="display:flex; gap:.6rem; align-items:center; justify-content:center; margin:1rem 0"></nav>
+
+    <h2 style="margin-top:2rem">Outils</h2>
+    <div class="rs-tools">
+        <div class="rs-card"><span class="rs-ok">disponible</span><h3>🔎 Recherche sémantique</h3><p class="muted" style="font-size:.88rem">Recherche par le sens, trans-domaine (citations, pertinence, auteur principal).</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>📄 Related work</h3><p class="muted" style="font-size:.88rem">Collez un résumé → articles proches (kNN) &amp; références manquantes.</p></div>
+        <a class="rs-card" href="{{ path('literature_review') }}" style="text-decoration:none; color:inherit; display:block"><span class="rs-ok">disponible</span><h3>📚 Revue de littérature</h3><p class="muted" style="font-size:.88rem">Synthèse RAG sourcée d'un sujet (consensus · méthodes · lacunes) + export Markdown/PDF.</p></a>
+        <a class="rs-card" href="{{ path('literature_reviews') }}" style="text-decoration:none; color:inherit; display:block"><span class="rs-ok">disponible</span><h3>📁 Mes revues</h3><p class="muted" style="font-size:.88rem">Vos revues de littérature sauvegardées : télécharger (PDF / Markdown), supprimer.</p></a>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⚖️ Consensus vs contradictions</h3><p class="muted" style="font-size:.88rem">Regroupe conclusions concordantes/divergentes + niveau de preuve.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>🔔 Veille &amp; alertes</h3><p class="muted" style="font-size:.88rem">Alertes e-mail : sous-domaine, auteur ou revue suivie.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>🕸️ Cartographie</h3><p class="muted" style="font-size:.88rem">Éditeurs / revues / auteurs &amp; graphes de collaboration.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⛔ Détecteur de rétractations</h3><p class="muted" style="font-size:.88rem">Collez des DOIs → études rétractées / sous « expression of concern ».</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⭐ Favoris</h3><p class="muted" style="font-size:.88rem">Vos articles, auteurs et revues mis de côté.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⚙️ Profil &amp; e-mails</h3><p class="muted" style="font-size:.88rem">Domaines d'expertise, préférences de réception d'e-mails.</p></div>
+    </div>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var q = document.getElementById('rs-q'), go = document.getElementById('rs-go'),
+            results = document.getElementById('rs-results'), countEl = document.getElementById('rs-count'),
+            pager = document.getElementById('rs-pager'), sortEl = document.getElementById('rs-sort');
+        var page = 1;
+        function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+        function frDate(iso){
+            if (!iso) return '';
+            var p = String(iso).split('-');
+            return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(iso);
+        }
+        function row(it){
+            var url = it.url || (it.doi ? 'https://doi.org/' + it.doi : '#');
+            var lead = it.leadAuthor || (it.authors && it.authors[0]) || '';
+            var metaArr = [];
+            if (lead) metaArr.push('✍️ ' + lead);
+            if (it.journal || it.venue) metaArr.push(it.journal || it.venue);
+            var dval = it.date ? frDate(it.date) : it.year;
+            if (dval) metaArr.push('📅 ' + dval);
+            var rel = (it.relevance != null) ? it.relevance : it.score; // 0–1
+            var badges = '';
+            if (it.citedByCount != null) badges += '<span class="pill" title="Citations">📊 ' + (it.citedByCount||0).toLocaleString('fr-FR') + ' citations</span> ';
+            if (rel != null) badges += '<span class="pill" title="Pertinence">🎯 ' + Math.round(rel * 100) + ' %</span> ';
+            if (it.fwci != null && it.fwci > 0) badges += '<span class="pill" title="Impact relatif (FWCI)">FWCI ' + (Math.round(it.fwci * 100) / 100) + '</span>';
+            return '<div style="padding:.6rem 0; border-bottom:1px solid var(--line)">'
+                + '<a class="q-title" href="' + url + '" target="_blank" rel="noopener">' + esc(it.title) + '</a>'
+                + (metaArr.length ? '<div class="muted" style="font-size:.85rem">' + esc(metaArr.join(' · ')) + '</div>' : '')
+                + (badges ? '<div style="margin-top:.25rem">' + badges + '</div>' : '')
+                + '</div>';
+        }
+        function pageBtn(label, disabled, onClick){
+            var b = document.createElement('button');
+            b.textContent = label; b.disabled = disabled;
+            b.style.cssText = 'font:inherit; padding:.35rem .9rem; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:' + (disabled?'default':'pointer') + '; opacity:' + (disabled?'.5':'1');
+            if (!disabled) b.addEventListener('click', onClick);
+            return b;
+        }
+        function renderPager(d){
+            pager.innerHTML = '';
+            var per = d.perPage || 20, total = d.total || 0;
+            if (total <= per) return;
+            var pages = Math.max(1, Math.ceil(total / per));
+            pager.appendChild(pageBtn('‹ Précédent', page <= 1, function(){ page--; run(); }));
+            var info = document.createElement('span'); info.className = 'muted';
+            info.textContent = 'Page ' + page + ' / ' + pages;
+            pager.appendChild(info);
+            pager.appendChild(pageBtn('Suivant ›', !d.hasMore, function(){ page++; run(); }));
+        }
+        function run(){
+            var term = q.value.trim();
+            if (!term) { results.innerHTML=''; countEl.textContent=''; pager.innerHTML=''; return; }
+            results.innerHTML = '<p class="muted">Recherche…</p>'; pager.innerHTML = '';
+            var url = '/api/search?q=' + encodeURIComponent(term) + '&page=' + page + '&sort=' + sortEl.value;
+            if (document.getElementById('rs-t-article').checked) url += '&types[]=article';
+            if (document.getElementById('rs-t-preprint').checked) url += '&types[]=preprint';
+            fetch(url).then(function(r){ return r.json(); }).then(function(d){
+                var items = d.results || [];
+                var total = (d.total != null) ? d.total : items.length;
+                countEl.textContent = total.toLocaleString('fr-FR') + ' résultat(s) les plus pertinents';
+                results.innerHTML = items.length ? items.map(row).join('') : '<p class="muted">Aucun résultat.</p>';
+                renderPager(d);
+                if (page > 1) results.scrollIntoView({ behavior:'smooth', block:'start' });
+            }).catch(function(){ results.innerHTML='<p class="muted">Erreur de recherche.</p>'; pager.innerHTML=''; });
+        }
+        // Toute nouvelle recherche / changement de filtre repart à la page 1.
+        function load(){ page = 1; run(); }
+        go.addEventListener('click', load);
+        q.addEventListener('keydown', function(e){ if (e.key==='Enter') load(); });
+        ['rs-t-article','rs-t-preprint','rs-sort'].forEach(function(id){ document.getElementById(id).addEventListener('change', load); });
+    })();
+    </script>
+{% endblock %}

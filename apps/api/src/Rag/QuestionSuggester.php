@@ -11,6 +11,7 @@ use App\Entity\TreeNode;
 use App\Enum\QuestionOrigin;
 use App\Harvester\Ai\EmbeddingClientFactory;
 use App\Repository\QuestionRepository;
+use App\Service\SettingsService;
 use Doctrine\ORM\EntityManagerInterface;
 
 /**
@@ -25,6 +26,7 @@ final class QuestionSuggester
         private readonly EmbeddingClientFactory $embeddingFactory,
         private readonly QuestionRepository $questions,
         private readonly EntityManagerInterface $em,
+        private readonly SettingsService $settings,
     ) {
     }
 
@@ -33,7 +35,13 @@ final class QuestionSuggester
      */
     public function suggest(TreeNode $node, int $count): array
     {
-        $completion = $this->llm->complete($this->messages($node, $count), ['temperature' => 0.4]);
+        // Même modèle que la rédaction des réponses (rag.model du back-office) ;
+        // sinon LLM_MODEL de l'environnement.
+        $options = ['temperature' => 0.4];
+        if (null !== ($m = $this->settings->model())) {
+            $options['model'] = $m;
+        }
+        $completion = $this->llm->complete($this->messages($node, $count), $options);
         $texts = \array_slice(QuestionListParser::parse($completion->content), 0, $count);
 
         $embedder = $this->embeddingFactory->create();

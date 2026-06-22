@@ -1,0 +1,36 @@
+{
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp
+
+	# Le TLS est géré par le reverse-proxy nginx (Heimdall) ; on ne fait pas
+	# d'auto-HTTPS ici. SERVER_NAME=:80 (cf. compose) => écoute HTTP simple.
+	auto_https off
+
+	order php_server before file_server
+	# Hub Mercure intégré (temps réel) servi à /.well-known/mercure.
+	order mercure before php_server
+}
+
+{$SERVER_NAME:80} {
+	root * /app/public
+	encode zstd br gzip
+
+	# Hub Mercure : abonnements anonymes autorisés (topics publics, ex. ticks de
+	# moisson sans données sensibles) ; publication réservée à l'api (JWT).
+	mercure {
+		publisher_jwt {env.MERCURE_PUBLISHER_JWT_KEY}
+		subscriber_jwt {env.MERCURE_SUBSCRIBER_JWT_KEY}
+		anonymous
+		cors_origins "{$MERCURE_CORS_ORIGINS:*}"
+	}
+
+	# Faisons confiance aux en-têtes X-Forwarded-* émis par Heimdall.
+	# (Symfony gère les proxies de confiance via TRUSTED_PROXIES.)
+	php_server
+
+	log {
+		output stderr
+		format console
+	}
+}

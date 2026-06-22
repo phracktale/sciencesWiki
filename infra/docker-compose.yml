@@ -1,0 +1,206 @@
+# SciencesWiki — pile applicative du homelab (nœud « Thor »).
+#
+#   database  : PostgreSQL + pgvector (embeddings)
+#   api       : Symfony 8 / API Platform (FrankenPHP)  — init: migrations, JWT, seed
+#   worker    : même image que l'api, consomme la file Messenger (moisson async)
+#   web       : front public Symfony/Twig (FrankenPHP), client de l'API
+#
+# Le TLS et l'exposition publique sont assurés par nginx sur « Heimdall »
+# (cf. infra/heimdall/scienceswiki.conf). L'IA (embeddings + LLM) tourne sur
+# « Marvin » et est jointe par le réseau privé (ML_EMBED_URL, LLM_BASE_URL).
+#
+# Démarrage :  docker compose --env-file .env.prod up -d --build
+name: scienceswiki
+
+services:
+  # ⚠️ Base MIGRÉE sur Marvin (cf. infra/marvin). Cette base locale n'est plus
+  # utilisée — conservée en ROLLBACK uniquement (volume database_data intact).
+  # Ne démarre que sur demande explicite : `docker compose --profile rollback up -d database`
+  # (et repasser DB_HOST=database dans .env.prod pour l'utiliser).
+  database:
+    image: pgvector/pgvector:pg16
+    profiles: ["rollback"]
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - database_data:/var/lib/postgresql/data:rw
+    healthcheck:
+      test: ["CMD", "pg_isready", "-d", "${POSTGRES_DB}", "-U", "${POSTGRES_USER}"]
+      timeout: 5s
+      interval: 10s
+      retries: 10
+      start_period: 30s
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: prod
+    # La base est désormais sur Marvin (DB_HOST). Plus de dépendance à la base locale.
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      # DB_HOST=192.168.1.171 (Marvin) en prod ; défaut « database » = base locale Thor (rollback).
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:-database}:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=1"
+      SERVER_NAME: ":80"
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES}
+      CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
+      DEFAULT_URI: ${PUBLIC_URL}
+      # JWT (lexik) — la clé est générée au 1er démarrage dans le volume jwt_keys.
+      JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      # Clé de déchiffrage du coffre de secrets (OPENALEX_API_KEY, BREVO_*, MAILER…).
+      SYMFONY_DECRYPTION_SECRET: ${SYMFONY_DECRYPTION_SECRET:-}
+      # Moisson + IA (Marvin)
+      HARVESTER_CONTACT_EMAIL: ${HARVESTER_CONTACT_EMAIL}
+      EMBEDDING_DRIVER: http
+      ML_EMBED_URL: ${ML_EMBED_URL}
+      GROBID_URL: ${GROBID_URL:-}
+      LLM_DRIVER: ${LLM_DRIVER}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_API_TOKEN: ${LLM_API_TOKEN}
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      # Mercure (temps réel) : l'api HÉBERGE le hub (Caddy) ET publie.
+      MERCURE_URL: http://api/.well-known/mercure
+      MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
+      # Cette instance initialise la base (migrations + clés JWT + seed).
+      RUN_INIT: "1"
+    volumes:
+      - jwt_keys:/app/config/jwt:rw
+      # Coffre de secrets persistant (survit aux rebuilds) : clés + secrets chiffrés
+      # (OPENALEX_API_KEY, BREVO_*…). Généré une fois via secrets:generate-keys.
+      - secrets_vault:/app/config/secrets:rw
+    ports:
+      - "${API_PORT:-8000}:80"
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      # DB_HOST=192.168.1.171 (Marvin) en prod ; défaut « database » = base locale Thor (rollback).
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:-database}:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=1"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      SYMFONY_DECRYPTION_SECRET: ${SYMFONY_DECRYPTION_SECRET:-}
+      HARVESTER_CONTACT_EMAIL: ${HARVESTER_CONTACT_EMAIL}
+      EMBEDDING_DRIVER: http
+      ML_EMBED_URL: ${ML_EMBED_URL}
+      GROBID_URL: ${GROBID_URL:-}
+      LLM_DRIVER: ${LLM_DRIVER}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_MODEL: ${LLM_MODEL}
+      LLM_API_TOKEN: ${LLM_API_TOKEN}
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      MERCURE_URL: http://api/.well-known/mercure
+      MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
+    # memory_limit PHP relevé (embeddings par lots + gros lots de moisson) ; le
+    # --memory-limit Messenger (RSS) redémarre proprement avant tout dépassement.
+    command: ["php", "-d", "memory_limit=1024M", "bin/console", "messenger:consume", "harvester", "failed", "-v", "--time-limit=3600", "--memory-limit=1500M"]
+    # Même coffre de secrets que l'api (le worker déchiffre OPENALEX_API_KEY pour la moisson).
+    volumes:
+      - secrets_vault:/app/config/secrets:rw
+    # Le worker ne sert pas de HTTP : on neutralise le healthcheck HTTP hérité
+    # de l'image FrankenPHP (sinon faux « unhealthy »).
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    # Plusieurs workers EN PARALLÈLE : plusieurs rubriques moissonnées à la fois
+    # (l'insertion d'auteur est sûre en concurrence via upsert ORCID). Persistant —
+    # `docker compose up` relance ce nombre sans avoir à repasser --scale.
+    # Relevé à 6 : OpenAlex est sous-exploité (~0,35 req/s pour 10 req/s permis) ;
+    # le débit est borné par le traitement DB → plus de workers = plus d'insertions.
+    deploy:
+      replicas: 6
+
+  # Pool dédié à l'ingestion du TEXTE INTÉGRAL (PDF éditeur → GROBID → vecteurs),
+  # en parallèle, sans bloquer la moisson. Débit ≈ replicas × ~1 article/~20 s.
+  fulltext-worker:
+    build:
+      context: ../apps/api
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${APP_SECRET}
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:-database}:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=1"
+      JWT_PASSPHRASE: ${JWT_PASSPHRASE}
+      SYMFONY_DECRYPTION_SECRET: ${SYMFONY_DECRYPTION_SECRET:-}
+      EMBEDDING_DRIVER: http
+      ML_EMBED_URL: ${ML_EMBED_URL}
+      GROBID_URL: ${GROBID_URL:-}
+      MERCURE_URL: http://api/.well-known/mercure
+      MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+    command: ["php", "-d", "memory_limit=1024M", "bin/console", "messenger:consume", "fulltext", "failed", "-v", "--time-limit=3600", "--memory-limit=1500M"]
+    volumes:
+      - secrets_vault:/app/config/secrets:rw
+    healthcheck:
+      disable: true
+    restart: unless-stopped
+    deploy:
+      replicas: 4
+
+  web:
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      - api
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${WEB_APP_SECRET}
+      SERVER_NAME: ":80"
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES}
+      DEFAULT_URI: ${PUBLIC_URL}
+      # Appel server-side de l'API via le réseau interne du compose.
+      API_BASE_URL: "http://api"
+    # Sessions + médias uploadés persistants (survivent aux rebuilds).
+    volumes:
+      - web_sessions:/app/var/sessions:rw
+      - web_uploads:/app/public/uploads:rw
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+  # Adminer : visualisation directe de la base (désormais sur Marvin). Exposé
+  # UNIQUEMENT sur le LAN (non proxifié par Heimdall). Accès total → jamais public.
+  # Identifiants = POSTGRES_* (.env.prod), serveur = Marvin. URL : http://<IP-Thor>:${ADMINER_PORT:-8091}
+  adminer:
+    image: adminer:5
+    environment:
+      ADMINER_DEFAULT_SERVER: ${DB_HOST:-192.168.1.171}
+      ADMINER_DESIGN: dracula
+    ports:
+      - "${ADMINER_PORT:-8091}:8080"
+    restart: unless-stopped
+
+volumes:
+  database_data:
+  jwt_keys:
+  secrets_vault:
+  web_sessions:
+  web_uploads:

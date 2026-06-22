@@ -30,9 +30,13 @@ final class OpenAiCompatibleLlmClient implements LlmClient
     public function complete(array $messages, array $options = []): LlmCompletion
     {
         $payload = [
-            'model' => $this->model,
+            'model' => $options['model'] ?? $this->model,
             'messages' => array_map(static fn (LlmMessage $m): array => $m->toArray(), $messages),
             'temperature' => $options['temperature'] ?? 0.2,
+            // Désactive le « raisonnement » des modèles thinking (Qwen3…) : sinon le
+            // contenu visible reste vide (tokens consommés par la réflexion, non
+            // diffusée). Surchargable via $options['reasoning_effort'].
+            'reasoning_effort' => $options['reasoning_effort'] ?? 'none',
             'stream' => false,
         ];
         if (isset($options['max_tokens'])) {
@@ -66,6 +70,64 @@ final class OpenAiCompatibleLlmClient implements LlmClient
             promptTokens: isset($usage['prompt_tokens']) ? (int) $usage['prompt_tokens'] : null,
             completionTokens: isset($usage['completion_tokens']) ? (int) $usage['completion_tokens'] : null,
         );
+    }
+
+    public function stream(array $messages, array $options = []): iterable
+    {
+        $payload = [
+            'model' => $options['model'] ?? $this->model,
+            'messages' => array_map(static fn (LlmMessage $m): array => $m->toArray(), $messages),
+            'temperature' => $options['temperature'] ?? 0.2,
+            // Cf. complete() : désactive le raisonnement (sinon flux vide avec Qwen3).
+            'reasoning_effort' => $options['reasoning_effort'] ?? 'none',
+            'stream' => true,
+        ];
+        if (isset($options['max_tokens'])) {
+            $payload['max_tokens'] = $options['max_tokens'];
+        }
+
+        $headers = ['Content-Type' => 'application/json'];
+        if ('' !== $this->apiToken) {
+            $headers['Authorization'] = 'Bearer '.$this->apiToken;
+        }
+
+        $response = $this->httpClient->request('POST', $this->chatUrl(), [
+            'headers' => $headers,
+            'json' => $payload,
+            'timeout' => 600,
+            'buffer' => false,
+        ]);
+
+        $buffer = '';
+        foreach ($this->httpClient->stream($response) as $chunk) {
+            if ($chunk->isTimeout()) {
+                continue;
+            }
+            if ($chunk->isLast()) {
+                break;
+            }
+            $buffer .= $chunk->getContent();
+            while (false !== ($pos = strpos($buffer, "\n"))) {
+                $line = trim(substr($buffer, 0, $pos));
+                $buffer = substr($buffer, $pos + 1);
+                if ('' === $line || !str_starts_with($line, 'data:')) {
+                    continue;
+                }
+                $data = trim(substr($line, 5));
+                if ('[DONE]' === $data) {
+                    return;
+                }
+                try {
+                    $json = json_decode($data, true, 512, \JSON_THROW_ON_ERROR);
+                } catch (\JsonException) {
+                    continue;
+                }
+                $delta = $json['choices'][0]['delta']['content'] ?? null;
+                if (\is_string($delta) && '' !== $delta) {
+                    yield $delta;
+                }
+            }
+        }
     }
 
     public function model(): string

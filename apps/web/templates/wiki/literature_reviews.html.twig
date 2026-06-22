@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+{% block title %}Mes revues de littérature — SciencesWiki{% endblock %}
+{% block body %}
+    <p class="crumbs"><a href="{{ path('researcher_dashboard') }}">← Espace chercheur</a> · <a href="{{ path('literature_review') }}">＋ Nouvelle revue</a></p>
+    <h1>📁 Mes revues de littérature</h1>
+    <p class="muted">Vos revues sauvegardées. Téléchargez-les (PDF / Markdown) ou supprimez-les.</p>
+
+    <style>
+        .rev-item { display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;
+            border:1px solid var(--line); border-radius:10px; padding:.8rem 1rem; margin:.6rem 0; background:#fff; }
+        .rev-item h3 { margin:0 0 .15rem; font-size:1.05rem; }
+        .rev-actions { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; }
+        .rev-actions a, .rev-actions button { font:inherit; font-size:.88rem; text-decoration:none;
+            border:1px solid var(--line); border-radius:8px; padding:.35rem .7rem; background:#fff; color:var(--ink); cursor:pointer; }
+        .rev-actions a:hover, .rev-actions button:hover { background:#f1f5f9; }
+        .rev-actions .del { border-color:#fca5a5; color:#991b1b; }
+    </style>
+
+    {% if reviews is empty %}
+        <p class="muted" style="margin-top:1.5rem">Aucune revue sauvegardée pour le moment.
+            <a href="{{ path('literature_review') }}">Générer une première revue</a>.</p>
+    {% else %}
+        {% for r in reviews %}
+            <div class="rev-item">
+                <div>
+                    {% if r.rubric %}<div class="muted" style="font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:var(--accent); font-weight:700">{{ r.rubric }}</div>{% endif %}
+                    <h3>{{ r.topic }}</h3>
+                    <div class="muted" style="font-size:.85rem">{{ r.createdAt|date('d/m/Y à H:i') }} · {{ r.sourceCount }} source{{ r.sourceCount > 1 ? 's' : '' }}</div>
+                </div>
+                <div class="rev-actions">
+                    <a href="{{ path('literature_review_saved_pdf', { id: r.id }) }}">📄 PDF</a>
+                    <a href="{{ path('literature_review_saved_md', { id: r.id }) }}">⬇️ Markdown</a>
+                    <form method="post" action="{{ path('literature_review_delete', { id: r.id }) }}" data-confirm="Supprimer définitivement cette revue ?" style="display:inline">
+                        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                        <button type="submit" class="del">🗑 Supprimer</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endblock %}

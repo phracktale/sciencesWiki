@@ -26,6 +26,26 @@ final class PublicationEmbedder
         $publication->touch();
     }
 
+    /**
+     * Embedde un lot de publications en un seul appel au service (bien plus rapide).
+     *
+     * @param list<Publication> $publications
+     */
+    public function embedMany(array $publications): void
+    {
+        if ([] === $publications) {
+            return;
+        }
+        $texts = array_map(fn (Publication $p): string => $this->text($p), $publications);
+        $vectors = $this->client->embedBatch($texts);
+        foreach ($publications as $i => $publication) {
+            if (isset($vectors[$i])) {
+                $publication->setEmbedding($vectors[$i]);
+                $publication->touch();
+            }
+        }
+    }
+
     private function text(Publication $publication): string
     {
         $text = trim($publication->getTitle()."\n\n".($publication->getAbstract() ?? ''));

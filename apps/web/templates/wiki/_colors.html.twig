@@ -1,0 +1,14 @@
+{# Couleur d'un lanceur de rubrique : teinte propre au domaine racine, atténuée
+   selon la profondeur (niveau 0 = pleine, puis 99 → 66 → 44 → 22 d'alpha). #}
+{% macro card_bg(rootSlug, level) %}
+{%- set map = {
+    'health-sciences':   ['#291805', '#ffc720'],
+    'life-sciences':     ['#051629', '#20ffea'],
+    'physical-sciences': ['#210529', '#e320ff'],
+    'social-sciences':   ['#290505', '#ff2020'],
+} -%}
+{%- set alpha = { 0: '', 1: '99', 2: '66', 3: '44' } -%}
+{%- set a = alpha[level] ?? '22' -%}
+{%- set pair = map[rootSlug] ?? ['#02356c', '#019fb9'] -%}
+linear-gradient(135deg,{{ pair[0] }}{{ a }},{{ pair[1] }}{{ a }})
+{%- endmacro %}

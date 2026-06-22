@@ -42,6 +42,11 @@ final class HarvestRunner
     {
         $connector = $this->connectors->get($source->getCode());
 
+        // Cache d'auteurs neuf à chaque run (worker long-running : l'EM est
+        // réinitialisé entre messages → les entités en cache seraient détachées,
+        // provoquant des ré-insertions et des violations de contrainte unique).
+        $this->importer->reset();
+
         $job = new IngestionJob($source, $query);
         $this->em->persist($job);
         $this->em->flush();
@@ -78,7 +83,7 @@ final class HarvestRunner
             $job->finish();
         } catch (\Throwable $e) {
             $job->fail($e->getMessage());
-            $this->logger->error('Échec de la moisson.', ['source' => $source->getCode(), 'exception' => $e]);
+            $this->logger->error('Échec de la moisson : '.$e->getMessage(), ['source' => $source->getCode(), 'exception' => $e]);
         }
 
         $this->em->flush();

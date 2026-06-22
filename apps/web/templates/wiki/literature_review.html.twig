@@ -1,0 +1,165 @@
+{% extends 'base.html.twig' %}
+{% block title %}Revue de littérature — Espace chercheur — SciencesWiki{% endblock %}
+{% block body %}
+    <p class="crumbs"><a href="{{ path('researcher_dashboard') }}">← Espace chercheur</a> · <a href="{{ path('literature_reviews') }}">📁 Mes revues sauvegardées</a></p>
+    <h1>📚 Revue de littérature</h1>
+    <p class="muted">Synthèse sourcée d'un sujet à partir du corpus : <strong>consensus, méthodes, lacunes</strong>, chaque affirmation citée [n], générée par l'IA à partir des publications les plus pertinentes.</p>
+
+    <style>
+        .lr-bar { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:1rem 0 .3rem }
+        .lr-bar input { flex:1; min-width:280px; padding:.6rem .8rem; border:1px solid #d1d5db; border-radius:9px; font:inherit }
+        .lr-bar button { background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.6rem 1.2rem; cursor:pointer; font:inherit; font-weight:600 }
+        .lr-bar button[disabled] { opacity:.6; cursor:wait }
+        .lr-layout { display:grid; grid-template-columns:1fr 300px; gap:1.6rem; align-items:start; margin-top:1rem }
+        @media (max-width:900px){ .lr-layout { grid-template-columns:1fr } }
+        .lr-review h3 { font-size:1.12rem; color:var(--accent-dark); margin:1.2rem 0 .4rem }
+        .lr-review p { margin:.5rem 0; line-height:1.6 }
+        .lr-review .cit { color:var(--accent-dark); font-weight:700; font-size:.8em }
+        .lr-live { white-space:pre-wrap; font-size:.92rem; line-height:1.55; color:#334155 }
+        .lr-aside { position:sticky; top:1rem; border:1px solid var(--line); border-radius:12px; padding:1rem; background:#fafcff; font-size:.86rem }
+        .lr-aside ol { padding-left:1.2rem; margin:.4rem 0 }
+        .lr-aside li { margin:.5rem 0 }
+        .lr-actions { display:flex; gap:.5rem; flex-wrap:wrap; margin:.8rem 0 }
+        .lr-actions button { background:#fff; border:1px solid var(--accent); color:var(--accent); border-radius:8px; padding:.45rem .9rem; cursor:pointer; font:inherit; font-weight:600 }
+        @media print { header, footer, .lr-bar, .lr-actions, .crumbs, #admin-bar { display:none !important } .lr-layout { grid-template-columns:1fr } }
+    </style>
+
+    <div class="lr-bar">
+        <input type="text" id="lr-q" placeholder="Ex. : jeûne intermittent et mortalité cardiovasculaire…" autocomplete="off">
+        <button id="lr-go" type="button">Générer la revue</button>
+    </div>
+    <p id="lr-status" class="muted" style="font-size:.85rem" role="status" aria-live="polite"></p>
+
+    <div class="lr-actions" id="lr-actions" hidden>
+        <button type="button" id="lr-save">💾 Enregistrer</button>
+        <button type="button" id="lr-dl">⬇️ Markdown</button>
+        <button type="button" id="lr-pdf">⬇️ PDF</button>
+        <input type="hidden" id="lr-csrf" value="{{ admin_csrf.token }}">
+    </div>
+
+    <div class="lr-layout">
+        <div>
+            <div id="lr-live" class="lr-live"></div>
+            <div id="lr-review" class="lr-review md"></div>
+        </div>
+        <aside class="lr-aside" id="lr-aside" hidden>
+            <strong>📎 Bibliographie</strong>
+            <ol id="lr-biblio"></ol>
+        </aside>
+    </div>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var q = document.getElementById('lr-q'), go = document.getElementById('lr-go'),
+            statusEl = document.getElementById('lr-status'), live = document.getElementById('lr-live'),
+            review = document.getElementById('lr-review'), aside = document.getElementById('lr-aside'),
+            biblio = document.getElementById('lr-biblio'), actions = document.getElementById('lr-actions');
+        var es = null, full = '', sources = [], topic = '', rubric = '';
+
+        function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+        function inline(t){
+            t = esc(t).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+            return t.replace(/\[(\d{1,2})\]/g, '<sup class="cit">[$1]</sup>');
+        }
+        function mdToHtml(md){
+            var out = '', inList = false;
+            md.split('\n').forEach(function (ln) {
+                var h = ln.match(/^#{2,3}\s+(.*)/);
+                if (h) { if (inList) { out += '</ul>'; inList = false; } out += '<h3>' + inline(h[1]) + '</h3>'; return; }
+                if (/^\s*[-*]\s+/.test(ln)) { if (!inList) { out += '<ul>'; inList = true; } out += '<li>' + inline(ln.replace(/^\s*[-*]\s+/, '')) + '</li>'; return; }
+                if (ln.trim() === '') { if (inList) { out += '</ul>'; inList = false; } return; }
+                if (inList) { out += '</ul>'; inList = false; }
+                out += '<p>' + inline(ln) + '</p>';
+            });
+            if (inList) out += '</ul>';
+            return out;
+        }
+        function renderBiblio(){
+            biblio.innerHTML = sources.map(function (s) {
+                var au = (s.authors || []).slice(0, 3).join(', ') + ((s.authors || []).length > 3 ? ' et al.' : '');
+                var meta = [au, s.venue, s.year].filter(Boolean).join(' · ');
+                var link = s.oaUrl ? ('<a href="' + esc(s.oaUrl) + '" target="_blank" rel="noopener">🔓 accès libre</a>')
+                         : (s.doi ? ('<a href="https://doi.org/' + esc(s.doi) + '" target="_blank" rel="noopener">doi:' + esc(s.doi) + '</a>') : '');
+                return '<li id="src-' + s.n + '"><strong>' + esc(s.title) + '</strong>'
+                    + (meta ? '<br><span class="muted">' + esc(meta) + '</span>' : '')
+                    + (s.citedByCount != null ? ' <span class="muted">· ' + s.citedByCount + ' cit.</span>' : '')
+                    + (link ? '<br>' + link : '') + '</li>';
+            }).join('');
+            aside.hidden = sources.length === 0;
+        }
+        function markdownExport(){
+            var md = '# Revue de littérature — ' + topic + '\n\n' + full.trim() + '\n\n## Bibliographie\n\n';
+            sources.forEach(function (s) {
+                var au = (s.authors || []).join(', ');
+                md += '[' + s.n + '] ' + s.title + (au ? ' — ' + au : '') + (s.year ? ' (' + s.year + ')' : '')
+                    + (s.doi ? '. DOI: ' + s.doi : '') + (s.oaUrl ? '. ' + s.oaUrl : '') + '\n';
+            });
+            return md;
+        }
+
+        function start(){
+            var term = q.value.trim();
+            if (term.length < 3) { statusEl.textContent = 'Indiquez un sujet (3 caractères minimum).'; return; }
+            if (es) es.close();
+            topic = term; full = ''; sources = []; rubric = '';
+            live.textContent = ''; review.innerHTML = ''; biblio.innerHTML = ''; aside.hidden = true; actions.hidden = true;
+            go.disabled = true; statusEl.textContent = 'Recherche des sources et rédaction…';
+            es = new EventSource('/api/literature-review/stream?q=' + encodeURIComponent(term));
+            es.onmessage = function (ev) {
+                var d; try { d = JSON.parse(ev.data); } catch (e) { return; }
+                if (d.sources) { sources = d.sources; rubric = d.rubric || ''; renderBiblio(); statusEl.textContent = (rubric ? 'Rubrique : ' + rubric + ' · ' : '') + sources.length + ' sources analysées — rédaction…'; return; }
+                if (d.delta) { full += d.delta; live.textContent = full; return; }
+                if (d.nosource) { statusEl.textContent = d.message; go.disabled = false; es.close(); return; }
+                if (d.error) { statusEl.textContent = d.message || 'Erreur.'; go.disabled = false; es.close(); return; }
+                if (d.done) {
+                    live.textContent = ''; review.innerHTML = mdToHtml(full);
+                    statusEl.textContent = 'Revue terminée — ' + sources.length + ' sources.';
+                    actions.hidden = false; go.disabled = false; es.close();
+                }
+            };
+            es.onerror = function () { statusEl.textContent = 'Connexion interrompue.'; go.disabled = false; if (es) es.close(); };
+        }
+
+        go.addEventListener('click', start);
+        q.addEventListener('keydown', function (e) { if (e.key === 'Enter') start(); });
+        document.getElementById('lr-save').addEventListener('click', function () {
+            var btn = document.getElementById('lr-save'); btn.disabled = true;
+            var body = new URLSearchParams();
+            body.set('topic', topic); body.set('markdown', full);
+            body.set('sources', JSON.stringify(sources)); body.set('rubric', rubric);
+            body.set('_csrf', document.getElementById('lr-csrf').value);
+            fetch('{{ path('literature_review_save') }}', {
+                method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(), credentials: 'same-origin'
+            }).then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+              .then(function () { statusEl.innerHTML = '✅ Revue enregistrée — <a href="{{ path('literature_reviews') }}">voir Mes revues</a>'; })
+              .catch(function () { statusEl.textContent = 'Échec de l\'enregistrement.'; })
+              .finally(function () { btn.disabled = false; });
+        });
+        document.getElementById('lr-pdf').addEventListener('click', function () {
+            var btn = document.getElementById('lr-pdf'); btn.disabled = true;
+            var body = new URLSearchParams();
+            body.set('topic', topic); body.set('markdown', full);
+            body.set('sources', JSON.stringify(sources)); body.set('rubric', rubric);
+            body.set('_csrf', document.getElementById('lr-csrf').value);
+            fetch('{{ path('literature_review_pdf') }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.ok ? r.blob() : Promise.reject(); }).then(function (blob) {
+                var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                a.download = 'revue-litterature.pdf'; document.body.appendChild(a); a.click();
+                setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+            }).catch(function () { statusEl.textContent = 'Échec de la génération du PDF.'; })
+              .finally(function () { btn.disabled = false; });
+        });
+        document.getElementById('lr-dl').addEventListener('click', function () {
+            var blob = new Blob([markdownExport()], { type: 'text/markdown;charset=utf-8' });
+            var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+            a.download = 'revue-litterature.md'; document.body.appendChild(a); a.click();
+            setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+        });
+    })();
+    </script>
+{% endblock %}

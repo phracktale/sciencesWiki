@@ -32,8 +32,17 @@ final class RawPublication
         public readonly ?string $license = null,
         public readonly OaStatus $oaStatus = OaStatus::Unknown,
         public readonly ?string $oaUrl = null,
+        public readonly ?string $landingPageUrl = null,
         public readonly bool $fulltextAvailable = false,
         public readonly array $authors = [],
+        public readonly ?RawSource $source = null,
+        public readonly int $citedByCount = 0,
+        public readonly ?float $fwci = null,
+        public readonly ?string $typeCrossref = null,
+        public readonly int $referencedWorksCount = 0,
+        public readonly bool $hasPdf = false,
+        public readonly bool $hasGrobidXml = false,
+        public readonly bool $anyRepoFulltext = false,
     ) {
     }
 }

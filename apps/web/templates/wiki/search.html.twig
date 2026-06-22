@@ -1,0 +1,58 @@
+{% extends 'base.html.twig' %}
+{% block title %}Rechercher un article — SciencesWiki{% endblock %}
+{% block body %}
+    <h1>Rechercher un article</h1>
+    <p class="muted">Parcourez les articles encyclopédiques des domaines de la science.</p>
+
+    <div class="xp-search" style="display:flex; gap:.5rem; flex-wrap:wrap; margin:1rem 0">
+        <input type="text" id="w-q" placeholder="Ex. : astrophysique, génétique, théorie des nombres…" autocomplete="off"
+               style="flex:1; min-width:240px; padding:.6rem .8rem; border:1px solid #d1d5db; border-radius:9px; font:inherit">
+        <button id="w-go" style="background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.6rem 1.2rem; cursor:pointer; font:inherit">Rechercher</button>
+    </div>
+    <p id="w-count" class="muted" style="font-size:.85rem"></p>
+    <div id="w-results"></div>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var LEVELS = ['domaine', 'champ', 'sous-domaine', 'sujet'];
+        var q = document.getElementById('w-q');
+        var go = document.getElementById('w-go');
+        var results = document.getElementById('w-results');
+        var countEl = document.getElementById('w-count');
+
+        function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+
+        function render(d) {
+            if (!d.items.length) {
+                results.innerHTML = '<p class="muted">Aucun article ne correspond.</p>';
+                countEl.textContent = '';
+                return;
+            }
+            countEl.textContent = d.items.length + ' résultat(s)';
+            results.innerHTML = d.items.map(function (it) {
+                var lvl = LEVELS[it.level] || ('niveau ' + it.level);
+                var badge = it.hasArticle
+                    ? (it.status === 'valide' ? '<span class="badge ok">✅ relu</span>' : '<span class="badge warn">⚠️ IA non relu</span>')
+                    : '<span class="pill">à rédiger</span>';
+                return '<div style="padding:.7rem 0; border-bottom:1px solid var(--line)">'
+                    + '<a class="q-title" href="/fr/' + encodeURIComponent(it.slug) + '" style="font-size:1.05rem">' + esc(it.label) + '</a> '
+                    + '<span class="pill">' + esc(lvl) + '</span> ' + badge
+                    + (it.snippet ? '<div class="muted" style="font-size:.9rem; margin-top:.25rem">' + esc(it.snippet) + '…</div>' : '')
+                    + '</div>';
+            }).join('');
+        }
+
+        function load() {
+            results.innerHTML = '<p class="muted">Chargement…</p>';
+            fetch('/api/wiki/search?q=' + encodeURIComponent(q.value.trim()))
+                .then(function (r) { return r.json(); })
+                .then(render)
+                .catch(function () { results.innerHTML = '<p class="muted">Erreur de chargement.</p>'; });
+        }
+
+        go.addEventListener('click', load);
+        q.addEventListener('keydown', function (e) { if (e.key === 'Enter') load(); });
+        load();
+    })();
+    </script>
+{% endblock %}

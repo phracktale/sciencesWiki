@@ -1,0 +1,161 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Articles moissonnés{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>Articles moissonnés <span class="muted">({{ data.total|number_format(0,',',' ') }})</span></h1>
+
+    {% import 'admin/_sort.html.twig' as s %}
+    {% set f = filters ?? {} %}
+    {# Paramètres conservés dans la pagination + les liens de tri (recherche + filtres). #}
+    {% set baseParams = {
+        q: data.query, journal: f.journal, journal_name: journalName,
+        indexation: f.indexation, domain: f.domain, pdf: f.pdf, access: f.access,
+        type: f.type, sort: f.sort, dir: f.dir
+    } %}
+
+    <form method="get" action="{{ path('admin_articles') }}" style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:.5rem; margin:1rem 0">
+        <input type="text" name="q" value="{{ data.query }}" placeholder="Titre ou auteur…"
+               style="grid-column:1 / 4; padding:.5rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+        {# tri : via en-têtes de colonnes cliquables (plus bas) #}
+        <input type="hidden" name="sort" value="{{ f.sort }}">
+        <input type="hidden" name="dir" value="{{ f.dir }}">
+
+        {# Revue : autocomplete (id caché + nom visible) #}
+        <div style="position:relative">
+            <input type="text" id="journal-input" autocomplete="off" value="{{ journalName }}" placeholder="Revue…"
+                   style="width:100%; padding:.5rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+            <input type="hidden" name="journal" id="journal-id" value="{{ f.journal }}">
+            <input type="hidden" name="journal_name" id="journal-name" value="{{ journalName }}">
+            <ul id="journal-results" style="position:absolute; z-index:5; left:0; right:0; margin:.2rem 0 0; padding:0; list-style:none; background:#fff; border:1px solid #d1d5db; border-radius:8px; box-shadow:0 6px 20px rgba(0,0,0,.08); display:none; max-height:240px; overflow:auto"></ul>
+        </div>
+
+        <select name="domain" style="padding:.5rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+            <option value="">Tous les domaines</option>
+            {% for d in domains ?? [] %}
+                <option value="{{ d.slug }}" {{ f.domain == d.slug ? 'selected' }}>{{ d.label }}</option>
+            {% endfor %}
+        </select>
+
+        <div style="display:flex; gap:.5rem">
+            <select name="access" style="flex:1; padding:.5rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+                <option value="">Accès : tous</option>
+                <option value="libre" {{ f.access == 'libre' ? 'selected' }}>Libre</option>
+                <option value="payant" {{ f.access == 'payant' ? 'selected' }}>Payant</option>
+                <option value="inconnu" {{ f.access == 'inconnu' ? 'selected' }}>Inconnu</option>
+            </select>
+            <select name="indexation" style="flex:1; padding:.5rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+                <option value="">Indexation : toutes</option>
+                <option value="fulltext" {{ f.indexation == 'fulltext' ? 'selected' }}>Texte intégral</option>
+                <option value="abstract" {{ f.indexation == 'abstract' ? 'selected' }}>Résumé seul</option>
+            </select>
+            <select name="pdf" style="flex:1; padding:.5rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+                <option value="">PDF : tous</option>
+                <option value="vectorise" {{ f.pdf == 'vectorise' ? 'selected' }}>Vectorisé</option>
+                <option value="lien" {{ f.pdf == 'lien' ? 'selected' }}>Lien seul</option>
+                <option value="aucun" {{ f.pdf == 'aucun' ? 'selected' }}>Aucun</option>
+            </select>
+            <select name="type" style="flex:1; padding:.5rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+                <option value="">Type : tous</option>
+                {% for t in data.availableTypes ?? [] %}
+                    <option value="{{ t }}" {{ f.type == t ? 'selected' }}>{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div style="display:flex; gap:.5rem; grid-column:1 / 4">
+            <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.55rem 1.2rem; cursor:pointer">Filtrer</button>
+            <a href="{{ path('admin_articles') }}" style="padding:.55rem 1rem; border:1px solid #d1d5db; border-radius:8px; text-decoration:none; color:#374151">Réinitialiser</a>
+        </div>
+    </form>
+
+    {% if data.items is empty %}
+        <p class="muted">Aucun article ne correspond à ces critères.</p>
+    {% else %}
+        <table style="width:100%; border-collapse:collapse; font-size:.9rem">
+            <thead>
+                <tr style="text-align:left; border-bottom:2px solid var(--line)">
+                    <th style="padding:.4rem">{{ s.th('Titre', 'titre', 'admin_articles', baseParams) }}</th>
+                    <th>Auteurs</th>
+                    <th>{{ s.th('Type', 'type', 'admin_articles', baseParams) }}</th>
+                    <th>{{ s.th('Date', 'date', 'admin_articles', baseParams) }}</th>
+                    <th>{{ s.th('Revue', 'revue', 'admin_articles', baseParams) }}</th>
+                    <th>Accès</th>
+                    <th>{{ s.th('Indexation', 'fragments', 'admin_articles', baseParams) }}</th>
+                    <th>PDF</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in data.items %}
+                    <tr style="border-bottom:1px solid var(--line)">
+                        <td style="padding:.4rem">
+                            <a class="q-title" href="{{ path('admin_article', { id: a.id }) }}" style="font-size:.92rem">{{ a.title|slice(0,90) }}</a>
+                            {% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener" title="Source externe" style="font-size:.75rem"> ↗</a>{% endif %}
+                        </td>
+                        <td class="muted">{{ a.authors|slice(0,60) }}</td>
+                        <td>{% if a.type %}<span class="pill">{{ a.type }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+                        <td class="muted">{{ a.date }}</td>
+                        <td class="muted">{{ a.venue|slice(0,30) }}</td>
+                        <td>
+                            {% if a.access == 'libre' %}<span class="badge ok">libre</span>
+                            {% elseif a.access == 'payant' %}<span class="badge warn">payant</span>
+                            {% else %}<span class="pill">inconnu</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if a.indexation == 'fulltext' %}<span class="badge ok" title="{{ a.chunks }} fragment(s) vectorisé(s)">texte intégral</span>
+                            {% else %}<span class="pill">résumé seul</span>{% endif %}
+                        </td>
+                        <td>
+                            {% if a.pdf == 'vectorise' %}<span class="badge ok" title="PDF téléchargé et vectorisé">📄 PDF</span>
+                            {% elseif a.pdf == 'lien' %}<span class="pill" title="Lien d'accès libre (PDF ou page éditeur)">🔗 lien</span>
+                            {% else %}<span class="muted">—</span>{% endif %}
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p style="margin-top:1rem; display:flex; gap:1rem; align-items:center">
+            {% if data.page > 1 %}<a href="{{ path('admin_articles', baseParams|merge({ page: data.page - 1 })) }}">← Précédent</a>{% endif %}
+            <span class="muted">Page {{ data.page }} / {{ data.pages }}</span>
+            {% if data.page < data.pages %}<a href="{{ path('admin_articles', baseParams|merge({ page: data.page + 1 })) }}">Suivant →</a>{% endif %}
+        </p>
+    {% endif %}
+
+    <script nonce="{{ csp_nonce.value }}">
+        (function () {
+            var input = document.getElementById('journal-input');
+            var idField = document.getElementById('journal-id');
+            var nameField = document.getElementById('journal-name');
+            var box = document.getElementById('journal-results');
+            if (!input) return;
+            var timer = null;
+
+            function close() { box.style.display = 'none'; box.innerHTML = ''; }
+            input.addEventListener('input', function () {
+                idField.value = ''; nameField.value = input.value;
+                var q = input.value.trim();
+                clearTimeout(timer);
+                if (q.length < 2) { close(); return; }
+                timer = setTimeout(function () {
+                    fetch('{{ path('admin_journals') }}?q=' + encodeURIComponent(q))
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            box.innerHTML = '';
+                            (d.items || []).forEach(function (j) {
+                                var li = document.createElement('li');
+                                li.style.cssText = 'padding:.45rem .6rem; cursor:pointer; border-bottom:1px solid #f1f5f9';
+                                li.innerHTML = '<strong>' + j.name + '</strong> <span style="color:#6b7280">— ' + (j.publisher || '—') + ' · ' + j.articles + ' art.</span>';
+                                li.addEventListener('mousedown', function (e) {
+                                    e.preventDefault();
+                                    idField.value = j.id; nameField.value = j.name; input.value = j.name; close();
+                                });
+                                box.appendChild(li);
+                            });
+                            box.style.display = box.children.length ? 'block' : 'none';
+                        });
+                }, 220);
+            });
+            document.addEventListener('click', function (e) { if (!box.contains(e.target) && e.target !== input) close(); });
+        })();
+    </script>
+{% endblock %}

@@ -1,0 +1,27 @@
+{# Fragment HTML rendu par TCPDF (writeHTML) DANS la zone de texte du gabarit.
+   Pas d'en-tête/pied ici : ils viennent du gabarit PDF + du Footer() TCPDF. #}
+<style>
+    h1 { font-size: 19pt; color: #02356c; font-weight: bold; }
+    h2 { font-size: 13pt; color: #019fb9; font-weight: bold; }
+    h3 { font-size: 11pt; color: #02356c; font-weight: bold; }
+    p { font-size: 10.5pt; color: #1f2937; }
+    .surtitle { font-size: 9pt; color: #019fb9; font-weight: bold; }
+    .atitle { font-size: 15pt; color: #02356c; font-weight: bold; }
+    .bh { font-size: 13pt; color: #019fb9; font-weight: bold; }
+    .ref { font-size: 9pt; color: #1f2937; }
+    .url { color: #02356c; }
+</style>
+
+<h1>Revue de littérature</h1>
+{% if rubric %}<div class="surtitle">{{ rubric|upper }}</div>{% endif %}
+<div class="atitle">{{ topic }}</div>
+
+{{ markdown|md }}
+
+{% if sources is not empty %}
+    <br>
+    <div class="bh">Bibliographie</div>
+    {% for s in sources %}
+        <div class="ref">[{{ s.n }}] <b>{{ s.title }}</b>{% if s.authors is not empty %} — {{ s.authors|join(', ') }}{% endif %}{% if s.year %} ({{ s.year }}){% endif %}{% if s.venue %}. {{ s.venue }}{% endif %}.{% if s.oaUrl %} <span class="url">{{ s.oaUrl }}</span>{% elseif s.doi %} <span class="url">https://doi.org/{{ s.doi }}</span>{% endif %}</div>
+    {% endfor %}
+{% endif %}

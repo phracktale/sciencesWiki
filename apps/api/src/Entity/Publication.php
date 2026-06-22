@@ -11,6 +11,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use App\Enum\OaStatus;
 use App\Enum\ProcessingStatus;
+use App\Enum\RetractionStatus;
 use App\Repository\PublicationRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -57,6 +58,21 @@ class Publication
     #[Groups(['publication:read'])]
     private ?string $abstract = null;
 
+    /** Traduction française du résumé (à la demande, mise en cache). */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $abstractFr = null;
+
+    /** Pour un « satellite » (erratum, peer-review…) : DOI de l'article parent. */
+    #[ORM\Column(name: 'parent_doi', type: Types::STRING, length: 255, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $parentDoi = null;
+
+    /** FK locale vers l'article parent, si présent en base. */
+    #[ORM\Column(name: 'parent_publication_id', type: Types::INTEGER, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?int $parentPublicationId = null;
+
     #[ORM\Column(type: Types::DATE_IMMUTABLE, nullable: true)]
     #[Groups(['publication:read'])]
     private ?\DateTimeImmutable $publicationDate = null;
@@ -85,6 +101,50 @@ class Publication
     #[Groups(['publication:read'])]
     private ?string $oaUrl = null;
 
+    /** Page canonique de l'article chez l'éditeur (primary_location.landing_page_url). */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $landingPageUrl = null;
+
+    /** Revue / source de publication (OpenAlex primary_location.source). */
+    #[ORM\ManyToOne(targetEntity: Journal::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    #[Groups(['publication:read'])]
+    private ?Journal $journal = null;
+
+    // --- Métadonnées OpenAlex (curation / affichage) ---
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
+    #[Groups(['publication:read'])]
+    private int $citedByCount = 0;
+
+    /** Field-Weighted Citation Impact (impact pondéré par domaine). */
+    #[ORM\Column(type: Types::FLOAT, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?float $fwci = null;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $typeCrossref = null;
+
+    #[ORM\Column(type: Types::INTEGER, options: ['default' => 0])]
+    private int $referencedWorksCount = 0;
+
+    /** Disponibilité du contenu chez OpenAlex (has_content). */
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['publication:read'])]
+    private bool $hasPdf = false;
+
+    #[ORM\Column(options: ['default' => false])]
+    #[Groups(['publication:read'])]
+    private bool $hasGrobidXml = false;
+
+    #[ORM\Column(options: ['default' => false])]
+    private bool $anyRepoFulltext = false;
+
+    /** Provenance du texte intégral indexé : grobid_self|openalex_api|author|publisher. */
+    #[ORM\Column(length: 16, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $fulltextSource = null;
+
     #[ORM\Column]
     #[Groups(['publication:read'])]
     private bool $fulltextAvailable = false;
@@ -95,6 +155,15 @@ class Publication
 
     #[ORM\Column(length: 16, enumType: ProcessingStatus::class)]
     private ProcessingStatus $processingStatus = ProcessingStatus::ToProcess;
+
+    /** Statut de rétractation / mise en garde (Retraction Watch / Crossref). */
+    #[ORM\Column(length: 16, enumType: RetractionStatus::class)]
+    #[Groups(['publication:read'])]
+    private RetractionStatus $retractionStatus = RetractionStatus::None;
+
+    /** Date de la dernière vérification de rétractation ; null si jamais vérifiée. */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $retractionCheckedAt = null;
 
     /** Date de la dernière résolution OA (Unpaywall) ; null si jamais résolue. */
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
@@ -190,6 +259,42 @@ class Publication
         return $this;
     }
 
+    public function getAbstractFr(): ?string
+    {
+        return $this->abstractFr;
+    }
+
+    public function getParentDoi(): ?string
+    {
+        return $this->parentDoi;
+    }
+
+    public function setParentDoi(?string $doi): self
+    {
+        $this->parentDoi = $doi;
+
+        return $this;
+    }
+
+    public function getParentPublicationId(): ?int
+    {
+        return $this->parentPublicationId;
+    }
+
+    public function setParentPublicationId(?int $id): self
+    {
+        $this->parentPublicationId = $id;
+
+        return $this;
+    }
+
+    public function setAbstractFr(?string $abstractFr): self
+    {
+        $this->abstractFr = $abstractFr;
+
+        return $this;
+    }
+
     public function getPublicationDate(): ?\DateTimeImmutable
     {
         return $this->publicationDate;
@@ -221,7 +326,9 @@ class Publication
 
     public function setVenue(?string $venue): self
     {
-        $this->venue = $venue;
+        // Certains noms de revue OpenAlex dépassent la colonne VARCHAR(512) ;
+        // on tronque pour ne pas casser la moisson (cf. bug « value too long »).
+        $this->venue = null !== $venue ? mb_substr($venue, 0, 512) : null;
 
         return $this;
     }
@@ -274,6 +381,126 @@ class Publication
         return $this;
     }
 
+    public function getLandingPageUrl(): ?string
+    {
+        return $this->landingPageUrl;
+    }
+
+    public function setLandingPageUrl(?string $landingPageUrl): self
+    {
+        $this->landingPageUrl = $landingPageUrl;
+
+        return $this;
+    }
+
+    public function getJournal(): ?Journal
+    {
+        return $this->journal;
+    }
+
+    public function setJournal(?Journal $journal): self
+    {
+        $this->journal = $journal;
+
+        return $this;
+    }
+
+    public function getCitedByCount(): int
+    {
+        return $this->citedByCount;
+    }
+
+    public function setCitedByCount(int $n): self
+    {
+        $this->citedByCount = $n;
+
+        return $this;
+    }
+
+    public function getFwci(): ?float
+    {
+        return $this->fwci;
+    }
+
+    public function setFwci(?float $fwci): self
+    {
+        $this->fwci = $fwci;
+
+        return $this;
+    }
+
+    public function getTypeCrossref(): ?string
+    {
+        return $this->typeCrossref;
+    }
+
+    public function setTypeCrossref(?string $typeCrossref): self
+    {
+        $this->typeCrossref = $typeCrossref;
+
+        return $this;
+    }
+
+    public function getReferencedWorksCount(): int
+    {
+        return $this->referencedWorksCount;
+    }
+
+    public function setReferencedWorksCount(int $n): self
+    {
+        $this->referencedWorksCount = $n;
+
+        return $this;
+    }
+
+    public function hasPdf(): bool
+    {
+        return $this->hasPdf;
+    }
+
+    public function setHasPdf(bool $v): self
+    {
+        $this->hasPdf = $v;
+
+        return $this;
+    }
+
+    public function hasGrobidXml(): bool
+    {
+        return $this->hasGrobidXml;
+    }
+
+    public function setHasGrobidXml(bool $v): self
+    {
+        $this->hasGrobidXml = $v;
+
+        return $this;
+    }
+
+    public function hasAnyRepoFulltext(): bool
+    {
+        return $this->anyRepoFulltext;
+    }
+
+    public function setAnyRepoFulltext(bool $v): self
+    {
+        $this->anyRepoFulltext = $v;
+
+        return $this;
+    }
+
+    public function getFulltextSource(): ?string
+    {
+        return $this->fulltextSource;
+    }
+
+    public function setFulltextSource(?string $src): self
+    {
+        $this->fulltextSource = $src;
+
+        return $this;
+    }
+
     public function isFulltextAvailable(): bool
     {
         return $this->fulltextAvailable;
@@ -294,6 +521,30 @@ class Publication
     public function setFulltextStored(bool $fulltextStored): self
     {
         $this->fulltextStored = $fulltextStored;
+
+        return $this;
+    }
+
+    public function getRetractionStatus(): RetractionStatus
+    {
+        return $this->retractionStatus;
+    }
+
+    public function setRetractionStatus(RetractionStatus $status): self
+    {
+        $this->retractionStatus = $status;
+
+        return $this;
+    }
+
+    public function getRetractionCheckedAt(): ?\DateTimeImmutable
+    {
+        return $this->retractionCheckedAt;
+    }
+
+    public function setRetractionCheckedAt(?\DateTimeImmutable $at): self
+    {
+        $this->retractionCheckedAt = $at;
 
         return $this;
     }

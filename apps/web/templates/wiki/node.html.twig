@@ -2,56 +2,309 @@
 
 {% block title %}{{ node.label }} — SciencesWiki{% endblock %}
 
+{% block admin_context %}
+    <a href="{{ path('admin_node', { slug: node.slug }) }}" style="color:#fcd34d">✏️ éditer / moissonner cette rubrique</a>
+{% endblock %}
+
 {% block body %}
-    {% if node.parents is not empty %}
-        <p class="crumbs muted">
-            {% for parent in node.parents %}
-                <a href="{{ path('node', { slug: parent.slug }) }}">{{ parent.label }}</a>{% if not loop.last %} · {% endif %}
+    {% import 'wiki/_colors.html.twig' as colors %}
+    {% import 'wiki/_vote.html.twig' as vote %}
+    {% set crumbs = node.breadcrumb ?? [] %}
+    {% set rootSlug = (crumbs|first).slug ?? node.slug %}
+    {% set qcount = answers|default([])|length %}
+    {% set cvcount = controversies|default([])|length %}
+
+    <style>
+        .qtabs { display:flex; gap:.3rem; border-bottom:2px solid var(--line); margin:1.2rem 0 1.4rem; }
+        .qtabs [role=tab] { background:none; border:0; border-bottom:3px solid transparent; margin-bottom:-2px; padding:.7rem 1.1rem; font:inherit; font-weight:700; color:#6b7280; cursor:pointer; border-radius:8px 8px 0 0; }
+        .qtabs [role=tab][aria-selected=true] { color:var(--accent-dark); border-bottom-color:var(--accent); }
+        .qtabs [role=tab]:hover { background:rgba(1,159,185,.08); }
+        .qtabs [role=tab]:focus-visible, .qa-summary:focus-visible, .node-aside a:focus-visible, .art-edit-btn:focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+        /* CRITIQUE : un panneau masqué doit l'être même si .node-layout impose display:grid. */
+        [role=tabpanel][hidden] { display:none !important; }
+        .tab-badge { display:inline-block; min-width:1.4em; text-align:center; font-size:.78rem; font-weight:700; padding:.05rem .45rem; border-radius:999px; background:var(--accent); color:#fff; margin-left:.35rem; }
+        [role=tab][aria-selected=false] .tab-badge { background:#94a3b8; }
+        .art-edit-bar { display:flex; justify-content:flex-end; margin:.4rem 0; }
+        .art-edit-btn { display:inline-block; background:#fff; border:1px solid var(--accent); color:var(--accent); border-radius:8px; padding:.45rem 1rem; cursor:pointer; font:inherit; font-weight:600; text-decoration:none; }
+        .art-edit-btn:hover { background:rgba(1,159,185,.08); }
+        .node-layout { display:grid; grid-template-columns:1fr 290px; gap:1.6rem; align-items:start; }
+        @media (max-width:880px){ .node-layout { grid-template-columns:1fr; } .node-aside { order:-1; } }
+        .node-aside { position:sticky; top:1rem; border:1px solid var(--line); border-radius:12px; padding:1rem 1.1rem; background:#fafcff; }
+        .node-aside hr { border:0; border-top:1px solid var(--line); margin:.8rem 0; }
+        .aside-badge { font-size:.95rem; padding:.35rem .7rem; display:inline-block; }
+        .aside-meta { margin:.5rem 0; font-size:.92rem; }
+        .aside-explore { display:block; text-align:center; background:var(--accent); color:#fff; text-decoration:none; padding:.6rem 1rem; border-radius:9px; font-weight:600; margin:.6rem 0; }
+        .qa-item { border:1px solid var(--line); border-radius:10px; margin:.6rem 0; background:#fff; overflow:hidden; }
+        .qa-item[open] { border-color:var(--accent); box-shadow:0 4px 16px rgba(1,159,185,.08); }
+        .qa-summary { list-style:none; cursor:pointer; padding:.85rem 1rem; display:flex; flex-direction:column; gap:.3rem; }
+        .qa-summary::-webkit-details-marker { display:none; }
+        .qa-summary::after { content:'▸'; position:absolute; right:1rem; color:var(--accent); transition:transform .15s; }
+        .qa-item[open] .qa-summary::after { transform:rotate(90deg); }
+        .qa-summary { position:relative; }
+        .qa-q { margin:0; font-weight:700; font-size:1.05rem; line-height:1.35; color:var(--ink); padding-right:1.5rem; }
+        .qa-answer { padding:.2rem 1rem 1rem; border-top:1px dashed var(--line); }
+        .qa-title { font-size:1.05rem; margin:.6rem 0 .4rem; color:var(--accent-dark); }
+        .qa-warn { border:1px solid #fcd34d; background:#fffbeb; color:#92400e; border-radius:8px; padding:.55rem .8rem; margin:1rem 0 .2rem; font-size:.85rem; }
+        @media (prefers-reduced-motion: reduce){ .qa-summary::after { transition:none; } }
+    </style>
+
+    {% if crumbs|length > 1 %}
+        <nav class="crumbs" aria-label="Fil d'Ariane">
+            {% set acc = '' %}
+            {% for c in crumbs %}
+                {% set acc = (acc == '') ? c.slug : acc ~ '/' ~ c.slug %}
+                {% if not loop.last %}<a href="/{{ app.request.locale }}/{{ acc }}">{{ c.label }}</a> › {% else %}<span class="muted" aria-current="page">{{ c.label }}</span>{% endif %}
             {% endfor %}
-        </p>
+        </nav>
     {% endif %}
 
     <h1>{{ node.label }}</h1>
     {% if node.description %}<p class="muted">{{ node.description }}</p>{% endif %}
 
-    {% if node.children is not empty %}
-        <h2>Sous-domaines</h2>
-        <div class="grid">
-            {% for child in node.children %}
-                <a class="card" href="{{ path('node', { slug: child.slug }) }}">{{ child.label }}</a>
-            {% endfor %}
-        </div>
-    {% endif %}
+    <div class="qtabs" role="tablist" aria-label="Contenu de la rubrique {{ node.label }}">
+        <button type="button" role="tab" id="tab-article" aria-controls="panel-article" aria-selected="true" tabindex="0">Article</button>
+        <button type="button" role="tab" id="tab-qa" aria-controls="panel-qa" aria-selected="false" tabindex="-1">Questions &amp; réponses{% if qcount > 0 %} <span class="tab-badge" aria-label="{{ qcount }} question(s)">{{ qcount }}</span>{% endif %}</button>
+        <button type="button" role="tab" id="tab-controv" aria-controls="panel-controv" aria-selected="false" tabindex="-1">Controverses{% if cvcount > 0 %} <span class="tab-badge" aria-label="{{ cvcount }} controverse(s)">{{ cvcount }}</span>{% endif %}</button>
+    </div>
 
-    <h2>Questions &amp; réponses</h2>
-    {% for answer in answers %}
-        <article class="qa">
-            <h3>{{ answer.questionText }}</h3>
-            {% if answer.validationStatus == 'valide' %}
-                <span class="badge ok">✅ Validé par le comité scientifique</span>
+    {# ===================== Onglet Article ===================== #}
+    <section role="tabpanel" id="panel-article" aria-labelledby="tab-article" class="node-layout">
+        <div class="node-main">
+            {% set editBtn %}
+                {% if current_user.canEdit and node.id %}
+                    <button type="button" class="art-edit-btn" data-toggle="art-edit" data-scroll>✏️ {{ node.articleMd ? 'Éditer' : 'Rédiger' }} l'article</button>
+                {% else %}
+                    <a class="art-edit-btn" href="{{ path('login', { back: app.request.uri }) }}">✏️ Proposer une modification</a>
+                {% endif %}
+            {% endset %}
+            <div class="art-edit-bar">{{ editBtn }}</div>
+
+            {% if node.articleMd %}
+                <article class="md wiki-article">
+                    {{ node.articleMd|md }}
+                    {% if node.articleStatus != 'valide' %}
+                        <aside class="ai-banner">
+                            <strong>⚠️ Contenu assisté par IA — non garanti par le comité scientifique.</strong>
+                            Cet article a été {{ node.articleModel ? 'rédigé par une intelligence artificielle (' ~ node.articleModel ~ ')' : 'généré automatiquement' }} et peut comporter des imprécisions. Sa fiabilité n'engage pas le comité tant qu'il n'est pas validé.
+                            {% if current_user.canEdit %}
+                                <a href="#art-edit" data-show="art-edit" data-scroll>✏️ Relire et corriger cet article</a>.
+                            {% else %}
+                                Vous êtes chercheur·e ou contributeur·rice&nbsp;? <a href="{{ path('login', { back: app.request.uri }) }}">Connectez-vous pour le relire et le corriger</a>.
+                            {% endif %}
+                        </aside>
+                    {% endif %}
+                </article>
             {% else %}
-                <span class="badge warn">⚠️ Réponse générée par IA — non encore relue par un comité</span>
+                <p class="muted">Aucun article encyclopédique n'a encore été rédigé pour cette rubrique.</p>
             {% endif %}
 
-            {% if answer.vulgarizationContent %}
-                <div class="block-vul"><h4>Vulgarisation</h4><p>{{ answer.vulgarizationContent|nl2br }}</p></div>
-            {% endif %}
-            {% if answer.academicContent %}
-                <div class="block-aca"><h4>Faits établis (sourcés)</h4><p>{{ answer.academicContent|nl2br }}</p></div>
-            {% endif %}
+            <div class="art-edit-bar">{{ editBtn }}</div>
 
-            {% if answer.sources is not empty %}
-                <div class="sources">
-                    <strong>Sources :</strong>
-                    <ol>
-                        {% for source in answer.sources %}
-                            <li>{{ source.title }}{% if source.doi %} — <a href="https://doi.org/{{ source.doi }}" rel="noopener" target="_blank">doi:{{ source.doi }}</a>{% endif %}</li>
-                        {% endfor %}
-                    </ol>
+            {% if current_user.canEdit and node.id %}
+                <div style="margin:.4rem 0 2rem">
+                    <div id="art-edit" hidden style="margin-top:.4rem; border:1px solid var(--line); border-radius:10px; padding:1rem; background:#fafafa">
+                        <form method="post" action="{{ path('article_edit', { id: node.id }) }}">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="back" value="{{ app.request.uri }}">
+                            <label for="art-md">Contenu (Markdown)</label>
+                            <textarea id="art-md" name="article_md" style="width:100%; min-height:32rem; font-family:ui-monospace,monospace; font-size:.85rem; line-height:1.5">{{ node.articleMd }}</textarea>
+                            <div style="display:flex; gap:.8rem; align-items:center; margin-top:.6rem; flex-wrap:wrap">
+                                <button type="submit">💾 Enregistrer</button>
+                                {% if current_user.canValidate %}<label style="font-size:.85rem; cursor:pointer"><input type="checkbox" name="validate" value="1"> et marquer « relu »</label>{% endif %}
+                                <span class="muted" style="font-size:.8rem">Lien interne : <code>[texte](/fr/slug)</code></span>
+                            </div>
+                        </form>
+                        {% if current_user.canValidate and node.articleMd and node.articleStatus != 'valide' %}
+                            <form method="post" action="{{ path('article_validate', { id: node.id }) }}" style="margin-top:.6rem">
+                                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                <input type="hidden" name="back" value="{{ app.request.uri }}">
+                                <button type="submit" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:.45rem .9rem;cursor:pointer">✅ Valider sans modifier</button>
+                            </form>
+                        {% endif %}
+                    </div>
                 </div>
             {% endif %}
-        </article>
-    {% else %}
-        <p class="muted">Aucune question publiée pour cette notion pour l'instant.</p>
-    {% endfor %}
+
+        </div>
+
+        <aside class="node-aside" aria-label="Informations sur la rubrique">
+            {% if node.articleMd %}
+                <p class="aside-status">
+                    {% if node.articleStatus == 'valide' %}<span class="badge ok aside-badge">🛡️ Garanti par le comité</span>
+                    {% else %}<span class="badge warn aside-badge">⚠️ Rédigé par IA · non relu</span>{% endif %}
+                </p>
+                {% if node.articleModel %}<p class="aside-meta">🤖 Modèle : <strong>{{ node.articleModel }}</strong></p>{% endif %}
+                {% if node.articleGeneratedAt %}<p class="aside-meta muted">Rédigé le {{ node.articleGeneratedAt|date('d/m/Y') }}</p>{% endif %}
+                <hr>
+            {% endif %}
+            {% if corpusCount is defined and corpusCount > 0 %}
+                <p class="aside-meta">📚 <strong>{{ corpusCount|number_format(0, ',', ' ') }}</strong> article(s) de recherche<br><span class="muted">dans cette rubrique et ses sous-rubriques</span></p>
+            {% endif %}
+            <a class="aside-explore" href="{{ path('explorer', { slug: node.slug }) }}">🔎 Explorer les articles</a>
+            {% if node.openalexUrl %}<p class="aside-meta muted" style="font-size:.8rem">Concept de référence : <a href="{{ node.openalexUrl }}" rel="noopener" target="_blank">OpenAlex ↗</a></p>{% endif %}
+        </aside>
+    </section>
+
+    {# ===================== Onglet Questions & réponses ===================== #}
+    <section role="tabpanel" id="panel-qa" aria-labelledby="tab-qa" hidden>
+        {% if answers is empty %}
+            <p class="muted">Aucune question publiée pour cette rubrique. Posez la première ci-dessous.</p>
+        {% else %}
+            <p class="muted" style="font-size:.9rem">Cliquez sur une question pour afficher sa réponse (une seule ouverte à la fois).</p>
+            {% for a in answers %}
+                <details name="qa-acc" class="qa-item">
+                    <summary class="qa-summary">
+                        <h2 class="qa-q">{{ a.questionText }}</h2>
+                        <span class="qmeta">
+                            <span class="pill author">✍️ {{ a.askerName }}</span>
+                            {% if a.createdAt %}<time datetime="{{ a.createdAt }}">{{ a.createdAt|date('d/m/Y') }}</time>{% endif %}
+                            {% if a.validationStatus == 'valide' %}<span class="badge ok">✅ validé</span>{% else %}<span class="badge warn">⚠️ non relu</span>{% endif %}
+                        </span>
+                    </summary>
+                    <div class="qa-answer">
+                        {% if a.title != a.questionText %}<h3 class="qa-title">{{ a.title }}</h3>{% endif %}
+                        {% if a.vulgarizationContent %}<div class="md">{{ a.vulgarizationContent|md }}</div>{% endif %}
+                        {% if a.academicContent %}<h3 style="font-size:1.05rem; margin-top:1rem">Faits établis (sourcés)</h3><div class="md">{{ a.academicContent|md }}</div>{% endif %}
+                        {% if a.sources is not empty %}
+                            <h3 style="font-size:1rem; margin-top:1rem">📚 Sources citées</h3>
+                            <ol>
+                                {% for s in a.sources %}
+                                    <li style="margin:.4rem 0">
+                                        <strong>{{ s.title }}</strong>
+                                        {% if s.year or s.venue %}<span class="muted">— {% if s.venue %}{{ s.venue }}{% endif %}{% if s.year %}{% if s.venue %}, {% endif %}{{ s.year }}{% endif %}</span>{% endif %}
+                                        {% if s.oaUrl %} · <a href="{{ s.oaUrl }}" rel="noopener" target="_blank">🔓 Accès libre</a>{% elseif s.doi %} · <a href="https://doi.org/{{ s.doi }}" rel="noopener" target="_blank">doi:{{ s.doi }}</a>{% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ol>
+                        {% endif %}
+                        <div class="qa-warn">
+                            ⚠️ <strong>Réponse générée par IA</strong>{% if a.generationModel %} ({{ a.generationModel|split(':')|first }}{% if a.generationMs %}, {{ (a.generationMs / 1000)|round(1) }}&nbsp;s{% endif %}){% endif %} à partir des sources citées{% if a.validationStatus != 'valide' %}, <strong>non encore relue</strong> par le comité scientifique{% endif %} — elle peut comporter des imprécisions.
+                        </div>
+                        {{ vote.widget(a.id, votes, myVotes) }}
+                        <p style="margin-top:.6rem"><a href="{{ path('answer', { id: a.id }) }}">Ouvrir la page dédiée ↗</a></p>
+                    </div>
+                </details>
+            {% endfor %}
+            {{ vote.assets() }}
+        {% endif %}
+
+        <div class="ask" style="margin-top:1.6rem">
+            <h2 style="margin-top:0">Poser une question sur « {{ node.label }} »</h2>
+            <p class="muted" style="font-size:.85rem">Une réponse vulgarisée et sourcée sera rédigée par l'IA, publiée avec la mention « non relu » en attendant la validation du comité.</p>
+            <form id="ask-form" data-turbo="false" data-node="{{ node.slug }}">
+                <label for="ask-name">Votre nom ou pseudonyme <span class="muted">(obligatoire)</span></label>
+                <input type="text" id="ask-name" name="name" maxlength="120" required autocomplete="nickname">
+                <label for="ask-q">Votre question</label>
+                <textarea id="ask-q" name="question" maxlength="400" required placeholder="Ex. : Comment fonctionne… ?"></textarea>
+                <button type="submit" id="ask-btn">Demander une réponse</button>
+                <span id="ask-msg" class="muted" role="status" aria-live="polite" style="margin-left:.6rem"></span>
+            </form>
+            <p style="margin-top:.6rem">
+                <button type="button" id="suggest-btn" style="background:#fff; color:var(--accent); border:1px solid var(--accent); border-radius:8px; padding:.55rem 1rem; font:inherit; font-weight:600; cursor:pointer">✨ Laisser l'IA proposer une question</button>
+            </p>
+            <div id="stream-out" hidden></div>
+        </div>
+    </section>
+
+    {# ===================== Onglet Controverses ===================== #}
+    <section role="tabpanel" id="panel-controv" aria-labelledby="tab-controv" hidden>
+        {% include 'wiki/_controversies.html.twig' %}
+    </section>
+
+    {# Sous-rubriques : hors des onglets, toujours affichées. #}
+    {% if node.children is not empty %}
+        <section aria-label="Sous-rubriques" style="margin-top:2rem">
+            <h2>Sous-rubriques</h2>
+            <div class="grid">
+                {% for child in node.children %}
+                    {% set cs = (childrenStats[child.slug] ?? {}) %}
+                    <a class="domain-card" href="/{{ app.request.locale }}/{{ path }}/{{ child.slug }}" style="background:{{ colors.card_bg(rootSlug, child.level) }}; min-height:96px">
+                        <span class="d-label">{{ child.label }}</span>
+                        <span style="display:block; margin-top:.45rem">
+                            <span class="pill" style="background:rgba(255,255,255,.85)" title="Publications">📚 {{ (cs.publications ?? 0)|number_format(0, ',', ' ') }}</span>
+                            <span class="pill" style="background:rgba(255,255,255,.85)" title="Questions">❓ {{ (cs.questions ?? 0)|number_format(0, ',', ' ') }}</span>
+                        </span>
+                    </a>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        // --- Onglets accessibles (ARIA APG : flèches, Origine/Fin, tabindex mobile) ---
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('.qtabs [role="tab"]'));
+        function panelOf(t) { return document.getElementById(t.getAttribute('aria-controls')); }
+        function select(tab, focus) {
+            tabs.forEach(function (t) {
+                var on = t === tab;
+                t.setAttribute('aria-selected', on ? 'true' : 'false');
+                t.tabIndex = on ? 0 : -1;
+                panelOf(t).hidden = !on;
+            });
+            if (focus !== false) { tab.focus(); }
+        }
+        tabs.forEach(function (tab, i) {
+            tab.addEventListener('click', function () { select(tab, false); });
+            tab.addEventListener('keydown', function (e) {
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); select(tabs[(i + 1) % tabs.length]); }
+                else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); select(tabs[(i - 1 + tabs.length) % tabs.length]); }
+                else if (e.key === 'Home') { e.preventDefault(); select(tabs[0]); }
+                else if (e.key === 'End') { e.preventDefault(); select(tabs[tabs.length - 1]); }
+            });
+        });
+        // Accès direct à l'onglet Q/R via #qa ou si aucun article.
+        if (location.hash === '#qa' {% if not node.articleMd and answers is not empty %}|| true{% endif %}) { select(document.getElementById('tab-qa'), false); }
+
+        // Repli pour les très anciens navigateurs sans <details name> exclusif :
+        // ferme les autres à l'ouverture d'un.
+        var accs = document.querySelectorAll('details[name="qa-acc"]');
+        if (accs.length && !('name' in document.createElement('details'))) {
+            accs.forEach(function (d) {
+                d.addEventListener('toggle', function () {
+                    if (d.open) { accs.forEach(function (o) { if (o !== d) o.open = false; }); }
+                });
+            });
+        }
+
+        // --- Poser / suggérer une question (inchangé) ---
+        var form = document.getElementById('ask-form');
+        var btn = document.getElementById('ask-btn');
+        var sbtn = document.getElementById('suggest-btn');
+        var msg = document.getElementById('ask-msg');
+        var out = document.getElementById('stream-out');
+        var nodeSlug = form.dataset.node;
+        function render(raw) { out.innerHTML = raw.replace(/^##\s*TITRE\s*$/gmi, '').replace(/^##\s*VULGARISATION\s*$/gmi, '').replace(/^##\s*ACAD[EÉ]MIQUE\s*$/gmi, '<h4>Pour aller plus loin</h4>'); }
+        function setBusy(b) { btn.disabled = b; sbtn.disabled = b; }
+        function startStream(streamUrl) {
+            msg.innerHTML = '<span class="loader"></span> Rédaction en cours…';
+            out.hidden = false; out.textContent = '';
+            var acc = '', es = new EventSource(streamUrl);
+            es.onmessage = function (ev) {
+                var data = JSON.parse(ev.data);
+                if (data.delta) { acc += data.delta; render(acc); }
+                if (data.nosource) { es.close(); setBusy(false); msg.textContent = ''; out.hidden = false; out.innerHTML = '<p class="muted">⚠️ ' + data.message + '</p>'; }
+                if (data.error) { es.close(); setBusy(false); msg.textContent = data.error; }
+                if (data.done) { es.close(); msg.innerHTML = '<span class="loader"></span> Réponse prête, redirection…'; window.location.href = '/q/' + data.answerId; }
+            };
+            es.onerror = function () { es.close(); setBusy(false); msg.textContent = 'Connexion interrompue.'; };
+        }
+        function post(url, body, loadingMsg) {
+            setBusy(true); msg.innerHTML = '<span class="loader"></span> ' + loadingMsg;
+            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) { if (!res.ok) { throw new Error(res.d.error || 'Erreur'); } startStream(res.d.stream); })
+                .catch(function (err) { setBusy(false); msg.textContent = err.message; });
+        }
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var name = document.getElementById('ask-name').value.trim();
+            var question = document.getElementById('ask-q').value.trim();
+            if (!name) { msg.textContent = 'Le nom ou pseudo est obligatoire.'; return; }
+            if (question.length < 8) { msg.textContent = 'Votre question est trop courte.'; return; }
+            post('/api/questions/ask', { name: name, question: question, node: nodeSlug }, 'Envoi…');
+        });
+        sbtn.addEventListener('click', function () { post('/api/questions/suggest', { node: nodeSlug }, 'L\'IA imagine une question…'); });
+    })();
+    </script>
 {% endblock %}

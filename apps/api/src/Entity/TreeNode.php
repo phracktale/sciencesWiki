@@ -10,6 +10,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use App\Enum\AnalysisStatus;
 use App\Repository\TreeNodeRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -46,6 +47,7 @@ class TreeNode
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['node:item'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255, unique: true)]
@@ -59,6 +61,11 @@ class TreeNode
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     #[Groups(['node:read'])]
     private ?string $description = null;
+
+    /** Image de fond du lanceur (URL) ; repli sur un dégradé si absente. */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?string $imageUrl = null;
 
     #[ORM\Column(length: 128, nullable: true)]
     #[Groups(['node:read'])]
@@ -86,6 +93,108 @@ class TreeNode
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
+    /** Dernière moisson ciblée de cette rubrique (pour la reprise incrémentale). */
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $lastHarvestedAt = null;
+
+    /**
+     * Cycle de vie de l'analyse « controverses & pistes » de ce nœud
+     * (cf. docs/spec-controverses-lacunes.md §0.2 / §7bis). Sert aussi de verrou :
+     * un seul job d'analyse par nœud à la fois (état Analyzing).
+     */
+    #[ORM\Column(name: 'analysis_status', length: 16, enumType: AnalysisStatus::class, options: ['default' => 'not_analyzed'])]
+    #[Groups(['node:read'])]
+    private AnalysisStatus $analysisStatus = AnalysisStatus::NotAnalyzed;
+
+    /** Fin de la dernière analyse réussie ; comparé à lastHarvestedAt pour détecter Stale. */
+    #[ORM\Column(name: 'analyzed_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $analyzedAt = null;
+
+    /** Article encyclopédique long (Markdown), rédigé par IA puis relu. */
+    #[ORM\Column(name: 'article_md', type: Types::TEXT, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?string $articleMd = null;
+
+    /** Paternité (comme les réponses) : 'non_relu' (IA seule) | 'valide' (relu humain). */
+    #[ORM\Column(name: 'article_status', length: 20, options: ['default' => 'non_relu'])]
+    #[Groups(['node:read'])]
+    private string $articleStatus = 'non_relu';
+
+    /** Modèle d'IA ayant rédigé l'article (paternité). */
+    #[ORM\Column(name: 'article_model', length: 120, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?string $articleModel = null;
+
+    #[ORM\Column(name: 'article_generated_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $articleGeneratedAt = null;
+
+    #[ORM\Column(name: 'article_reviewed_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?\DateTimeImmutable $articleReviewedAt = null;
+
+    public function getArticleMd(): ?string
+    {
+        return $this->articleMd;
+    }
+
+    public function setArticleMd(?string $md): self
+    {
+        $this->articleMd = $md;
+
+        return $this;
+    }
+
+    public function getArticleStatus(): string
+    {
+        return $this->articleStatus;
+    }
+
+    public function setArticleStatus(string $status): self
+    {
+        $this->articleStatus = $status;
+
+        return $this;
+    }
+
+    public function getArticleModel(): ?string
+    {
+        return $this->articleModel;
+    }
+
+    public function setArticleModel(?string $model): self
+    {
+        $this->articleModel = $model;
+
+        return $this;
+    }
+
+    public function getArticleGeneratedAt(): ?\DateTimeImmutable
+    {
+        return $this->articleGeneratedAt;
+    }
+
+    public function setArticleGeneratedAt(?\DateTimeImmutable $at): self
+    {
+        $this->articleGeneratedAt = $at;
+
+        return $this;
+    }
+
+    public function getArticleReviewedAt(): ?\DateTimeImmutable
+    {
+        return $this->articleReviewedAt;
+    }
+
+    public function setArticleReviewedAt(?\DateTimeImmutable $at): self
+    {
+        $this->articleReviewedAt = $at;
+
+        return $this;
+    }
+
     public function __construct(string $slug, string $label)
     {
         $this->slug = $slug;
@@ -106,7 +215,7 @@ class TreeNode
         $children = [];
         foreach ($this->childEdges as $edge) {
             $node = $edge->getChild();
-            $children[] = ['slug' => $node->getSlug(), 'label' => $node->getLabel(), 'level' => $node->getLevel()];
+            $children[] = ['id' => $node->getId(), 'slug' => $node->getSlug(), 'label' => $node->getLabel(), 'level' => $node->getLevel()];
         }
         usort($children, static fn (array $a, array $b): int => $a['label'] <=> $b['label']);
 
@@ -136,6 +245,52 @@ class TreeNode
         return $this->childEdges->count();
     }
 
+    /**
+     * Fil d'Ariane canonique (racine → ce nœud), en remontant les parents
+     * « principaux ». Sert à l'affichage et aux URLs arborescentes (SEO).
+     *
+     * @return list<array{slug:string,label:string}>
+     */
+    #[Groups(['node:item'])]
+    public function getBreadcrumb(): array
+    {
+        $chain = [];
+        $node = $this;
+        $guard = 0;
+        while (null !== $node && $guard++ < 12) {
+            array_unshift($chain, ['id' => $node->getId(), 'slug' => $node->getSlug(), 'label' => $node->getLabel()]);
+            $node = $node->principalParent();
+        }
+
+        return $chain;
+    }
+
+    private function principalParent(): ?self
+    {
+        $fallback = null;
+        foreach ($this->parentEdges as $edge) {
+            if ($edge->isPrincipal()) {
+                return $edge->getParent();
+            }
+            $fallback ??= $edge->getParent();
+        }
+
+        return $fallback;
+    }
+
+    /** @return Collection<int,TreeEdge> arêtes où ce nœud est parent */
+    public function getChildEdges(): Collection
+    {
+        return $this->childEdges;
+    }
+
+    /** @return Collection<int,TreeEdge> arêtes où ce nœud est enfant */
+    public function getParentEdges(): Collection
+    {
+        return $this->parentEdges;
+    }
+
+    #[Groups(['node:read'])]
     public function getId(): ?int
     {
         return $this->id;
@@ -170,6 +325,18 @@ class TreeNode
         return $this;
     }
 
+    public function getImageUrl(): ?string
+    {
+        return $this->imageUrl;
+    }
+
+    public function setImageUrl(?string $imageUrl): self
+    {
+        $this->imageUrl = $imageUrl;
+
+        return $this;
+    }
+
     public function getDomain(): ?string
     {
         return $this->domain;
@@ -182,9 +349,17 @@ class TreeNode
         return $this;
     }
 
+    #[Groups(['node:read'])]
     public function getOpenalexConceptId(): ?string
     {
         return $this->openalexConceptId;
+    }
+
+    /** URL publique OpenAlex du concept (mapping graine), si disponible. */
+    #[Groups(['node:read'])]
+    public function getOpenalexUrl(): ?string
+    {
+        return null !== $this->openalexConceptId ? 'https://openalex.org/'.$this->openalexConceptId : null;
     }
 
     public function setOpenalexConceptId(?string $openalexConceptId): self
@@ -222,5 +397,56 @@ class TreeNode
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getLastHarvestedAt(): ?\DateTimeImmutable
+    {
+        return $this->lastHarvestedAt;
+    }
+
+    public function markHarvested(): self
+    {
+        $this->lastHarvestedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    public function getAnalysisStatus(): AnalysisStatus
+    {
+        return $this->analysisStatus;
+    }
+
+    public function setAnalysisStatus(AnalysisStatus $status): self
+    {
+        $this->analysisStatus = $status;
+
+        return $this;
+    }
+
+    public function getAnalyzedAt(): ?\DateTimeImmutable
+    {
+        return $this->analyzedAt;
+    }
+
+    /** Fin d'une analyse réussie : passe le nœud à Ready et horodate. */
+    public function markAnalyzed(): self
+    {
+        $this->analysisStatus = AnalysisStatus::Ready;
+        $this->analyzedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    /**
+     * Le nœud a-t-il été moissonné depuis sa dernière analyse ? (⇒ Stale).
+     * Sans analyse antérieure, rien à rafraîchir.
+     */
+    public function isAnalysisStale(): bool
+    {
+        if (null === $this->analyzedAt || null === $this->lastHarvestedAt) {
+            return false;
+        }
+
+        return $this->lastHarvestedAt > $this->analyzedAt;
     }
 }

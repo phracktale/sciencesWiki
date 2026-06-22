@@ -1,0 +1,69 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Demandes « Nous rejoindre »{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.6rem 1rem; word-break:break-word">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+
+    <h1>Demandes « Nous rejoindre » <span class="muted">({{ data.items|length }})</span></h1>
+
+    {% set roleLabels = {
+        'ROLE_REDACTEUR': 'Rédacteur', 'ROLE_COMITE': 'Comité scientifique',
+        'ROLE_MODERATEUR': 'Modérateur', 'ROLE_ADMIN': 'Administrateur'
+    } %}
+    {% set typeLabels = { 'committee': 'Comité', 'author': 'Auteur', 'editor': 'Rédacteur' } %}
+
+    <p style="margin:.6rem 0">
+        <a href="{{ path('admin_join') }}" class="pill {{ status == '' ? 'author' }}">Toutes</a>
+        <a href="{{ path('admin_join', { status: 'pending' }) }}" class="pill {{ status == 'pending' ? 'author' }}">En attente</a>
+        <a href="{{ path('admin_join', { status: 'approved' }) }}" class="pill {{ status == 'approved' ? 'author' }}">Approuvées</a>
+        <a href="{{ path('admin_join', { status: 'rejected' }) }}" class="pill {{ status == 'rejected' ? 'author' }}">Rejetées</a>
+    </p>
+
+    {% if data.items is empty %}
+        <p class="muted">Aucune demande.</p>
+    {% else %}
+        <div class="grid" style="grid-template-columns:1fr">
+            {% for r in data.items %}
+                <div class="card" style="display:block">
+                    <div style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap">
+                        <div>
+                            <strong>{{ r.firstName }} {{ r.lastName }}</strong>
+                            <span class="pill">{{ typeLabels[r.type] ?? r.type }}</span>
+                            {% if r.status == 'pending' %}<span class="badge warn">en attente</span>
+                            {% elseif r.status == 'approved' %}<span class="badge ok">approuvée</span>
+                            {% else %}<span class="pill">rejetée</span>{% endif %}
+                            <br>
+                            <span class="muted" style="font-size:.88rem">
+                                {% if r.email %}✉️ {{ r.email }}{% else %}<em>sans e-mail</em>{% endif %}
+                                {% if r.profile %} · {{ r.profile }}{% endif %}
+                                {% if r.profession %} · {{ r.profession }}{% endif %}
+                                {% if r.orcid %} · <a href="https://orcid.org/{{ r.orcid }}" target="_blank" rel="noopener">{{ r.orcid }}</a>{% endif %}
+                                · {{ r.createdAt|slice(0,10) }}
+                            </span>
+                            {% if r.message %}<p class="muted" style="font-size:.9rem; margin:.4rem 0 0">{{ r.message }}</p>{% endif %}
+                        </div>
+                        {% if r.status == 'pending' %}
+                            <div style="display:flex; gap:.4rem; align-items:flex-start; flex-wrap:wrap">
+                                <form method="post" action="{{ path('admin_join_op', { id: r.id, op: 'promote' }) }}" style="display:flex; gap:.3rem; align-items:center"
+                                      data-needs-email="{{ r.email ? '1' : '0' }}">
+                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                    <select name="role" style="padding:.35rem; border:1px solid #d1d5db; border-radius:7px; font:inherit">
+                                        {% for role in data.availableRoles %}
+                                            <option value="{{ role }}" {{ (r.type == 'committee' and role == 'ROLE_COMITE') ? 'selected' }}>{{ roleLabels[role] ?? role }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:7px; padding:.35rem .8rem; cursor:pointer">✅ Promouvoir</button>
+                                </form>
+                                <form method="post" action="{{ path('admin_join_op', { id: r.id, op: 'reject' }) }}" data-confirm="Rejeter cette demande ?">
+                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                    <button type="submit" style="background:#7f1d1d; color:#fff; border:0; border-radius:7px; padding:.35rem .8rem; cursor:pointer">Rejeter</button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endblock %}

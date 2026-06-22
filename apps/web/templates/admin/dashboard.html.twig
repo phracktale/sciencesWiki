@@ -1,0 +1,264 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Tableau de bord{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>Tableau de bord</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <style>
+        .tabs { display:flex; gap:.3rem; border-bottom:2px solid var(--line); margin:1rem 0 1.2rem }
+        .tabs button { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px;
+            padding:.6rem 1rem; font:inherit; font-weight:600; color:var(--muted, #6b7280); cursor:pointer }
+        .tabs button[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent) }
+        .tabpane[hidden] { display:none }
+        .twocol { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem }
+        @media (max-width:720px) { .twocol { grid-template-columns:1fr } }
+    </style>
+
+    <div class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-pane="pane-corpus">Corpus &amp; progression</button>
+        <button role="tab" aria-selected="false" data-pane="pane-types">Types de publication</button>
+        <button role="tab" aria-selected="false" data-pane="pane-editeurs">Éditeurs</button>
+        <button role="tab" aria-selected="false" data-pane="pane-moisson">Moisson &amp; domaines</button>
+        <button role="tab" aria-selected="false" data-pane="pane-domaines">Domaines</button>
+        <button role="tab" aria-selected="false" data-pane="pane-systeme">Système &amp; base de données</button>
+    </div>
+
+    {# ===== Onglet 1 : Corpus + progression du corpus ===== #}
+    <section class="tabpane" id="pane-corpus">
+        {% set c = stats.corpus ?? {} %}
+        {% set tf = stats.typeFilter ?? [] %}
+        {% set bd = {} %}
+        {% for r in stats.typeBreakdown ?? [] %}{% set bd = bd|merge({ (r.type): r.n }) %}{% endfor %}
+        <h2 style="margin-top:0">Corpus</h2>
+
+        <form method="get" action="{{ path('admin_dashboard') }}" style="margin:.2rem 0 1rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap">
+            <div style="position:relative">
+                <button type="button" id="type-btn" style="background:#fff; border:1px solid #d1d5db; border-radius:8px; padding:.5rem .9rem; cursor:pointer; font:inherit">
+                    Filtrer par type{% if tf|length %} <span class="badge" style="font-size:.7rem">{{ tf|length }}</span>{% endif %} ▾
+                </button>
+                <div id="type-panel" hidden style="position:absolute; z-index:20; top:calc(100% + 4px); left:0; background:#fff; border:1px solid #d1d5db; border-radius:9px; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:.7rem .9rem; min-width:300px; max-height:360px; overflow:auto">
+                    {% for famLabel, types in stats.families ?? {} %}
+                        <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.4rem .7rem; margin:.3rem 0">
+                            <legend style="font-size:.78rem; font-weight:700; padding:0 .3rem">
+                                <label style="cursor:pointer"><input type="checkbox" class="grp-all" data-grp="grp-{{ loop.index }}"> {{ famLabel }}</label>
+                            </legend>
+                            {% for t in types %}
+                                <label style="display:block; font-size:.83rem; cursor:pointer; padding:.05rem 0">
+                                    <input type="checkbox" name="types[]" value="{{ t }}" class="grp-{{ loop.parent.index }}" {{ t in tf ? 'checked' }}>
+                                    {{ t }}{% if bd[t] is defined %} <span class="muted">({{ bd[t]|number_format(0,',',' ') }})</span>{% endif %}
+                                </label>
+                            {% endfor %}
+                        </fieldset>
+                    {% endfor %}
+                    <div style="display:flex; gap:.5rem; margin-top:.4rem">
+                        <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.45rem 1rem; cursor:pointer">Appliquer</button>
+                        {% if tf|length %}<a href="{{ path('admin_dashboard') }}" style="font-size:.85rem; align-self:center">réinitialiser</a>{% endif %}
+                    </div>
+                </div>
+            </div>
+            {% if tf|length %}<span class="badge">Filtré&nbsp;: <strong>{{ tf|join(', ') }}</strong></span>{% endif %}
+        </form>
+        <script nonce="{{ csp_nonce.value }}">
+        (function () {
+            document.querySelectorAll('.grp-all').forEach(function (master) {
+                var boxes = document.querySelectorAll('input.' + master.getAttribute('data-grp'));
+                function sync() { var all = boxes.length > 0; boxes.forEach(function (b) { if (!b.checked) all = false; }); master.checked = all; }
+                master.addEventListener('change', function () { boxes.forEach(function (b) { b.checked = master.checked; }); });
+                boxes.forEach(function (b) { b.addEventListener('change', sync); });
+                sync();
+            });
+            var btn = document.getElementById('type-btn'), panel = document.getElementById('type-panel');
+            btn.addEventListener('click', function (e) { e.stopPropagation(); panel.hidden = !panel.hidden; });
+            panel.addEventListener('click', function (e) { e.stopPropagation(); });
+            document.addEventListener('click', function () { panel.hidden = true; });
+        })();
+        </script>
+
+        <div class="grid">
+            <div class="card"><strong style="font-size:1.6rem">{{ (c.publications ?? 0)|number_format(0,',',' ') }}</strong>{% if (stats.metrics.openAlexTotal ?? 0) > 0 %} <span class="muted">/ ≈ {{ stats.metrics.openAlexTotal|number_format(0,',',' ') }}</span>{% endif %}<br><span class="muted">publications moissonnées{% if (stats.metrics.openAlexTotal ?? 0) > 0 %} / dispo. OpenAlex{% endif %}</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ c.answers ?? 0 }}</strong><br><span class="muted">réponses publiées</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ c.questions ?? 0 }}</strong><br><span class="muted">questions</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (c.treeNodes ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">rubriques</span></div>
+        </div>
+
+        {% set m = stats.metrics ?? {} %}
+        <h3>Indicateurs</h3>
+        <div class="grid">
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.freeFullArticles ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles en accès libre</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.paywalled ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles payants (résumé seul)</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.fulltextVectorized ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles <strong>texte intégral</strong> vectorisés{% if (m.fulltextGrobid ?? 0) > 0 %} <span class="muted">(dont {{ m.fulltextGrobid|number_format(0,',',' ') }} TEI GROBID)</span>{% endif %}</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.abstractOnly ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">articles <strong>résumé seul</strong> vectorisés</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.fulltextRetryable ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">échecs texte intégral <span class="muted">(reprenables : <code>app:fulltext:retry</code>)</span></span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.authors ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">auteurs référencés</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.journals ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">revues</span></div>
+            <div class="card"><strong style="font-size:1.6rem">{{ (m.publishers ?? 0)|number_format(0,',',' ') }}</strong><br><span class="muted">éditeurs</span></div>
+            <div class="card"><strong style="font-size:1.3rem">{{ (m.answersValidated ?? 0)|number_format(0,',',' ') }} <span class="muted">validées</span> / {{ (m.answersAi ?? 0)|number_format(0,',',' ') }} <span class="muted">IA</span></strong><br><span class="muted">réponses (humain / IA seule)</span></div>
+            <div class="card"><strong style="font-size:1.3rem">{{ (m.questionsHuman ?? 0)|number_format(0,',',' ') }} <span class="muted">humain</span> / {{ (m.questionsAi ?? 0)|number_format(0,',',' ') }} <span class="muted">IA</span></strong><br><span class="muted">questions (humain / IA)</span></div>
+        </div>
+
+    </section>
+
+    {# ===== Onglet : Types de publication ===== #}
+    <section class="tabpane" id="pane-types" hidden>
+        {% set tf = stats.typeFilter ?? [] %}
+        <h2 style="margin-top:0">Répartition par type de publication</h2>
+        {% if (stats.typeBreakdown ?? [])|length > 0 %}
+            <table style="width:100%; border-collapse:collapse; max-width:480px">
+                <thead><tr><th style="text-align:left; padding:.3rem 0; border-bottom:1px solid var(--line)">Type</th><th style="text-align:right; border-bottom:1px solid var(--line)">Publications</th></tr></thead>
+                <tbody>
+                {% for row in stats.typeBreakdown %}
+                    <tr>
+                        <td style="padding:.3rem 0">
+                            {% if row.type != '(inconnu)' %}<a href="{{ path('admin_dashboard', { 'types[]': row.type }) }}" {{ row.type in tf ? 'style="font-weight:700"' }}>{{ row.type }}</a>{% if row.type in (stats.satelliteTypes ?? []) %} <span class="badge warn" style="font-size:.65rem">satellite</span>{% endif %}{% else %}<span class="muted">{{ row.type }}</span>{% endif %}
+                        </td>
+                        <td style="text-align:right">{{ row.n|number_format(0,',',' ') }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}<p class="muted">Aucune donnée.</p>{% endif %}
+    </section>
+
+    {# ===== Onglet : Éditeurs ===== #}
+    <section class="tabpane" id="pane-editeurs" hidden>
+        {% set m = stats.metrics ?? {} %}
+        <h2 style="margin-top:0">Éditeurs — nombre de revues référencées</h2>
+        {% if (m.topPublishers ?? [])|length > 0 %}
+            <table style="width:100%; border-collapse:collapse">
+                <thead><tr><th style="text-align:left; padding:.3rem 0; border-bottom:1px solid var(--line)">Éditeur</th><th style="text-align:right; border-bottom:1px solid var(--line)">Revues</th></tr></thead>
+                <tbody>
+                {% for p in m.topPublishers %}
+                    <tr><td style="padding:.3rem 0">{{ p.name }}</td><td style="text-align:right">{{ p.journals|number_format(0,',',' ') }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% else %}<p class="muted">Aucune donnée.</p>{% endif %}
+    </section>
+
+    {# ===== Onglet : Moisson & domaines ===== #}
+    <section class="tabpane" id="pane-moisson" hidden>
+        {% set c = stats.corpus ?? {} %}
+        <h2 style="margin-top:0">Publications par domaine</h2>
+        <div class="grid">
+            {% for r in c.roots ?? [] %}
+                <a class="card" href="{{ path('admin_node', { slug: r.slug }) }}">{{ r.label }}<br><strong>{{ r.publications|number_format(0,',',' ') }}</strong> <span class="muted">publications</span></a>
+            {% endfor %}
+        </div>
+
+        {% set hist = stats.history ?? [] %}
+        {% if hist|length > 0 %}
+            <h3>Articles moissonnés par jour</h3>
+            {% set maxPub = max(hist|map(h => h.publications)) ?: 1 %}
+            {% set chartH = 160 %}
+            <div style="display:flex; gap:.5rem; align-items:stretch">
+                <div style="display:flex; flex-direction:column; justify-content:space-between; height:{{ chartH }}px; font-size:.7rem; color:#9ca3af; text-align:right; min-width:42px">
+                    {% for i in 4..0 %}<span>{{ (maxPub * i / 4)|round|number_format(0,',',' ') }}</span>{% endfor %}
+                </div>
+                {# Zone traçante : grille + barres finies (32px) ferrées à droite. #}
+                <div style="position:relative; flex:1; height:{{ chartH }}px; border-left:1px solid var(--line); border-bottom:1px solid var(--line); overflow-x:auto">
+                    {% for i in 1..4 %}<div style="position:absolute; left:0; right:0; bottom:{{ (chartH * i / 4)|round }}px; border-top:1px dashed #eef2f7"></div>{% endfor %}
+                    <div style="position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:flex-end; gap:6px; padding:0 6px">
+                        {% for h in hist %}
+                            <div title="{{ h.day }} : {{ h.publications|number_format(0,',',' ') }} article(s) moissonné(s)"
+                                 style="width:32px; flex:0 0 32px; background:linear-gradient(180deg,var(--accent),var(--accent-dark)); border-radius:4px 4px 0 0; height:{{ (h.publications / maxPub * 100)|round }}%; min-height:2px"></div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            <p class="muted" style="font-size:.8rem; margin-top:.3rem">{{ hist|first.day }} → {{ hist|last.day }} ({{ hist|length }} jours) · articles réellement moissonnés (insérés) chaque jour.</p>
+        {% endif %}
+    </section>
+
+    {# ===== Onglet 2 : Domaines + Créer un domaine racine ===== #}
+    <section class="tabpane" id="pane-domaines" hidden>
+        <h2 style="margin-top:0">Aller à une rubrique (concept OpenAlex)</h2>
+        <input type="text" id="oa-search" placeholder="Tapez un nom de rubrique…" autocomplete="off"
+               style="width:100%; max-width:480px; padding:.55rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+        <ul id="oa-results" class="qlist"></ul>
+
+        <h2>Domaines (édition)</h2>
+        <div class="grid">
+            {% for d in domains %}
+                <a class="card" href="{{ path('admin_node', { slug: d.slug }) }}">{{ d.label }} <span class="muted">({{ d.childrenCount }})</span></a>
+            {% endfor %}
+        </div>
+
+        <h2>Créer un domaine racine</h2>
+        <form class="ask" method="post" action="{{ path('admin_action') }}">
+            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+            <input type="hidden" name="action" value="add-child">
+            <label for="label">Libellé</label>
+            <input type="text" id="label" name="label" required>
+            <button type="submit">Créer</button>
+        </form>
+    </section>
+
+    {# ===== Onglet 3 : Système + base de Données (2 colonnes) ===== #}
+    <section class="tabpane" id="pane-systeme" hidden>
+        {% set db = stats.database ?? {} %}
+        {% set sys = stats.system ?? {} %}
+        <div class="twocol">
+            <div>
+                <h2 style="margin-top:0">Système</h2>
+                <ul class="qlist">
+                    <li>OS : <strong>{{ sys.os ?? '—' }}</strong></li>
+                    <li>PHP : <strong>{{ sys.php ?? '—' }}</strong></li>
+                    <li>Serveur web : <strong>{{ sys.webServer ?? '—' }}</strong></li>
+                    <li>Disque hôte Thor (partagé par tous les services) : <strong>{{ ((sys.diskUsedBytes ?? 0)/1073741824)|round(1) }} Go</strong> utilisés / {{ ((sys.diskTotalBytes ?? 0)/1073741824)|round(1) }} Go</li>
+                    <li>Données SciencesWiki (base PostgreSQL : articles + embeddings) :
+                        <strong>{% if (db.sizeBytes ?? 0) > 1073741824 %}{{ ((db.sizeBytes)/1073741824)|round(2) }} Go{% else %}{{ ((db.sizeBytes ?? 0)/1048576)|round(1) }} Mo{% endif %}</strong></li>
+                </ul>
+                <p class="muted" style="font-size:.8rem">Le disque hôte regroupe tous les conteneurs de Thor. SciencesWiki proprement dit ≈ la taille de sa base ci-dessus (+ ~quelques centaines de Mo d'images conteneurs).</p>
+            </div>
+            <div>
+                <h2 style="margin-top:0">Base de données</h2>
+                <p>{{ db.engine ?? '—' }} · version <strong>{{ db.version ?? '—' }}</strong><br>taille <strong>{{ ((db.sizeBytes ?? 0) / 1048576)|round }} Mo</strong></p>
+                <ul class="qlist">
+                    {% for name, n in db.tables ?? {} %}
+                        <li style="display:flex; justify-content:space-between"><span>{{ name }}</span><strong>{{ n|number_format(0,',',' ') }}</strong></li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </section>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        // Onglets (mémorise l'onglet actif dans l'URL #hash).
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs button'));
+        function show(paneId) {
+            tabs.forEach(function (t) {
+                var sel = t.dataset.pane === paneId;
+                t.setAttribute('aria-selected', sel ? 'true' : 'false');
+                document.getElementById(t.dataset.pane).hidden = !sel;
+            });
+        }
+        tabs.forEach(function (t) {
+            t.addEventListener('click', function () { show(t.dataset.pane); history.replaceState(null, '', '#' + t.dataset.pane); });
+        });
+        if (location.hash && document.getElementById(location.hash.slice(1))) { show(location.hash.slice(1)); }
+
+        // Recherche OpenAlex (autocomplete → navigation vers la rubrique).
+        var inp = document.getElementById('oa-search'), out = document.getElementById('oa-results'), timer;
+        if (inp) {
+            inp.addEventListener('input', function () {
+                clearTimeout(timer);
+                var q = inp.value.trim();
+                if (q.length < 2) { out.innerHTML = ''; return; }
+                timer = setTimeout(function () {
+                    fetch('/admin/openalex-search?q=' + encodeURIComponent(q))
+                        .then(function (r) { return r.json(); })
+                        .then(function (d) {
+                            out.innerHTML = (d.items || []).map(function (i) {
+                                return '<li><a class="q-title" href="/admin/r/' + i.slug + '">' + i.label +
+                                    '</a> <span class="muted">niv. ' + i.level + (i.openalexId ? ' · ' + i.openalexId : '') + '</span></li>';
+                            }).join('');
+                        });
+                }, 250);
+            });
+        }
+    })();
+    </script>
+{% endblock %}

@@ -59,6 +59,64 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Publications en accès libre (oaUrl) dont le texte intégral n'a pas encore
+     * été récupéré/vectorisé.
+     *
+     * @return list<Publication>
+     */
+    public function findNeedingFulltext(int $limit): array
+    {
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                // Curation : on traite d'abord ce qui a un TEI GROBID dispo et le plus
+                // cité (haut du panier), puis les PDF directs.
+                "SELECT id FROM publication
+                 WHERE oa_url IS NOT NULL AND oa_url <> '' AND fulltext_fetched_at IS NULL
+                 ORDER BY has_grobid_xml DESC, cited_by_count DESC, (oa_url ILIKE '%%.pdf%%') DESC, id DESC LIMIT %d",
+                max(1, $limit),
+            ),
+        )->fetchFirstColumn();
+
+        $out = [];
+        foreach ($ids as $id) {
+            $pub = $this->find((int) $id);
+            if (null !== $pub) {
+                $out[] = $pub;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Publications sans revue rattachée mais ayant un identifiant OpenAlex
+     * (rattrapage du référentiel éditeurs/revues sur le stock existant).
+     *
+     * @return list<Publication>
+     */
+    public function findNeedingJournal(int $limit): array
+    {
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                "SELECT id FROM publication
+                 WHERE journal_id IS NULL AND external_ids->>'openalex' IS NOT NULL
+                 ORDER BY id DESC LIMIT %d",
+                max(1, $limit),
+            ),
+        )->fetchFirstColumn();
+
+        $out = [];
+        foreach ($ids as $id) {
+            $pub = $this->find((int) $id);
+            if (null !== $pub) {
+                $out[] = $pub;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Publications avec embedding mais pas encore placées dans l'arbre.
      *
      * @return list<Publication>
@@ -83,21 +141,64 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
      *
      * @return list<array{publication:Publication,distance:float}>
      */
-    public function nearestTo(array $embedding, int $k): array
+    /**
+     * @param list<float>  $embedding
+     * @param list<string> $types restreint aux types de publication donnés (vide = tous, hors satellites)
+     */
+    public function nearestTo(array $embedding, int $k, array $types = []): array
     {
         $literal = (string) new Vector($embedding);
         $k = max(1, $k);
+        $typeClause = [] !== $types ? ' AND p.type IN (:ptypes)' : '';
+        $params = ['vec' => $literal];
+        $paramTypes = [];
+        if ([] !== $types) {
+            $params['ptypes'] = array_values($types);
+            $paramTypes['ptypes'] = \Doctrine\DBAL\ArrayParameterType::STRING;
+        }
+        // Sur-échantillonnage par côté : marge pour la déduplication (un article
+        // peut sortir des deux côtés) et le filtre rétraction appliqué ensuite.
+        $perSide = min($k * 4, 120);
 
-        $rows = $this->getEntityManager()->getConnection()->executeQuery(
+        $conn = $this->getEntityManager()->getConnection();
+        // ef_search ≥ taille demandée : qualité du kNN approximatif HNSW.
+        $conn->executeStatement('SET hnsw.ef_search = '.max(40, $perSide));
+
+        // Recherche kNN combinée : embedding du résumé (publication) ET fragments
+        // de texte intégral (publication_chunk). Chaque sous-requête
+        // « ORDER BY embedding <=> const LIMIT n » exploite l'index HNSW (≈ ms
+        // au lieu d'un scan séquentiel). On fusionne en retenant la meilleure
+        // distance par publication, afin qu'un article dont le corps répond
+        // précisément ressorte même si son résumé est moins proche, puis on
+        // filtre les rétractations et on limite. L'unité reste la publication.
+        $rows = $conn->executeQuery(
             \sprintf(
-                'SELECT id, embedding <=> CAST(:vec AS vector) AS distance
-                 FROM publication
-                 WHERE embedding IS NOT NULL
-                 ORDER BY distance ASC
-                 LIMIT %d',
+                "WITH abs AS (
+                    SELECT id, embedding <=> CAST(:vec AS vector) AS distance
+                    FROM publication
+                    ORDER BY embedding <=> CAST(:vec AS vector)
+                    LIMIT %1\$d
+                 ), chk AS (
+                    SELECT publication_id AS id, embedding <=> CAST(:vec AS halfvec) AS distance
+                    FROM publication_chunk
+                    ORDER BY embedding <=> CAST(:vec AS halfvec)
+                    LIMIT %1\$d
+                 ), merged AS (
+                    SELECT id, MIN(distance) AS distance
+                    FROM (SELECT id, distance FROM abs UNION ALL SELECT id, distance FROM chk) AS u
+                    GROUP BY id
+                 )
+                 SELECT m.id, m.distance
+                 FROM merged m
+                 JOIN publication p ON p.id = m.id
+                 WHERE p.retraction_status = 'none' AND p.".\App\Catalog\PublicationType::notSatelliteSql().$typeClause."
+                 ORDER BY m.distance ASC
+                 LIMIT %2\$d",
+                $perSide,
                 $k,
             ),
-            ['vec' => $literal],
+            $params,
+            $paramTypes,
         )->fetchAllAssociative();
 
         $result = [];
@@ -109,6 +210,53 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         }
 
         return $result;
+    }
+
+    /**
+     * Publications placées (validées) dans un nœud — périmètre de l'analyse de
+     * controverses (cf. spec controverses §0.1 / §6.1). Une placement_suggestion
+     * « accepted » fait foi du placement validé. Hors rétractations.
+     *
+     * @return list<Publication>
+     */
+    public function findAcceptedInNode(int $nodeId, int $limit): array
+    {
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                "SELECT p.id
+                 FROM publication p
+                 JOIN placement_suggestion ps ON ps.publication_id = p.id
+                 WHERE ps.tree_node_id = :node AND ps.status = 'accepted'
+                   AND p.retraction_status = 'none'
+                 ORDER BY p.cited_by_count DESC, p.id DESC
+                 LIMIT %d",
+                max(1, $limit),
+            ),
+            ['node' => $nodeId],
+        )->fetchFirstColumn();
+
+        $out = [];
+        foreach ($ids as $id) {
+            $pub = $this->find((int) $id);
+            if (null !== $pub) {
+                $out[] = $pub;
+            }
+        }
+
+        return $out;
+    }
+
+    /** Nombre de publications validées (placées) directement dans un nœud. */
+    public function countAcceptedInNode(int $nodeId): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeQuery(
+            "SELECT count(*)
+             FROM placement_suggestion ps
+             JOIN publication p ON p.id = ps.publication_id
+             WHERE ps.tree_node_id = :node AND ps.status = 'accepted'
+               AND p.retraction_status = 'none'",
+            ['node' => $nodeId],
+        )->fetchOne();
     }
 
     /**
@@ -125,6 +273,96 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             ->setMaxResults(max(1, $limit))
             ->getQuery()
             ->getResult();
+    }
+
+    /**
+     * Recherche paginée des articles d'un sous-domaine (le nœud + ses descendants),
+     * avec recherche plein-texte facultative. Le stemming (racinisation) est
+     * activable : config FTS « english » (mots de la même famille rapprochés) ou
+     * « simple » (correspondance exacte des tokens). Exclut les études rétractées.
+     *
+     * @return array{items: list<array<string,mixed>>, total: int}
+     */
+    public function searchInSubtree(string $slug, string $query, bool $stemming, int $page, int $perPage, string $sort = '', string $dir = 'asc', array $types = []): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $offset = max(0, ($page - 1) * $perPage);
+        $hasQuery = '' !== trim($query);
+        $config = $stemming ? 'english' : 'simple';
+        $d = 'desc' === strtolower($dir) ? 'DESC' : 'ASC';
+
+        // Front : on ne remonte que les types demandés (satellites retirés) ;
+        // par défaut, uniquement les papiers de recherche primaires.
+        $searchTypes = \App\Catalog\PublicationType::searchTypes($types);
+
+        // Sous-arbre résolu UNE SEULE FOIS : si on laisse la CTE récursive dans
+        // l'EXISTS corrélé, PostgreSQL la ré-évalue par ligne candidate (×100k+)
+        // → timeout. On passe les ids des nœuds en paramètre.
+        $nodeIds = array_map('intval', $conn->executeQuery(
+            'WITH RECURSIVE sub AS (
+                SELECT id FROM tree_node WHERE slug = :slug
+                UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
+             ) SELECT id FROM sub',
+            ['slug' => $slug],
+        )->fetchFirstColumn());
+        if ([] === $nodeIds) {
+            return ['items' => [], 'total' => 0];
+        }
+
+        $params = ['nodes' => $nodeIds, 'ptypes' => $searchTypes];
+        $paramTypes = [
+            'nodes' => \Doctrine\DBAL\ArrayParameterType::INTEGER,
+            'ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING,
+        ];
+        $ftsWhere = '';
+        $order = 'p.publication_date DESC NULLS LAST, p.id DESC';
+        if ($hasQuery) {
+            $params['q'] = $query;
+            // Config injectée en LITTÉRAL (liste blanche, pas une entrée utilisateur) :
+            // un paramètre empêcherait l'usage de l'index GIN fonctionnel (cf. migration).
+            // L'expression DOIT être identique à celle de l'index.
+            $tsv = "to_tsvector('$config', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
+            $tsq = "plainto_tsquery('$config', :q)";
+            $ftsWhere = "AND $tsv @@ $tsq";
+            $order = "ts_rank($tsv, $tsq) DESC, p.publication_date DESC NULLS LAST";
+        }
+        // Tri par colonne (en-têtes cliquables) — prioritaire sur le rang FTS.
+        $order = match ($sort) {
+            'titre' => "p.title $d NULLS LAST",
+            'annee' => "p.publication_date $d NULLS LAST, p.id DESC",
+            'revue' => "coalesce(j.name, p.venue) $d NULLS LAST",
+            'auteurs' => "authors $d NULLS LAST",
+            default => $order,
+        };
+
+        $base = "FROM publication p
+            LEFT JOIN journal j ON j.id = p.journal_id
+            WHERE p.retraction_status = 'none'
+              AND p.type IN (:ptypes)
+              AND EXISTS (
+                SELECT 1 FROM placement_suggestion ps
+                 WHERE ps.publication_id = p.id AND ps.tree_node_id IN (:nodes)
+              )
+              $ftsWhere";
+
+        $total = (int) $conn->executeQuery("SELECT count(*) $base", $params, $paramTypes)->fetchOne();
+
+        $rows = $conn->executeQuery(
+            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
+                    j.name AS journal_name,
+                    to_char(p.publication_date, 'YYYY') AS year,
+                    (SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) AS chunks,
+                    (SELECT string_agg(a.name, ', ' ORDER BY au.position)
+                       FROM authorship au JOIN author a ON a.id = au.author_id
+                      WHERE au.publication_id = p.id) AS authors
+             $base
+             ORDER BY $order
+             LIMIT $perPage OFFSET $offset",
+            $params,
+            $paramTypes,
+        )->fetchAllAssociative();
+
+        return ['items' => $rows, 'total' => $total];
     }
 
     /**

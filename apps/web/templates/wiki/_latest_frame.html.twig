@@ -1,0 +1,24 @@
+<turbo-frame id="latest-q" target="_top">
+    {% if latest.items is empty %}
+        <p class="muted">Aucune question{% if latest.page > 1 %} supplémentaire{% endif %} pour l'instant.</p>
+    {% else %}
+        <ul class="qlist">
+            {% for q in latest.items %}
+                <li>
+                    <a class="q-title" href="{{ path('answer', { id: q.answerId }) }}">{{ q.title }}</a>
+                    <div class="qmeta">
+                        <span class="pill author">✍️ {{ q.author }}</span>
+                        {% if q.node.slug is defined %}<a class="pill node" href="/{{ app.request.locale }}/{{ q.node.slug }}">{{ q.node.label }}</a>{% endif %}
+                        {% if q.status == 'valide' %}<span class="badge ok">✅ validé</span>{% else %}<span class="badge warn">⚠️ non relu</span>{% endif %}
+                        <time datetime="{{ q.createdAt }}">{{ q.createdAt|date('d/m/Y') }}</time>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    <div style="display:flex; gap:1rem; align-items:center; justify-content:space-between; font-size:.85rem; margin-top:.4rem">
+        <span>{% if latest.page > 1 %}<a href="{{ path('latest_frame', { page: latest.page - 1 }) }}" data-turbo-frame="latest-q">← précédentes</a>{% endif %}</span>
+        <span class="muted">page {{ latest.page }}</span>
+        <span>{% if latest.hasMore %}<a href="{{ path('latest_frame', { page: latest.page + 1 }) }}" data-turbo-frame="latest-q">suivantes →</a>{% endif %}</span>
+    </div>
+</turbo-frame>

@@ -29,9 +29,25 @@ class Author
     #[ORM\Column(length: 512, nullable: true)]
     private ?string $affiliation = null;
 
+    /** Nombre de publications (dénormalisé, recompté en cron) — tri/affichage rapides. */
+    #[ORM\Column(name: 'publication_count', type: 'integer', options: ['default' => 0])]
+    private int $publicationCount = 0;
+
     public function __construct(string $name)
     {
         $this->name = $name;
+    }
+
+    public function getPublicationCount(): int
+    {
+        return $this->publicationCount;
+    }
+
+    public function setPublicationCount(int $n): self
+    {
+        $this->publicationCount = $n;
+
+        return $this;
     }
 
     public function getId(): ?int

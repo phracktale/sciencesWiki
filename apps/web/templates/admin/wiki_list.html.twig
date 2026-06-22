@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Articles wiki{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>Articles wiki</h1>
+    {% set levels = ['domaine', 'champ', 'sous-domaine', 'sujet'] %}
+
+    <form method="get" action="{{ path('admin_wiki') }}" style="display:flex; gap:.5rem; flex-wrap:wrap; margin:1rem 0">
+        <input type="text" name="q" value="{{ data.query }}" placeholder="Rechercher un domaine…" style="flex:1; min-width:220px; padding:.5rem .7rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+        <select name="status" style="padding:.5rem; border:1px solid #d1d5db; border-radius:8px; font:inherit">
+            <option value="" {{ data.status == '' ? 'selected' }}>Tous statuts</option>
+            <option value="valide" {{ data.status == 'valide' ? 'selected' }}>Relus</option>
+            <option value="non_relu" {{ data.status == 'non_relu' ? 'selected' }}>Non relus</option>
+        </select>
+        <button type="submit" style="background:var(--accent); color:#fff; border:0; border-radius:8px; padding:.5rem 1.1rem; cursor:pointer">Filtrer</button>
+    </form>
+
+    {% if data.items is empty %}
+        <p class="muted">Aucun article (la génération les remplit progressivement).</p>
+    {% else %}
+        <p class="muted" style="font-size:.85rem">{{ data.items|length }} article(s)</p>
+        <table style="width:100%; border-collapse:collapse; font-size:.9rem">
+            <thead><tr style="text-align:left; border-bottom:2px solid var(--line)">
+                <th style="padding:.4rem">Domaine</th><th>Niveau</th><th>Statut</th><th style="text-align:right">Signes</th><th style="text-align:right">Versions</th><th>Dernier auteur</th><th>Modifié</th>
+            </tr></thead>
+            <tbody>
+            {% for a in data.items %}
+                <tr style="border-bottom:1px solid var(--line)">
+                    <td style="padding:.4rem"><a class="q-title" href="{{ path('admin_wiki_detail', { id: a.id }) }}">{{ a.label }}</a></td>
+                    <td class="muted">{{ levels[a.level] ?? a.level }}</td>
+                    <td>{% if a.status == 'valide' %}<span class="badge ok">relu</span>{% else %}<span class="badge warn">non relu</span>{% endif %}</td>
+                    <td style="text-align:right">{{ a.length|number_format(0, ',', ' ') }}</td>
+                    <td style="text-align:right">{{ a.revisions }}</td>
+                    <td class="muted">{% if a.lastAuthorType == 'ia' %}🤖 {% else %}✍️ {% endif %}{{ a.lastAuthor ?: '—' }}</td>
+                    <td class="muted">{{ a.reviewedAt ?: a.generatedAt }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}

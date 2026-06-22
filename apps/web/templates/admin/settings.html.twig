@@ -1,0 +1,108 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Paramètres IA{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>Paramètres IA</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <form class="ask" method="post" action="{{ path('admin_settings') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+        <label>Prompt système (rédaction RAG)</label>
+        <textarea name="system_prompt" style="min-height:18rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ settings['rag.system_prompt'] }}</textarea>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem; margin-top:.6rem">
+            <div>
+                <label>Longueur max (tokens)</label>
+                <input type="text" name="max_tokens" value="{{ settings['rag.max_tokens'] }}">
+            </div>
+            <div>
+                <label>Température (0–1, créativité)</label>
+                <input type="text" name="temperature" value="{{ settings['rag.temperature'] }}">
+            </div>
+            <div>
+                <label>Sources récupérées (kNN)</label>
+                <input type="text" name="neighbors" value="{{ settings['rag.neighbors'] }}">
+            </div>
+        </div>
+
+        <h2 style="margin-top:1.4rem">Modèles de rédaction (Ollama)</h2>
+        <p class="muted" style="font-size:.85rem">Un modèle par objet rédactionnel. Les <strong>articles wiki</strong> (rédaction longue, hors-ligne via cron) gagnent à utiliser le modèle le plus <em>capable</em> ; les <strong>questions/réponses</strong> (interactif, streaming) un modèle plus <em>rapide</em>.{% if models.error %} <span class="badge warn">serveur de modèles injoignable</span>{% endif %}</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.8rem">
+            <div>
+                <label>1 — Articles WIKI</label>
+                {% if models.models is not empty %}
+                    <select name="wiki_model">
+                        {% for m in models.models %}<option value="{{ m }}" {{ settings['wiki.model'] == m ? 'selected' : '' }}>{{ m }}</option>{% endfor %}
+                    </select>
+                {% else %}
+                    <input type="text" name="wiki_model" value="{{ settings['wiki.model'] }}" placeholder="ex. qwen3.6:latest">
+                {% endif %}
+            </div>
+            <div>
+                <label>2 — Questions / Réponses</label>
+                {% if models.models is not empty %}
+                    <select name="model">
+                        <option value="">Défaut serveur{% if models.default %} ({{ models.default }}){% endif %}</option>
+                        {% for m in models.models %}<option value="{{ m }}" {{ settings['rag.model'] == m ? 'selected' : '' }}>{{ m }}</option>{% endfor %}
+                    </select>
+                {% else %}
+                    <input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">
+                {% endif %}
+            </div>
+        </div>
+
+        <h2 style="margin-top:1.4rem">Cadence d'interrogation OpenAlex</h2>
+        <p class="muted" style="font-size:.85rem">Garde-fou interne pour rester sous les limites d'OpenAlex (polite pool : ~10 req/s, ~10000 req/jour sans clé). La vraie limite restante du jour est visible dans le <a href="{{ path('admin_harvest') }}">suivi de la moisson</a>.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem">
+            <div>
+                <label>Requêtes par minute (max)</label>
+                <input type="text" name="openalex_per_minute" value="{{ settings['openalex.per_minute'] }}" placeholder="540">
+            </div>
+            <div>
+                <label>Requêtes par jour (plafond)</label>
+                <input type="text" name="openalex_per_day" value="{{ settings['openalex.per_day'] }}" placeholder="100000">
+            </div>
+        </div>
+
+        <h2 style="margin-top:1.4rem">Stratégie de moisson</h2>
+        <p class="muted" style="font-size:.85rem">Détermine quels articles sont moissonnés en priorité, et borne le volume pour que la moisson reste finie.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.8rem">
+            <div>
+                <label>Tri OpenAlex</label>
+                {% set hsort = settings['harvest.sort'] %}
+                <select name="harvest_sort">
+                    <option value="cited_by_count:desc" {{ hsort == 'cited_by_count:desc' ? 'selected' : '' }}>Les plus cités</option>
+                    <option value="publication_date:desc" {{ hsort == 'publication_date:desc' ? 'selected' : '' }}>Les plus récents</option>
+                    <option value="relevance_score:desc" {{ hsort == 'relevance_score:desc' ? 'selected' : '' }}>Pertinence</option>
+                    <option value="" {{ hsort == '' ? 'selected' : '' }}>Ordre par défaut</option>
+                </select>
+            </div>
+            <div>
+                <label>Fenêtre de récence (années, 0 = illimité)</label>
+                <input type="text" name="harvest_recent_years" value="{{ settings['harvest.recent_years'] }}" placeholder="5">
+            </div>
+            <div>
+                <label>Plafond par rubrique (0 = illimité)</label>
+                <input type="text" name="harvest_cap_per_rubric" value="{{ settings['harvest.cap_per_rubric'] }}" placeholder="3000">
+            </div>
+            <div>
+                <label>Articles par exécution</label>
+                <input type="text" name="harvest_max_per_run" value="{{ settings['harvest.max_per_run'] }}" placeholder="500">
+            </div>
+        </div>
+        <p class="muted" style="font-size:.82rem">« Top-cité + récents » = tri <em>Les plus cités</em> + récence <em>5 ans</em>. Mets la récence à 0 pour inclure les classiques de tous temps.</p>
+
+        <h2 style="margin-top:1.4rem">Réacheminement des e-mails</h2>
+        <p class="muted" style="font-size:.85rem">Si activé, <strong>tous</strong> les e-mails sortants (sollicitations auteurs, « Nous rejoindre », bienvenue…) sont redirigés vers l'adresse ci-dessous, quels que soient leurs destinataires d'origine. Utile en tests / pré-prod / supervision. Les destinataires réels sont conservés dans l'en-tête <code>X-Original-Recipients</code>.</p>
+        <label style="display:flex; align-items:center; gap:.5rem; margin:.4rem 0">
+            <input type="checkbox" name="reroute_enabled" value="1" {{ settings['mail.reroute_enabled'] == '1' ? 'checked' }}>
+            Rerouter tous les e-mails vers une seule adresse
+        </label>
+        <label>Adresse de réacheminement</label>
+        <input type="email" name="reroute_to" value="{{ settings['mail.reroute_to'] }}" placeholder="ex. phracktale@gmail.com">
+
+        <button type="submit" style="margin-top:1rem">Enregistrer les paramètres</button>
+    </form>
+    <p class="muted" style="font-size:.85rem">Ces réglages s'appliquent immédiatement (sans redéploiement).</p>
+{% endblock %}

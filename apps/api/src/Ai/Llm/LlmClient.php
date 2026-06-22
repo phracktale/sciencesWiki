@@ -20,5 +20,16 @@ interface LlmClient
      */
     public function complete(array $messages, array $options = []): LlmCompletion;
 
+    /**
+     * Génération en flux : émet les fragments de texte au fil de l'eau (pour un
+     * affichage « machine à écrire »).
+     *
+     * @param list<LlmMessage>                                            $messages
+     * @param array{temperature?:float,max_tokens?:int,stop?:list<string>} $options
+     *
+     * @return iterable<string>
+     */
+    public function stream(array $messages, array $options = []): iterable;
+
     public function model(): string;
 }

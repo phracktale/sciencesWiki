@@ -1,6 +1,16 @@
 # see https://symfony.com/doc/current/reference/configuration/framework.html
+parameters:
+    # Défaut inoffensif si la variable n'est pas fournie (build, dev) ; en prod
+    # le compose injecte les plages privées du homelab (proxy nginx Heimdall).
+    env(TRUSTED_PROXIES): '127.0.0.1'
+
 framework:
     secret: '%env(APP_SECRET)%'
+
+    # Derrière le reverse-proxy nginx (Heimdall) qui termine le TLS : on fait
+    # confiance aux en-têtes X-Forwarded-* pour reconstituer scheme/host/IP.
+    trusted_proxies: '%env(TRUSTED_PROXIES)%'
+    trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
 
     # Note that the session will be started ONLY if you read or write from it.
     session: true

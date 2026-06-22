@@ -7,14 +7,19 @@ namespace App\Rag;
 use App\Ai\Llm\LlmMessage;
 use App\Entity\Publication;
 use App\Entity\Question;
+use App\Service\SettingsService;
 
 /**
- * Assemble le prompt de rédaction sourcée (ancrage RAG). Impose : appui
- * **exclusif** sur les sources fournies, séparation bloc académique / bloc
- * vulgarisation, citations numérotées, et sortie JSON stricte (cf. spec §8.3).
+ * Assemble le prompt de rédaction sourcée (ancrage RAG). Le prompt système est
+ * éditable via le back-office (SettingsService) ; défaut = niveau collège,
+ * sections délimitées (cf. spec §8.3).
  */
 final class PromptBuilder
 {
+    public function __construct(private readonly SettingsService $settings)
+    {
+    }
+
     /**
      * @param list<Publication> $sources
      *
@@ -23,32 +28,9 @@ final class PromptBuilder
     public function build(Question $question, array $sources): array
     {
         return [
-            LlmMessage::system($this->system()),
+            LlmMessage::system($this->settings->systemPrompt()),
             LlmMessage::user($this->user($question, $sources)),
         ];
-    }
-
-    private function system(): string
-    {
-        return <<<'TXT'
-            Tu es un rédacteur de vulgarisation scientifique pour SciencesWiki, une
-            encyclopédie libre d'éducation populaire en français.
-
-            Règles impératives :
-            - Réponds UNIQUEMENT à partir des SOURCES fournies. N'invente aucun fait.
-            - Si les sources sont insuffisantes, dis-le explicitement dans la
-              vulgarisation et laisse le bloc académique vide.
-            - Sépare deux blocs : "academique" (faits établis, sourcés, chaque
-              affirmation suivie de sa ou ses citations entre crochets, ex. [1][3])
-              et "vulgarisation" (explication pédagogique accessible, en français).
-            - Les citations renvoient au NUMÉRO de la source utilisée.
-            - Reste neutre, rigoureux, sans extrapolation.
-
-            Réponds STRICTEMENT en JSON, sans texte autour, au format :
-            {"academique": "...", "vulgarisation": "...", "citations": [{"marqueur": 1, "source": 1}]}
-            où "source" est le numéro d'une source fournie et "marqueur" le numéro
-            de note affiché dans le texte.
-            TXT;
     }
 
     /**

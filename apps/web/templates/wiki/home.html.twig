@@ -1,19 +1,178 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}SciencesWiki — l'arbre des connaissances{% endblock %}
+{% block title %}SciencesWiki — l'encyclopédie scientifique libre et vulgarisée{% endblock %}
 
 {% block body %}
-    <h1>L'arbre des connaissances</h1>
-    <p class="muted">Explorez les grands domaines scientifiques. Chaque notion est vulgarisée à partir de publications de recherche en libre accès.</p>
+    {% set palette = [
+        'linear-gradient(135deg,#0ea5e9,#1e3a8a)',
+        'linear-gradient(135deg,#10b981,#065f46)',
+        'linear-gradient(135deg,#f59e0b,#b45309)',
+        'linear-gradient(135deg,#8b5cf6,#5b21b6)',
+        'linear-gradient(135deg,#ef4444,#7f1d1d)',
+        'linear-gradient(135deg,#ec4899,#831843)',
+        'linear-gradient(135deg,#14b8a6,#134e4a)',
+        'linear-gradient(135deg,#6366f1,#312e81)',
+        'linear-gradient(135deg,#84cc16,#3f6212)',
+        'linear-gradient(135deg,#f97316,#7c2d12)'
+    ] %}
 
-    <div class="grid">
-        {% for domain in domains %}
-            <a class="card" href="{{ path('node', { slug: domain.slug }) }}">
-                <strong>{{ domain.label }}</strong><br>
-                <span class="muted">{{ domain.childrenCount }} champ(s)</span>
-            </a>
-        {% else %}
-            <p class="muted">Arbre non encore amorcé.</p>
-        {% endfor %}
+    <div class="home-grid">
+        {# ===================== Colonne principale ===================== #}
+        <div>
+            <section class="side-block" style="background:linear-gradient(135deg,#0f172a,#1e3a8a); color:#fff; border:0">
+                <h1 style="margin:.1rem 0; color:#fff">Le savoir scientifique, libre et vulgarisé</h1>
+                <p style="margin:.4rem 0 0; opacity:.95">
+                    Posez une question sur une notion scientifique : une réponse vous est rédigée,
+                    <strong>sourcée sur des publications de recherche</strong> et expliquée simplement.
+                    Projet libre, gratuit et open source. <a href="{{ path('project') }}" style="color:#fcd34d">Découvrir le projet →</a>
+                </p>
+            </section>
+
+            <h2>Explorer par domaine</h2>
+            {% import 'wiki/_colors.html.twig' as colors %}
+            <div class="domains">
+                {% for domain in domains %}
+                    {% set bg = domain.imageUrl ? 'center/cover no-repeat url(' ~ domain.imageUrl ~ ')' : colors.card_bg(domain.slug, 0) %}
+                    <a class="domain-card" href="/{{ app.request.locale }}/{{ domain.slug }}" style="background:{{ bg }}">
+                        <span class="d-label">{{ domain.label }}</span><br>
+                        <span class="d-sub">{{ domain.childrenCount }} sous-domaine(s)</span>
+                    </a>
+                {% else %}
+                    <p class="muted">Arbre non encore amorcé.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# ===================== Colonne latérale ===================== #}
+        <aside>
+            {# --- Nous rejoindre --- #}
+            <section class="side-block">
+                <h2>Nous rejoindre</h2>
+                <div class="join-tabs" role="tablist">
+                    <button role="tab" aria-selected="true" data-pane="jp-committee">Comité scientifique</button>
+                    <button role="tab" aria-selected="false" data-pane="jp-author">Auteur</button>
+                    <button role="tab" aria-selected="false" data-pane="jp-editor">Rédacteur</button>
+                </div>
+                <p id="join-msg" class="badge ok" hidden style="display:block; margin-bottom:.6rem"></p>
+
+                {# Comité scientifique #}
+                <div class="join-pane" id="jp-committee">
+                    <p class="muted" style="font-size:.85rem">Le comité relit et valide les réponses, garantit la rigueur scientifique et arbitre les sources. Missions : relecture, validation, signalement d'erreurs, orientation éditoriale.</p>
+                    <form class="join-form" data-type="committee">
+                        <label>Nom</label><input type="text" name="lastName" required maxlength="120">
+                        <label>Prénom</label><input type="text" name="firstName" required maxlength="120">
+                        <label>Profil</label>
+                        <span style="display:flex; gap:1rem; font-size:.9rem">
+                            <label style="font-weight:400"><input type="radio" name="profile" value="chercheur" checked> Chercheur</label>
+                            <label style="font-weight:400"><input type="radio" name="profile" value="vulgarisateur"> Vulgarisateur</label>
+                        </span>
+                        <div class="orcid-field">
+                            <label>Numéro ORCID</label><input type="text" name="orcid" placeholder="0000-0000-0000-0000" maxlength="32">
+                        </div>
+                        <label>Message</label><textarea name="message" rows="3"></textarea>
+                        <button type="submit">Envoyer ma demande</button>
+                    </form>
+                </div>
+
+                {# Auteur #}
+                <div class="join-pane" id="jp-author" hidden>
+                    <p class="muted" style="font-size:.85rem">Vous êtes l'auteur d'une publication citée ? Rejoignez la plateforme pour valider et préciser les réponses qui s'appuient sur vos travaux.</p>
+                    <form class="join-form" data-type="author">
+                        <label>Nom</label><input type="text" name="lastName" required maxlength="120">
+                        <label>Prénom</label><input type="text" name="firstName" required maxlength="120">
+                        <label>E-mail</label><input type="email" name="email" required maxlength="180">
+                        <label>Numéro ORCID</label><input type="text" name="orcid" placeholder="0000-0000-0000-0000" maxlength="32">
+                        <label>Message</label><textarea name="message" rows="3"></textarea>
+                        <button type="submit">Envoyer ma demande</button>
+                    </form>
+                </div>
+
+                {# Rédacteur #}
+                <div class="join-pane" id="jp-editor" hidden>
+                    <p class="muted" style="font-size:.85rem">Aidez à vulgariser : reformulation, clarté, accessibilité des réponses pour le grand public.</p>
+                    <form class="join-form" data-type="editor">
+                        <label>Nom</label><input type="text" name="lastName" required maxlength="120">
+                        <label>Prénom</label><input type="text" name="firstName" required maxlength="120">
+                        <label>E-mail</label><input type="email" name="email" required maxlength="180">
+                        <label>Profession</label><input type="text" name="profession" maxlength="180">
+                        <label>Message</label><textarea name="message" rows="3"></textarea>
+                        <button type="submit">Envoyer ma demande</button>
+                    </form>
+                </div>
+            </section>
+
+            {# --- Dernières questions (Turbo, paginé par 5) --- #}
+            <section class="side-block">
+                <h2>Dernières questions</h2>
+                {% include 'wiki/_latest_frame.html.twig' with { latest: latestFrame } %}
+            </section>
+
+            {# --- Statistiques --- #}
+            <section class="side-block">
+                <h2>Statistiques</h2>
+                <div class="stat-grid">
+                    <div class="s"><strong>{{ (stats.publications ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">articles référencés</span></div>
+                    <div class="s"><strong>{{ (stats.fulltextPdfs ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">PDF en texte intégral</span></div>
+                    <div class="s"><strong>{{ (stats.publishedAnswers ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">réponses publiées</span></div>
+                    <div class="s"><strong>{{ (stats.validatedAnswers ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">validées par le comité</span></div>
+                    <div class="s"><strong>{{ (stats.questions ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">questions posées</span></div>
+                    <div class="s"><strong>{{ (stats.placedPublications ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">articles classés</span></div>
+                </div>
+                {% if stats.lastUpdate %}<p class="muted" style="font-size:.78rem; margin:.5rem 0 0">Corpus mis à jour le {{ stats.lastUpdate|date('d/m/Y') }}.</p>{% endif %}
+            </section>
+        </aside>
     </div>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        // Onglets « Nous rejoindre ».
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('.join-tabs button'));
+        tabs.forEach(function (t) {
+            t.addEventListener('click', function () {
+                tabs.forEach(function (x) {
+                    var sel = x === t;
+                    x.setAttribute('aria-selected', sel ? 'true' : 'false');
+                    document.getElementById(x.dataset.pane).hidden = !sel;
+                });
+            });
+        });
+
+        // ORCID visible seulement si « Chercheur » (comité).
+        var committee = document.getElementById('jp-committee');
+        if (committee) {
+            var orcidField = committee.querySelector('.orcid-field');
+            committee.querySelectorAll('input[name=profile]').forEach(function (r) {
+                r.addEventListener('change', function () {
+                    orcidField.style.display = (committee.querySelector('input[name=profile]:checked').value === 'chercheur') ? '' : 'none';
+                });
+            });
+        }
+
+        // Soumission des formulaires → /api/join-requests.
+        var msg = document.getElementById('join-msg');
+        document.querySelectorAll('.join-form').forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                var btn = form.querySelector('button[type=submit]');
+                var data = { type: form.dataset.type };
+                form.querySelectorAll('input, textarea, select').forEach(function (el) {
+                    if (el.type === 'radio') { if (el.checked) data[el.name] = el.value; }
+                    else if (el.name) data[el.name] = el.value;
+                });
+                btn.disabled = true;
+                fetch('/api/join-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                    .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                    .then(function (res) {
+                        btn.disabled = false;
+                        msg.hidden = false;
+                        msg.className = res.ok ? 'badge ok' : 'badge warn';
+                        msg.style.display = 'block';
+                        msg.textContent = res.d.message || res.d.error || (res.ok ? 'Merci !' : 'Erreur');
+                        if (res.ok) { form.reset(); }
+                    })
+                    .catch(function () { btn.disabled = false; msg.hidden = false; msg.style.display='block'; msg.className='badge warn'; msg.textContent = 'Erreur réseau.'; });
+            });
+        });
+    })();
+    </script>
 {% endblock %}

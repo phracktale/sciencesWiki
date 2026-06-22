@@ -1,0 +1,240 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Suivi de la moisson{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+
+    <h1>Suivi de la moisson <span id="live" class="pill" style="font-size:.7rem; vertical-align:middle">● en direct</span></h1>
+    <p class="muted">État de chaque moisson lancée depuis le back-office : en attente, en cours, terminée ou en erreur. Volume, durée et modèle d'embeddings indiqués. Les dépassements des limites OpenAlex sont signalés en rouge.</p>
+
+    <div class="grid">
+        <div class="card">
+            <span class="muted">File d'attente (workers)</span><br>
+            <strong id="queued" style="font-size:1.6rem">{{ status.queued ?? 0 }}</strong> moisson(s) en attente
+        </div>
+        <div class="card">
+            <span class="muted">Requêtes OpenAlex aujourd'hui ({{ status.openalex.date ?? '' }})</span><br>
+            <strong id="oa-used" style="font-size:1.6rem">{{ (status.openalex.used ?? 0)|number_format(0,',',' ') }}</strong>
+            <span class="muted">/ <span id="oa-cap">{{ (status.openalex.perDay ?? 0)|number_format(0,',',' ') }}</span> (limite OpenAlex/jour) · <span id="oa-min">{{ status.openalex.perMinute ?? 0 }}</span>/min</span>
+            <div style="margin-top:.4rem; height:8px; background:var(--line); border-radius:4px; overflow:hidden">
+                <div id="oa-bar" style="height:100%; width:0%; background:var(--accent)"></div>
+            </div>
+            <p id="oa-warn" class="badge warn" hidden style="margin-top:.4rem">⛔ Limite quotidienne OpenAlex atteinte — réinitialisation à minuit UTC.</p>
+        </div>
+        <div class="card">
+            <span class="muted">Crédit OpenAlex <span id="oa-key" class="pill" style="font-size:.65rem">sans clé API</span></span><br>
+            <strong id="oa-credit-spent" style="font-size:1.6rem">—</strong>
+            <span class="muted">$ dépensés / <span id="oa-credit-limit">—</span> $ accordés</span>
+            <p class="muted" style="font-size:.78rem; margin:.3rem 0 0">Limite OpenAlex du jour : <strong id="oa-api-remaining">—</strong> / <span id="oa-api-limit">—</span> requêtes restantes. Polite pool gratuit (mailto), en-têtes lus <span id="oa-credit-at"></span>.</p>
+        </div>
+    </div>
+
+    <h2>Moissons par rubrique</h2>
+    <p style="display:flex; gap:.5rem; flex-wrap:wrap; margin:.2rem 0 .8rem">
+        <button type="button" class="js-cleanup" data-mode="duplicates" style="font:inherit; cursor:pointer; padding:.3rem .7rem; border:1px solid #d1d5db; background:#fff; border-radius:6px">🧹 Purger les doublons</button>
+        <button type="button" class="js-cleanup" data-mode="finished" style="font:inherit; cursor:pointer; padding:.3rem .7rem; border:1px solid #d1d5db; background:#fff; border-radius:6px">✅ Supprimer les terminées</button>
+        <button type="button" class="js-cleanup" data-mode="all" style="font:inherit; cursor:pointer; padding:.3rem .7rem; border:1px solid #fca5a5; background:#fee2e2; color:#b91c1c; border-radius:6px">🗑 Tout réinitialiser</button>
+        <span class="muted" style="font-size:.8rem; align-self:center">(n'affecte pas le corpus moissonné — uniquement le journal des moissons)</span>
+    </p>
+    <div id="action-status" hidden style="margin:.4rem 0; padding:.5rem .8rem; border-radius:8px; font-size:.9rem"></div>
+    <table style="width:100%; border-collapse:collapse; font-size:.92rem">
+        <thead>
+            <tr style="text-align:left; border-bottom:2px solid var(--line)">
+                <th style="padding:.5rem .4rem">Rubrique</th>
+                <th style="padding:.5rem .4rem">État</th>
+                <th style="padding:.5rem .4rem; width:22%">Progression</th>
+                <th style="padding:.5rem .4rem; text-align:right">Nouveaux</th>
+                <th style="padding:.5rem .4rem; text-align:right">Durée</th>
+                <th style="padding:.5rem .4rem">Actions</th>
+            </tr>
+        </thead>
+        <tbody id="jobs"><tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Chargement…</td></tr></tbody>
+    </table>
+    <p class="muted" style="font-size:.82rem; margin-top:.6rem">Modèle d'embeddings utilisé : <strong id="emb-model">{{ status.embeddingModel ?? '—' }}</strong>.</p>
+
+    <script type="application/json" id="bootstrap">{{ status|json_encode|raw }}</script>
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var tbody = document.getElementById('jobs');
+        if (!tbody) return;
+        var HARVEST = { maxPerRun: 500, capPerRubric: 0 }; // mis à jour par render() depuis l'API
+        var CSRF = {{ admin_csrf.token|json_encode|raw }};
+
+        function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+        function fmtDate(s) {
+            if (!s) return '—';
+            var d = new Date(s.replace(' ', 'T'));
+            return isNaN(d) ? esc(s) : d.toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function fmtDuration(sec) {
+            if (sec == null) return '—';
+            if (sec < 60) return sec + ' s';
+            var m = Math.floor(sec / 60), s = sec % 60;
+            if (m < 60) return m + ' min ' + (s < 10 ? '0' : '') + s + ' s';
+            return Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+        }
+
+        function isActive(job) { return (job.status === 'running' && !job.stale) || job.queued; }
+
+        function badge(job) {
+            if (job.stale) return '<span class="badge warn">⛔ interrompue (timeout)</span>';
+            if (job.rateLimited) return '<span class="badge warn">⛔ limite OpenAlex</span>';
+            if (job.queued && job.status !== 'running') return '<span class="badge warn"><span class="loader"></span> en file d\'attente</span>';
+            switch (job.status) {
+                case 'running': return '<span class="badge warn"><span class="loader"></span> en cours…</span>';
+                case 'ok': return '<span class="badge ok">✅ terminée</span>';
+                case 'partial': return job.errors > 0
+                    ? '<span class="badge warn">⚠️ terminée (' + job.errors + ' erreur' + (job.errors > 1 ? 's' : '') + ')</span>'
+                    : '<span class="badge warn" title="Moisson interrompue (recyclage ou redéploiement du worker) — reprend automatiquement au curseur à la prochaine exécution">⏸️ partielle (reprise auto)</span>';
+                case 'failed': return '<span class="badge warn">⛔ échec</span>';
+                default: return '<span class="muted">' + esc(job.status) + '</span>';
+            }
+        }
+
+        function bar(job) {
+            // Progression = cumul moissonné pour la rubrique / cible. Cible = plafond
+            // configuré, sinon total dispo chez OpenAlex, sinon la taille de lot.
+            var cumulative = job.cumulativeProcessed != null ? job.cumulativeProcessed : job.processed;
+            // Cible = OBJECTIF DE MOISSON configuré (plafond/rubrique, sinon taille de
+            // lot). Le total OpenAlex n'est PAS la cible : il s'affiche à part (≈ N).
+            var target = HARVEST.capPerRubric > 0 ? HARVEST.capPerRubric : HARVEST.maxPerRun;
+            var pct = target > 0 ? Math.min(100, Math.round((cumulative / target) * 100)) : 0;
+            var running = job.status === 'running' && !job.stale;
+            var color = job.stale ? '#9ca3af' : (running ? 'var(--accent)' : (job.errors > 0 || job.status === 'failed' ? '#dc2626' : '#16a34a'));
+            var anim = running ? 'opacity:.85' : '';
+            return '<div style="height:9px; background:var(--line); border-radius:5px; overflow:hidden" title="' + cumulative + ' / ' + target + '">' +
+                   '<div style="height:100%; width:' + pct + '%; background:' + color + ';' + anim + '"></div></div>' +
+                   '<span class="muted" style="font-size:.78rem">' + cumulative.toLocaleString('fr-FR') + ' / ' + target.toLocaleString('fr-FR') + ' (' + pct + '%)</span>';
+        }
+
+        function actions(job) {
+            if (!job.nodeId) return '<span class="muted">—</span>';
+            var active = isActive(job);
+            // Relancer désactivé tant que la moisson est active (en cours / en file).
+            var relaunch = '<button type="button" class="js-relaunch" data-node="' + job.nodeId + '"' +
+                (active ? ' disabled title="Déjà en cours ou en file"' : '') +
+                ' style="font:inherit; cursor:' + (active ? 'not-allowed' : 'pointer') + '; padding:.25rem .55rem; border:1px solid var(--accent); background:#fff; color:var(--accent); border-radius:6px; opacity:' + (active ? '.45' : '1') + '">↻ Relancer</button>';
+            // Annuler : pertinent si en file/en cours.
+            var cancel = active ? ' <button type="button" class="js-cancel" data-node="' + job.nodeId + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid #d1d5db; background:#fff; color:#6b7280; border-radius:6px">✕ Annuler</button>' : '';
+            // Supprimer la ligne : toujours dispo (utile sur timeout/orpheline).
+            var del = ' <button type="button" class="js-delete" data-node="' + job.nodeId + '" data-label="' + esc(job.label || job.rubric) + '" style="font:inherit; cursor:pointer; padding:.25rem .55rem; border:1px solid #fca5a5; background:#fff; color:#b91c1c; border-radius:6px">🗑</button>';
+            return relaunch + cancel + del;
+        }
+
+        function row(job) {
+            var label = esc(job.label || job.rubric || '—');
+            var name = job.rubric ? '<a class="q-title" href="/admin/r/' + esc(job.rubric) + '">' + label + '</a>' : label;
+            if (job.available != null) name += '<div class="muted" style="font-size:.74rem">≈ ' + job.available.toLocaleString('fr-FR') + ' articles chez OpenAlex</div>';
+            var errLine = job.log ? '<div class="muted" style="font-size:.78rem; color:#b91c1c; margin-top:.2rem">' + esc(job.log) + '</div>' : '';
+            var started = '<div class="muted" style="font-size:.74rem">' + fmtDate(job.startedAt) + '</div>';
+            return '<tr style="border-bottom:1px solid var(--line)">' +
+                '<td style="padding:.5rem .4rem">' + name + errLine + '</td>' +
+                '<td style="padding:.5rem .4rem">' + badge(job) + '</td>' +
+                '<td style="padding:.5rem .4rem">' + bar(job) + '</td>' +
+                '<td style="padding:.5rem .4rem; text-align:right"><strong>' + job.created + '</strong></td>' +
+                '<td style="padding:.5rem .4rem; text-align:right">' + fmtDuration(job.durationSeconds) + started + '</td>' +
+                '<td style="padding:.5rem .4rem; white-space:nowrap">' + actions(job) + '</td>' +
+                '</tr>';
+        }
+
+        function render(data) {
+            if (data.harvest) HARVEST = data.harvest;
+            var jobs = data.jobs || [];
+            tbody.innerHTML = jobs.length ? jobs.map(row).join('') :
+                '<tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Aucune moisson lancée. Utilisez « Moissonner cette rubrique » depuis une rubrique.</td></tr>';
+
+            document.getElementById('queued').textContent = data.queued || 0;
+            if (data.embeddingModel) document.getElementById('emb-model').textContent = data.embeddingModel;
+
+            var oa = data.openalex || {};
+            document.getElementById('oa-used').textContent = (oa.used || 0).toLocaleString('fr-FR');
+            document.getElementById('oa-cap').textContent = (oa.perDay || 0).toLocaleString('fr-FR');
+            document.getElementById('oa-min').textContent = oa.perMinute || 0;
+            var pct = oa.perDay ? Math.min(100, (oa.used / oa.perDay) * 100) : 0;
+            var oaBar = document.getElementById('oa-bar');
+            oaBar.style.width = pct + '%';
+            oaBar.style.background = pct >= 90 ? '#dc2626' : (pct >= 70 ? '#f59e0b' : 'var(--accent)');
+            document.getElementById('oa-warn').hidden = !oa.exhausted;
+
+            var keyBadge = document.getElementById('oa-key');
+            if (keyBadge) {
+                keyBadge.textContent = oa.usesApiKey ? 'avec clé API' : 'sans clé API';
+                keyBadge.style.background = oa.usesApiKey ? '#dcfce7' : '#f1f5f9';
+                keyBadge.style.color = oa.usesApiKey ? '#166534' : '#475569';
+            }
+            document.getElementById('oa-credit-spent').textContent = oa.creditSpentUsd != null ? oa.creditSpentUsd.toFixed(4) : '—';
+            document.getElementById('oa-credit-limit').textContent = oa.creditLimitUsd != null ? oa.creditLimitUsd.toFixed(2) : '—';
+            document.getElementById('oa-api-remaining').textContent = oa.apiDailyRemaining != null ? oa.apiDailyRemaining.toLocaleString('fr-FR') : '—';
+            document.getElementById('oa-api-limit').textContent = oa.apiDailyLimit != null ? oa.apiDailyLimit.toLocaleString('fr-FR') : '—';
+            document.getElementById('oa-credit-at').textContent = oa.creditUpdatedAt ? '(' + fmtDate(oa.creditUpdatedAt) + ')' : '(jamais)';
+        }
+
+        var statusBox = document.getElementById('action-status');
+        function showStatus(msg, ok) {
+            statusBox.hidden = false;
+            statusBox.textContent = msg;
+            statusBox.style.background = ok ? '#dcfce7' : '#fee2e2';
+            statusBox.style.color = ok ? '#166534' : '#b91c1c';
+        }
+
+        function op(kind, nodeId, btn, label) {
+            btn.disabled = true;
+            var prev = btn.innerHTML;
+            btn.innerHTML = '<span class="loader"></span>';
+            showStatus('Requête en cours…', true);
+            fetch('/admin/harvest/' + kind, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nodeId: nodeId, _csrf: CSRF })
+            })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, status: r.status, d: d }; }); })
+            .then(function (res) {
+                btn.innerHTML = prev; btn.disabled = false;
+                // Un 409 (déjà en cours / en file) est informatif, pas une erreur bloquante.
+                var ok = res.ok || res.status === 409;
+                showStatus((label ? label + ' : ' : '') + (res.d.message || res.d.error || (res.ok ? 'OK' : 'Erreur ' + res.status)), ok);
+                poll();
+            })
+            .catch(function (err) { btn.innerHTML = prev; btn.disabled = false; showStatus('Échec réseau : ' + err, false); });
+        }
+
+        tbody.addEventListener('click', function (e) {
+            var r = e.target.closest('.js-relaunch'), c = e.target.closest('.js-cancel'), d = e.target.closest('.js-delete');
+            if (r && !r.disabled) op('relaunch', +r.dataset.node, r, r.closest('tr').querySelector('.q-title') ? r.closest('tr').querySelector('.q-title').textContent : '');
+            else if (c) op('cancel', +c.dataset.node, c, '');
+            else if (d) { if (confirm('Supprimer la ligne « ' + d.dataset.label + ' » du suivi ? (le corpus n\'est pas touché)')) op('delete', +d.dataset.node, d, d.dataset.label); }
+        });
+
+        var confirmMsg = {
+            duplicates: 'Purger les doublons (ne garder que la dernière moisson par rubrique) ?',
+            finished: 'Supprimer toutes les lignes de moisson terminées / en erreur / orphelines ?',
+            all: 'Tout réinitialiser : supprimer TOUTES les lignes de moisson ? (le corpus n\'est pas touché)'
+        };
+        Array.prototype.forEach.call(document.querySelectorAll('.js-cleanup'), function (btn) {
+            btn.addEventListener('click', function () {
+                var mode = btn.dataset.mode;
+                if (!confirm(confirmMsg[mode])) return;
+                btn.disabled = true;
+                fetch('/admin/harvest/cleanup', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: mode, _csrf: CSRF })
+                })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) { btn.disabled = false; alert(res.d.message || res.d.error || 'OK'); poll(); })
+                .catch(function () { btn.disabled = false; });
+            });
+        });
+
+        function poll() {
+            fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) { if (d) render(d); })
+                .catch(function () {});
+        }
+
+        try { render(JSON.parse(document.getElementById('bootstrap').textContent)); } catch (e) {}
+        var timer = setInterval(poll, 4000);
+        document.addEventListener('turbo:before-cache', function () { clearInterval(timer); }, { once: true });
+    })();
+    </script>
+{% endblock %}

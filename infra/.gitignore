@@ -1,0 +1,4 @@
+# Secrets de production — ne jamais commiter.
+.env.prod
+.env.*.local
+marvin/.env
