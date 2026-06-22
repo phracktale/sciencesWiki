@@ -51,6 +51,7 @@ final class GenerateWikiArticlesCommand extends Command
         $this->addOption('force', null, InputOption::VALUE_NONE, 'Régénère même les nœuds ayant déjà un article');
         $this->addOption('slug', null, InputOption::VALUE_REQUIRED, 'Cible un nœud précis (par slug)');
         $this->addOption('max-level', null, InputOption::VALUE_REQUIRED, 'Limite aux nœuds de niveau ≤ N (0=domaines…)');
+        $this->addOption('model', null, InputOption::VALUE_REQUIRED, 'Modèle LLM rédacteur (Ollama)', 'qwen3.6:latest');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -58,6 +59,7 @@ final class GenerateWikiArticlesCommand extends Command
         @set_time_limit(0);
         $io = new SymfonyStyle($input, $output);
         $limit = max(1, (int) $input->getOption('limit'));
+        $model = (string) $input->getOption('model');
 
         if (null !== ($slug = $input->getOption('slug'))) {
             $node = $this->nodes->findOneBy(['slug' => $slug]);
@@ -94,10 +96,15 @@ final class GenerateWikiArticlesCommand extends Command
                 $md = '';
                 foreach ($this->llm->stream(
                     $this->buildMessages($node, $sources, $this->formatRelated($related)),
-                    ['temperature' => 0.3, 'max_tokens' => 8000],
+                    ['temperature' => 0.3, 'max_tokens' => 12000, 'model' => $model],
                 ) as $delta) {
                     $md .= $delta;
                 }
+                // Retire d'éventuelles traces de raisonnement (modèles « thinking » type Qwen3)
+                // + un éventuel bloc de code englobant ```markdown … ```.
+                $md = preg_replace('#<think>.*?</think>#is', '', $md) ?? $md;
+                $md = trim($md);
+                $md = preg_replace('#^```(?:markdown|md)?\s*\n(.*)\n```$#is', '$1', $md) ?? $md;
                 $md = trim($md);
                 // Liens internes garantis (le modèle local les omet souvent) : on lie
                 // la 1re occurrence de chaque domaine voisin dans le corps de l'article.
@@ -107,7 +114,7 @@ final class GenerateWikiArticlesCommand extends Command
                     continue;
                 }
                 $node->setArticleMd($md)
-                    ->setArticleModel($this->llmModel)
+                    ->setArticleModel($model)
                     ->setArticleStatus('non_relu')
                     ->setArticleGeneratedAt(new \DateTimeImmutable());
                 $this->em->flush();
