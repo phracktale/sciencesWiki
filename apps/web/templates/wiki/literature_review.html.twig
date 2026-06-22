@@ -1,7 +1,7 @@
 {% extends 'base.html.twig' %}
 {% block title %}Revue de littérature — Espace chercheur — SciencesWiki{% endblock %}
 {% block body %}
-    <p class="crumbs"><a href="{{ path('researcher_dashboard') }}">← Espace chercheur</a></p>
+    <p class="crumbs"><a href="{{ path('researcher_dashboard') }}">← Espace chercheur</a> · <a href="{{ path('literature_reviews') }}">📁 Mes revues sauvegardées</a></p>
     <h1>📚 Revue de littérature</h1>
     <p class="muted">Synthèse sourcée d'un sujet à partir du corpus : <strong>consensus, méthodes, lacunes</strong>, chaque affirmation citée [n], générée par l'IA à partir des publications les plus pertinentes.</p>
 
@@ -31,6 +31,7 @@
     <p id="lr-status" class="muted" style="font-size:.85rem" role="status" aria-live="polite"></p>
 
     <div class="lr-actions" id="lr-actions" hidden>
+        <button type="button" id="lr-save">💾 Enregistrer</button>
         <button type="button" id="lr-dl">⬇️ Markdown</button>
         <button type="button" id="lr-pdf">⬇️ PDF</button>
         <input type="hidden" id="lr-csrf" value="{{ admin_csrf.token }}">
@@ -121,6 +122,20 @@
 
         go.addEventListener('click', start);
         q.addEventListener('keydown', function (e) { if (e.key === 'Enter') start(); });
+        document.getElementById('lr-save').addEventListener('click', function () {
+            var btn = document.getElementById('lr-save'); btn.disabled = true;
+            var body = new URLSearchParams();
+            body.set('topic', topic); body.set('markdown', full);
+            body.set('sources', JSON.stringify(sources));
+            body.set('_csrf', document.getElementById('lr-csrf').value);
+            fetch('{{ path('literature_review_save') }}', {
+                method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(), credentials: 'same-origin'
+            }).then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+              .then(function () { statusEl.innerHTML = '✅ Revue enregistrée — <a href="{{ path('literature_reviews') }}">voir Mes revues</a>'; })
+              .catch(function () { statusEl.textContent = 'Échec de l\'enregistrement.'; })
+              .finally(function () { btn.disabled = false; });
+        });
         document.getElementById('lr-pdf').addEventListener('click', function () {
             var btn = document.getElementById('lr-pdf'); btn.disabled = true;
             var body = new URLSearchParams();

@@ -56,7 +56,7 @@ final class WikiController extends AbstractController
         return $this->render('wiki/literature_review.html.twig');
     }
 
-    /** Export PDF propre d'une revue de littérature (dompdf, markdown rendu serveur). */
+    /** Export PDF d'une revue ad hoc (depuis la page de génération). */
     #[Route('/{_locale}/chercheur/revue-litterature/pdf', name: 'literature_review_pdf', requirements: ['_locale' => 'fr'], methods: ['POST'])]
     public function literatureReviewPdf(Request $request): Response
     {
@@ -66,21 +66,138 @@ final class WikiController extends AbstractController
         if (!$this->csrf->isValid($request)) {
             return new Response('Jeton de sécurité invalide.', Response::HTTP_FORBIDDEN);
         }
-
         $markdown = (string) $request->request->get('markdown', '');
         if ('' === trim($markdown)) {
             return new Response('Revue vide.', Response::HTTP_BAD_REQUEST);
         }
-        // Garde-fou : CommonMark exige de l'UTF-8 valide (sinon exception).
-        if (!mb_check_encoding($markdown, 'UTF-8')) {
-            $markdown = mb_convert_encoding($markdown, 'UTF-8', 'UTF-8');
-        }
         $sources = json_decode((string) $request->request->get('sources', '[]'), true);
 
-        $html = $this->renderView('pdf/literature_review.html.twig', [
-            'topic' => trim((string) $request->request->get('topic', '')) ?: 'Revue de littérature',
-            'markdown' => $markdown,
+        return $this->reviewPdf(
+            trim((string) $request->request->get('topic', '')),
+            $markdown,
+            \is_array($sources) ? $sources : [],
+        );
+    }
+
+    /** Enregistre la revue courante dans la bibliothèque du chercheur (proxy API). */
+    #[Route('/{_locale}/chercheur/revues/save', name: 'literature_review_save', requirements: ['_locale' => 'fr'], methods: ['POST'])]
+    public function saveReview(Request $request): JsonResponse
+    {
+        if (!$this->user->isLogged() || !$this->user->canResearch()) {
+            return new JsonResponse(['error' => 'Accès refusé.'], 403);
+        }
+        if (!$this->csrf->isValid($request)) {
+            return new JsonResponse(['error' => 'Jeton de sécurité invalide.'], 403);
+        }
+        $sources = json_decode((string) $request->request->get('sources', '[]'), true);
+        $res = $this->user->send('POST', '/api/literature-reviews', [
+            'topic' => (string) $request->request->get('topic', ''),
+            'markdown' => (string) $request->request->get('markdown', ''),
             'sources' => \is_array($sources) ? $sources : [],
+        ]);
+
+        return new JsonResponse($res['data'], $res['ok'] ? 201 : (0 !== $res['status'] ? $res['status'] : 502));
+    }
+
+    /** « Mes revues » : bibliothèque des revues sauvegardées. */
+    #[Route('/{_locale}/chercheur/revues', name: 'literature_reviews', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function savedReviews(): Response
+    {
+        if ($r = $this->researcherRedirect('/fr/chercheur/revues')) {
+            return $r;
+        }
+        $res = $this->user->send('GET', '/api/literature-reviews');
+
+        return $this->render('wiki/literature_reviews.html.twig', ['reviews' => $res['data']['items'] ?? []]);
+    }
+
+    /** PDF d'une revue sauvegardée. */
+    #[Route('/{_locale}/chercheur/revues/{id}/pdf', name: 'literature_review_saved_pdf', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['GET'])]
+    public function savedReviewPdf(int $id): Response
+    {
+        if ($r = $this->researcherRedirect('/fr/chercheur/revues')) {
+            return $r;
+        }
+        $res = $this->user->send('GET', '/api/literature-reviews/'.$id);
+        if (!$res['ok']) {
+            throw $this->createNotFoundException('Revue introuvable.');
+        }
+        $d = $res['data'];
+
+        return $this->reviewPdf((string) ($d['topic'] ?? ''), (string) ($d['markdown'] ?? ''), \is_array($d['sources'] ?? null) ? $d['sources'] : []);
+    }
+
+    /** Export Markdown d'une revue sauvegardée. */
+    #[Route('/{_locale}/chercheur/revues/{id}/markdown', name: 'literature_review_saved_md', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['GET'])]
+    public function savedReviewMarkdown(int $id): Response
+    {
+        if ($r = $this->researcherRedirect('/fr/chercheur/revues')) {
+            return $r;
+        }
+        $res = $this->user->send('GET', '/api/literature-reviews/'.$id);
+        if (!$res['ok']) {
+            throw $this->createNotFoundException('Revue introuvable.');
+        }
+        $d = $res['data'];
+        $md = '# Revue de littérature — '.($d['topic'] ?? '')."\n\n".($d['markdown'] ?? '')."\n\n## Bibliographie\n\n";
+        foreach (($d['sources'] ?? []) as $s) {
+            $authors = \is_array($s['authors'] ?? null) ? implode(', ', $s['authors']) : '';
+            $md .= '['.($s['n'] ?? '?').'] '.($s['title'] ?? '').('' !== $authors ? ' — '.$authors : '')
+                .(isset($s['year']) ? ' ('.$s['year'].')' : '')
+                .(isset($s['doi']) && $s['doi'] ? '. DOI: '.$s['doi'] : '')
+                .(isset($s['oaUrl']) && $s['oaUrl'] ? '. '.$s['oaUrl'] : '')."\n";
+        }
+
+        return new Response($md, Response::HTTP_OK, [
+            'Content-Type' => 'text/markdown; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="'.$this->reviewSlug((string) ($d['topic'] ?? '')).'.md"',
+        ]);
+    }
+
+    /** Suppression d'une revue sauvegardée. */
+    #[Route('/{_locale}/chercheur/revues/{id}/supprimer', name: 'literature_review_delete', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['POST'])]
+    public function deleteReview(int $id, Request $request): Response
+    {
+        if ($r = $this->researcherRedirect('/fr/chercheur/revues')) {
+            return $r;
+        }
+        if ($this->csrf->isValid($request)) {
+            $res = $this->user->send('DELETE', '/api/literature-reviews/'.$id);
+            $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Revue supprimée.' : 'Échec de la suppression.');
+        } else {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+        }
+
+        return $this->redirectToRoute('literature_reviews');
+    }
+
+    private function researcherRedirect(string $back): ?Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => $back]);
+        }
+        if (!$this->user->canResearch()) {
+            $this->addFlash('error', 'Espace réservé aux chercheurs (ROLE_RESEARCHER).');
+
+            return $this->redirectToRoute('home');
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $sources
+     */
+    private function reviewPdf(string $topic, string $markdown, array $sources): Response
+    {
+        // Garde-fou : CommonMark exige de l'UTF-8 valide (sinon exception).
+        if (!mb_check_encoding($markdown, 'UTF-8')) {
+            $markdown = (string) mb_convert_encoding($markdown, 'UTF-8', 'UTF-8');
+        }
+        $html = $this->renderView('pdf/literature_review.html.twig', [
+            'topic' => '' !== trim($topic) ? $topic : 'Revue de littérature',
+            'markdown' => $markdown,
+            'sources' => $sources,
             'date' => date('d/m/Y'),
         ]);
 
@@ -92,8 +209,16 @@ final class WikiController extends AbstractController
 
         return new Response($dompdf->output(), Response::HTTP_OK, [
             'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="revue-litterature.pdf"',
+            'Content-Disposition' => 'attachment; filename="'.$this->reviewSlug($topic).'.pdf"',
         ]);
+    }
+
+    private function reviewSlug(string $topic): string
+    {
+        $slug = strtolower((string) preg_replace('/[^a-zA-Z0-9]+/', '-', $topic));
+        $slug = trim($slug, '-');
+
+        return 'revue-'.('' !== $slug ? mb_substr($slug, 0, 60) : 'litterature');
     }
 
     #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], methods: ['GET'])]

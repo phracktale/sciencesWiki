@@ -6,7 +6,7 @@ twig:
         current_user: '@App\Service\UserApiClient'
         csp_nonce: '@App\Service\CspNonce'
         # Tag de version affiché en pied de page. À BUMPER à chaque livraison.
-        app_version: 'v0.49 · garde-fou IA : périmètre géographique/juridique obligatoire pour tout contexte non universel (2026-06-22)'
+        app_version: 'v0.50 · espace chercheur : bibliothèque de revues de littérature sauvegardées (PDF/MD/suppression) (2026-06-22)'
 
 when@test:
     twig:
