@@ -33,6 +33,10 @@ final class OpenAiCompatibleLlmClient implements LlmClient
             'model' => $options['model'] ?? $this->model,
             'messages' => array_map(static fn (LlmMessage $m): array => $m->toArray(), $messages),
             'temperature' => $options['temperature'] ?? 0.2,
+            // Désactive le « raisonnement » des modèles thinking (Qwen3…) : sinon le
+            // contenu visible reste vide (tokens consommés par la réflexion, non
+            // diffusée). Surchargable via $options['reasoning_effort'].
+            'reasoning_effort' => $options['reasoning_effort'] ?? 'none',
             'stream' => false,
         ];
         if (isset($options['max_tokens'])) {
@@ -74,6 +78,8 @@ final class OpenAiCompatibleLlmClient implements LlmClient
             'model' => $options['model'] ?? $this->model,
             'messages' => array_map(static fn (LlmMessage $m): array => $m->toArray(), $messages),
             'temperature' => $options['temperature'] ?? 0.2,
+            // Cf. complete() : désactive le raisonnement (sinon flux vide avec Qwen3).
+            'reasoning_effort' => $options['reasoning_effort'] ?? 'none',
             'stream' => true,
         ];
         if (isset($options['max_tokens'])) {
