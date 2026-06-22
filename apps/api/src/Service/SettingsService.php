@@ -76,7 +76,7 @@ final class SettingsService
         // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
-        self::OPENALEX_PER_DAY => '10000',
+        self::OPENALEX_PER_DAY => '100000',
         // Par défaut : les plus cités, sur les 5 dernières années, plafonné à 3000/rubrique.
         self::HARVEST_SORT => 'cited_by_count:desc',
         self::HARVEST_RECENT_YEARS => '5',
