@@ -51,9 +51,9 @@ final class AskQuestionController
             return $this->error('Trop de demandes récentes. Merci de réessayer dans un moment.', Response::HTTP_TOO_MANY_REQUESTS);
         }
 
-        // La génération de la question passe par le LLM local (gemma4, inférence CPU
-        // sur Marvin) : on lève la limite de 30 s de PHP, sinon la requête échoue
-        // avant la réponse du modèle (comme le fait le streaming des réponses).
+        // La génération de la question passe par le LLM local (modèle Q/R configuré
+        // en back-office, inférence sur Marvin) : on lève la limite de 30 s de PHP,
+        // sinon la requête échoue avant la réponse du modèle (comme le streaming).
         @set_time_limit(0);
 
         $created = $this->suggester->suggest($node, 1);
