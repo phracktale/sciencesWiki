@@ -141,10 +141,21 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
      *
      * @return list<array{publication:Publication,distance:float}>
      */
-    public function nearestTo(array $embedding, int $k): array
+    /**
+     * @param list<float>  $embedding
+     * @param list<string> $types restreint aux types de publication donnés (vide = tous, hors satellites)
+     */
+    public function nearestTo(array $embedding, int $k, array $types = []): array
     {
         $literal = (string) new Vector($embedding);
         $k = max(1, $k);
+        $typeClause = [] !== $types ? ' AND p.type IN (:ptypes)' : '';
+        $params = ['vec' => $literal];
+        $paramTypes = [];
+        if ([] !== $types) {
+            $params['ptypes'] = array_values($types);
+            $paramTypes['ptypes'] = \Doctrine\DBAL\ArrayParameterType::STRING;
+        }
         // Sur-échantillonnage par côté : marge pour la déduplication (un article
         // peut sortir des deux côtés) et le filtre rétraction appliqué ensuite.
         $perSide = min($k * 4, 120);
@@ -180,13 +191,14 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                  SELECT m.id, m.distance
                  FROM merged m
                  JOIN publication p ON p.id = m.id
-                 WHERE p.retraction_status = 'none' AND p.".\App\Catalog\PublicationType::notSatelliteSql()."
+                 WHERE p.retraction_status = 'none' AND p.".\App\Catalog\PublicationType::notSatelliteSql().$typeClause."
                  ORDER BY m.distance ASC
                  LIMIT %2\$d",
                 $perSide,
                 $k,
             ),
-            ['vec' => $literal],
+            $params,
+            $paramTypes,
         )->fetchAllAssociative();
 
         $result = [];

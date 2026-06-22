@@ -50,27 +50,6 @@ services:
       - "192.168.1.171:8070:8070"
     restart: unless-stopped
 
-  # Meilisearch : moteur de recherche plein-texte TOLÉRANT AUX FAUTES (instant-search,
-  # facettes, surlignage). Indexe titre+résumé+métas d'un sous-ensemble du corpus.
-  # Exposé sur le LAN privé uniquement ; l'API de Thor le pilote (MEILI_URL + clé).
-  meilisearch:
-    image: getmeili/meilisearch:v1.12
-    environment:
-      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY}
-      MEILI_ENV: production
-      MEILI_NO_ANALYTICS: "true"
-    volumes:
-      - /data/scienceswiki-meili:/meili_data:rw
-    ports:
-      - "192.168.1.171:7700:7700"
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:7700/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    restart: unless-stopped
-
   embeddings:
     build:
       # ml/ est à la racine du dépôt ; ce compose vit dans infra/marvin/.

@@ -38,10 +38,23 @@ final class SearchController
             return new JsonResponse(['error' => 'Le paramètre « q » est requis.'], 400);
         }
 
+        // Filtre par type (cases « Articles » / « Preprint ») + option « privilégier les cités ».
+        $typeMap = [
+            'article' => ['article', 'journalArticle', 'conferencePaper', 'conference-paper'],
+            'preprint' => ['preprint'],
+        ];
+        $types = [];
+        foreach ($request->query->all('types') as $t) {
+            foreach ($typeMap[$t] ?? [(string) $t] as $x) {
+                $types[] = $x;
+            }
+        }
+        $boostCited = $request->query->getBoolean('boost');
+
         $results = match (true) {
             'nodes' === $type => $this->searchNodes($query, $limit),
             'text' === $mode => $this->textPublications($query, $limit),
-            default => $this->semanticPublications($query, $limit),
+            default => $this->semanticPublications($query, $limit, $types, $boostCited),
         };
 
         return new JsonResponse([
@@ -56,14 +69,29 @@ final class SearchController
     /**
      * @return list<array<string,mixed>>
      */
-    private function semanticPublications(string $query, int $limit): array
+    /**
+     * @param list<string> $types restreint aux types (vide = tous)
+     */
+    private function semanticPublications(string $query, int $limit, array $types = [], bool $boostCited = false): array
     {
         $embedding = $this->embeddingFactory->create()->embed($query);
+        // Pour privilégier les cités : on sur-échantillonne puis on re-classe.
+        $fetch = $boostCited ? min($limit * 4, 80) : $limit;
 
-        return array_map(
+        $rows = array_map(
             fn (array $hit): array => ['score' => round(1.0 - $hit['distance'], 4)] + $this->publicationSummary($hit['publication']),
-            $this->publications->nearestTo($embedding, $limit),
+            $this->publications->nearestTo($embedding, $fetch, $types),
         );
+
+        if ($boostCited) {
+            // Score combiné = pertinence + petit bonus logarithmique de notoriété
+            // (les très cités remontent sans écraser la pertinence sémantique).
+            $blend = static fn (array $r): float => (float) ($r['score'] ?? 0) + 0.08 * log10(1 + (int) ($r['citedByCount'] ?? 0));
+            usort($rows, static fn (array $a, array $b): int => $blend($b) <=> $blend($a));
+            $rows = \array_slice($rows, 0, $limit);
+        }
+
+        return $rows;
     }
 
     /**
