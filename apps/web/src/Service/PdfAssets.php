@@ -26,9 +26,9 @@ final class PdfAssets
         if (null === $this->logo) {
             $path = $this->projectDir.'/public/logo.svg';
             $svg = is_readable($path) ? (string) file_get_contents($path) : '';
-            // La racine SVG est en width/height="100%" → dompdf l'étirerait sur toute
-            // la largeur. On fige une taille intrinsèque (ratio du viewBox 1443×423).
-            $svg = str_replace('width="100%" height="100%"', 'width="157" height="46"', $svg);
+            // La racine SVG est en width/height="100%" → dompdf l'étirerait. On fige la
+            // taille demandée (150×37.9 pt) ; preserveAspectRatio="none" remplit la boîte.
+            $svg = str_replace('width="100%" height="100%"', 'width="150pt" height="37.9pt" preserveAspectRatio="none"', $svg);
             $this->logo = '' !== $svg ? 'data:image/svg+xml;base64,'.base64_encode($svg) : '';
         }
 
