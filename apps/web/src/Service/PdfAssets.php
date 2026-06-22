@@ -20,6 +20,12 @@ final class PdfAssets
     ) {
     }
 
+    /** Chemin absolu du gabarit PDF (en-tête/charte) importé en fond de page. */
+    public function templatePath(): string
+    {
+        return $this->projectDir.'/assets/pdf/template.pdf';
+    }
+
     /** Logo SciencesWiki (SVG vectoriel) en data-URI base64, ou chaîne vide si absent. */
     public function logo(): string
     {

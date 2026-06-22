@@ -21,6 +21,7 @@ final class WikiController extends AbstractController
         private readonly ApiClient $api,
         private readonly \App\Service\UserApiClient $user,
         private readonly \App\Service\AdminCsrf $csrf,
+        private readonly \App\Service\PdfAssets $pdfAssets,
     ) {
     }
 
@@ -198,21 +199,31 @@ final class WikiController extends AbstractController
         if (!mb_check_encoding($markdown, 'UTF-8')) {
             $markdown = (string) mb_convert_encoding($markdown, 'UTF-8', 'UTF-8');
         }
-        $html = $this->renderView('pdf/literature_review.html.twig', [
+        $html = $this->renderView('pdf/review_body.html.twig', [
             'topic' => '' !== trim($topic) ? $topic : 'Revue de littérature',
             'rubric' => $rubric,
             'markdown' => $markdown,
             'sources' => $sources,
-            'date' => date('d/m/Y'),
         ]);
 
-        // dompdf : pas d'accès réseau (anti-SSRF), police DejaVu (Unicode/accents).
-        $dompdf = new \Dompdf\Dompdf(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false]);
-        $dompdf->loadHtml($html, 'UTF-8');
-        $dompdf->setPaper('A4', 'portrait');
-        $dompdf->render();
+        // Gabarit PDF (charte/en-tête) en fond + texte stampé dans la zone définie.
+        $pdf = new \App\Pdf\TemplatePdf('P', 'pt', 'A4', true, 'UTF-8', false);
+        $pdf->SetCreator('SciencesWiki');
+        $pdf->SetAuthor('SciencesWiki');
+        $pdf->SetTitle($topic);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->setHeaderMargin(0);
+        $pdf->setFooterMargin(0);
+        // Zone de texte : X=43, Y=103, L=510, H=680 (pt) → marges + saut de page.
+        $pdf->SetMargins(43, 103, 42);
+        $pdf->SetAutoPageBreak(true, 59);
+        $pdf->SetFont('dejavusans', '', 10.5);
+        $pdf->loadTemplate($this->pdfAssets->templatePath());
+        $pdf->AddPage();
+        $pdf->writeHTML($html, true, false, true, false, '');
 
-        return new Response($dompdf->output(), Response::HTTP_OK, [
+        return new Response((string) $pdf->Output('revue.pdf', 'S'), Response::HTTP_OK, [
             'Content-Type' => 'application/pdf',
             'Content-Disposition' => 'attachment; filename="'.$this->reviewSlug($topic).'.pdf"',
         ]);
