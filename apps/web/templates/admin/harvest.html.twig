@@ -14,11 +14,11 @@
         <div class="card">
             <span class="muted">Requêtes OpenAlex aujourd'hui ({{ status.openalex.date ?? '' }})</span><br>
             <strong id="oa-used" style="font-size:1.6rem">{{ (status.openalex.used ?? 0)|number_format(0,',',' ') }}</strong>
-            <span class="muted">/ <span id="oa-cap">{{ (status.openalex.perDay ?? 0)|number_format(0,',',' ') }}</span> (plafond interne) · <span id="oa-min">{{ status.openalex.perMinute ?? 0 }}</span>/min</span>
+            <span class="muted">/ <span id="oa-cap">{{ (status.openalex.perDay ?? 0)|number_format(0,',',' ') }}</span> (limite OpenAlex/jour) · <span id="oa-min">{{ status.openalex.perMinute ?? 0 }}</span>/min</span>
             <div style="margin-top:.4rem; height:8px; background:var(--line); border-radius:4px; overflow:hidden">
                 <div id="oa-bar" style="height:100%; width:0%; background:var(--accent)"></div>
             </div>
-            <p id="oa-warn" class="badge warn" hidden style="margin-top:.4rem">⛔ Plafond interne quotidien atteint — augmentez-le dans les Paramètres.</p>
+            <p id="oa-warn" class="badge warn" hidden style="margin-top:.4rem">⛔ Limite quotidienne OpenAlex atteinte — réinitialisation à minuit UTC.</p>
         </div>
         <div class="card">
             <span class="muted">Crédit OpenAlex <span id="oa-key" class="pill" style="font-size:.65rem">sans clé API</span></span><br>

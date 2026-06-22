@@ -183,11 +183,16 @@ final class AdminHarvestController
             'openalex' => [
                 'date' => $today,
                 'usesApiKey' => '' !== $this->openalexApiKey,
-                // Garde-fou interne (cadence configurable en back-office).
-                'used' => $used,
-                'perDay' => $perDay,
+                // Stats fondées sur les requêtes RÉELLEMENT enregistrées par OpenAlex
+                // (en-têtes X-RateLimit-*) quand disponibles ; repli sur le compteur interne.
+                'used' => (null !== $apiLimit && null !== $apiRemaining) ? max(0, (int) $apiLimit - (int) $apiRemaining) : $used,
+                'perDay' => null !== $apiLimit ? (int) $apiLimit : $perDay,
                 'perMinute' => $this->settings->openalexPerMinute(),
-                'exhausted' => $used >= $perDay,
+                'exhausted' => null !== $apiRemaining ? (int) $apiRemaining <= 0 : $used >= $perDay,
+                'real' => null !== $apiLimit && null !== $apiRemaining,
+                // Garde-fou interne (cadence configurable) — secondaire.
+                'internalUsed' => $used,
+                'internalPerDay' => $perDay,
                 // Valeurs RÉELLES annoncées par OpenAlex (en-têtes X-RateLimit-*).
                 'apiDailyLimit' => null !== $apiLimit ? (int) $apiLimit : null,
                 'apiDailyRemaining' => null !== $apiRemaining ? (int) $apiRemaining : null,
