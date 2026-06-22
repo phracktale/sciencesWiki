@@ -83,6 +83,9 @@ final class SearchKeywordController
                 'oaUrl' => $h['oa_url'] ?? null,
                 'citedByCount' => $h['cited_by_count'] ?? 0,
                 'fwci' => $h['fwci'] ?? null,
+                'leadAuthor' => $h['lead_author'] ?? null,
+                // Pertinence Meilisearch (0–1) → exposée en %.
+                'relevance' => isset($h['_rankingScore']) ? round((float) $h['_rankingScore'], 4) : null,
                 'url' => ($h['oa_url'] ?? null) ?: (($h['doi'] ?? null) ? 'https://doi.org/'.$h['doi'] : null),
             ];
         }, $res['hits'] ?? []);

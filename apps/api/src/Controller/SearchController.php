@@ -101,13 +101,18 @@ final class SearchController
      */
     private function publicationSummary(Publication $p): array
     {
+        $authors = array_map(static fn (array $a): string => $a['name'], $p->getAuthors());
+
         return [
             'doi' => $p->getDoi(),
             'title' => $p->getTitle(),
             'venue' => $p->getVenue(),
             'oaStatus' => $p->getOaStatus()->value,
             'oaUrl' => $p->getOaUrl(),
-            'authors' => array_map(static fn (array $a): string => $a['name'], $p->getAuthors()),
+            'authors' => $authors,
+            'leadAuthor' => $authors[0] ?? null,
+            'citedByCount' => $p->getCitedByCount(),
+            'fwci' => $p->getFwci(),
         ];
     }
 }

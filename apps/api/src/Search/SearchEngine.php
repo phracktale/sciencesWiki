@@ -35,10 +35,10 @@ final class SearchEngine
     {
         $this->request('POST', '/indexes', ['uid' => self::INDEX, 'primaryKey' => 'id']);
         $this->request('PATCH', '/indexes/'.self::INDEX.'/settings', [
-            'searchableAttributes' => ['title', 'abstract'],
+            'searchableAttributes' => ['title', 'abstract', 'lead_author'],
             'filterableAttributes' => ['year', 'type', 'oa_status', 'journal', 'retraction_status'],
             'sortableAttributes' => ['cited_by_count', 'fwci', 'year'],
-            'displayedAttributes' => ['id', 'doi', 'title', 'journal', 'year', 'type', 'oa_status', 'cited_by_count', 'fwci', 'oa_url'],
+            'displayedAttributes' => ['id', 'doi', 'title', 'journal', 'year', 'type', 'oa_status', 'cited_by_count', 'fwci', 'oa_url', 'lead_author'],
             'typoTolerance' => ['enabled' => true, 'minWordSizeForTypos' => ['oneTypo' => 4, 'twoTypos' => 8]],
             'pagination' => ['maxTotalHits' => 5000],
         ]);
@@ -63,6 +63,7 @@ final class SearchEngine
         $body = array_merge([
             'q' => $q,
             'limit' => 20,
+            'showRankingScore' => true,
             'attributesToHighlight' => ['title'],
             'highlightPreTag' => '<mark>',
             'highlightPostTag' => '</mark>',

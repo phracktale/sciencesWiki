@@ -64,7 +64,9 @@ final class SearchIndexCommand extends Command
                 "SELECT p.id, p.doi, p.title, left(coalesce(p.abstract,''), 1500) AS abstract,
                         COALESCE(j.name, p.venue) AS journal,
                         EXTRACT(YEAR FROM p.publication_date)::int AS year,
-                        p.type, p.oa_status, p.cited_by_count, p.fwci, p.oa_url, p.retraction_status
+                        p.type, p.oa_status, p.cited_by_count, p.fwci, p.oa_url, p.retraction_status,
+                        (SELECT a.name FROM authorship au JOIN author a ON a.id = au.author_id
+                          WHERE au.publication_id = p.id ORDER BY au.position ASC LIMIT 1) AS lead_author
                    FROM publication p
                    LEFT JOIN journal j ON j.id = p.journal_id
                   WHERE p.id > ".$fromId.' AND p.type IN (:types) AND p.title IS NOT NULL
@@ -91,6 +93,7 @@ final class SearchIndexCommand extends Command
                 'fwci' => null !== $r['fwci'] ? (float) $r['fwci'] : null,
                 'oa_url' => $r['oa_url'],
                 'retraction_status' => $r['retraction_status'],
+                'lead_author' => $r['lead_author'],
             ], $rows);
 
             $this->engine->indexBatch($docs);
