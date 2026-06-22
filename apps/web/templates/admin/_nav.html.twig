@@ -2,9 +2,9 @@
 {% set r = app.request.attributes.get('_route') %}
 {% set groups = [
     { label: 'Corpus', match: ['admin_articles', 'admin_article', 'admin_authors', 'admin_harvest'], items: [
+        { label: 'Moisson (suivi)', route: 'admin_harvest' },
         { label: 'Articles', route: 'admin_articles' },
         { label: 'Auteurs', route: 'admin_authors' },
-        { label: 'Moisson (suivi)', route: 'admin_harvest' },
     ] },
     { label: 'Wiki', match: ['admin_wiki', 'admin_wiki_detail', 'admin_questions'], items: [
         { label: 'Articles wiki', route: 'admin_wiki' },
