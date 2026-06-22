@@ -90,9 +90,11 @@ final class WikiController extends AbstractController
             return new JsonResponse(['error' => 'Jeton de sécurité invalide.'], 403);
         }
         $sources = json_decode((string) $request->request->get('sources', '[]'), true);
+        // Garde-fou : json_encode (UserApiClient) échoue sur de l'UTF-8 invalide.
+        $utf8 = static fn (string $s): string => mb_check_encoding($s, 'UTF-8') ? $s : (string) mb_convert_encoding($s, 'UTF-8', 'UTF-8');
         $res = $this->user->send('POST', '/api/literature-reviews', [
-            'topic' => (string) $request->request->get('topic', ''),
-            'markdown' => (string) $request->request->get('markdown', ''),
+            'topic' => $utf8((string) $request->request->get('topic', '')),
+            'markdown' => $utf8((string) $request->request->get('markdown', '')),
             'sources' => \is_array($sources) ? $sources : [],
         ]);
 
