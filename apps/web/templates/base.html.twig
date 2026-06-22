@@ -121,7 +121,9 @@
         .admin-nav .dd-top { color:#cbd5e1; font-size:.88rem; font-weight:600; padding:.4rem .8rem; border-radius:8px; cursor:pointer; display:inline-block; user-select:none; }
         .admin-nav .dd-top:hover, .admin-nav .dd:focus-within .dd-top { background:#1e293b; color:#fff; }
         .admin-nav .dd-top.active { background:var(--accent); color:#fff; }
-        .admin-nav .dd-menu { position:absolute; top:100%; left:0; margin-top:.2rem; background:#0f172a; border:1px solid #334155; border-radius:8px; min-width:210px; padding:.3rem; display:none; z-index:50; box-shadow:0 10px 28px rgba(0,0,0,.35); }
+        .admin-nav .dd-menu { position:absolute; top:calc(100% + 6px); left:0; background:#0f172a; border:1px solid #334155; border-radius:8px; min-width:210px; padding:.3rem; display:none; z-index:50; box-shadow:0 10px 28px rgba(0,0,0,.35); }
+        /* Pont invisible collé au lanceur : couvre l'espace visuel, le survol ne « tombe » jamais dans le vide. */
+        .admin-nav .dd-menu::before { content:''; position:absolute; left:0; right:0; top:-8px; height:8px; }
         .admin-nav .dd:hover .dd-menu, .admin-nav .dd:focus-within .dd-menu { display:block; }
         .admin-nav .dd-menu a { display:block; white-space:nowrap; }
         /* Rendu Markdown (articles wiki + réponses) */
