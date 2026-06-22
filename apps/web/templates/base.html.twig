@@ -157,7 +157,8 @@
             <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
             <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
             {% if current_user.isLogged %}
-                <a href="{{ path('logout') }}" title="Connecté·e : {{ current_user.displayName }}">Déconnexion</a>
+                {% if current_user.hasRole('ROLE_ADMIN') %}<a href="{{ path('admin_dashboard') }}">⚙️ Tableau de bord</a>{% endif %}
+                <a href="{{ path('logout') }}" title="Déconnexion">⏻ {{ current_user.displayName }}</a>
             {% else %}
                 <a href="{{ path('login') }}"{{ route == 'login' ? ' class="is-active"' : '' }}>Connexion</a>
             {% endif %}
