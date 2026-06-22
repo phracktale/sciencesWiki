@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        @page { margin: 2cm 1.8cm; }
+        body { font-family: 'DejaVu Sans', sans-serif; font-size: 11pt; line-height: 1.5; color: #1f2937; }
+        h1 { font-size: 18pt; color: #02356c; margin: 0 0 4pt; }
+        .meta { color: #555; font-size: 9.5pt; margin-bottom: 16pt; }
+        h2 { font-size: 13pt; color: #019fb9; margin: 14pt 0 4pt; page-break-after: avoid; }
+        h3 { font-size: 11.5pt; color: #02356c; margin: 10pt 0 3pt; page-break-after: avoid; }
+        p, li { page-break-inside: avoid; margin: 4pt 0; }
+        ul, ol { margin: 4pt 0 4pt 10pt; }
+        strong { color: #111827; }
+        .biblio { margin-top: 18pt; border-top: 1px solid #ccc; padding-top: 8pt; }
+        .ref { page-break-inside: avoid; margin: 6pt 0; font-size: 10pt; }
+        .ref .url { color: #02356c; }
+        .foot { margin-top: 22pt; border-top: 1px solid #ccc; padding-top: 6pt; color: #777; font-size: 8.5pt; }
+    </style>
+</head>
+<body>
+    <h1>Revue de littérature</h1>
+    <div class="meta"><strong>Sujet :</strong> {{ topic }} · {{ date }} · SciencesWiki</div>
+
+    <div class="review">{{ markdown|md }}</div>
+
+    {% if sources is not empty %}
+        <div class="biblio">
+            <h2>Bibliographie</h2>
+            {% for s in sources %}
+                <div class="ref">
+                    [{{ s.n }}] <strong>{{ s.title }}</strong>{% if s.authors is not empty %} — {{ s.authors|join(', ') }}{% endif %}{% if s.year %} ({{ s.year }}){% endif %}{% if s.venue %}. {{ s.venue }}{% endif %}.{% if s.citedByCount is not null %} {{ s.citedByCount }} citations.{% endif %}
+                    {% if s.oaUrl %}<br><span class="url">{{ s.oaUrl }}</span>{% elseif s.doi %}<br><span class="url">https://doi.org/{{ s.doi }}</span>{% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <div class="foot">Document généré par SciencesWiki — encyclopédie scientifique libre. Synthèse assistée par IA à partir des sources citées ; à vérifier avant tout usage académique.</div>
+</body>
+</html>

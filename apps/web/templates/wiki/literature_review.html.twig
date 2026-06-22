@@ -31,8 +31,9 @@
     <p id="lr-status" class="muted" style="font-size:.85rem" role="status" aria-live="polite"></p>
 
     <div class="lr-actions" id="lr-actions" hidden>
-        <button type="button" id="lr-dl">⬇️ Télécharger (Markdown)</button>
-        <button type="button" id="lr-print">🖨️ Imprimer / PDF</button>
+        <button type="button" id="lr-dl">⬇️ Markdown</button>
+        <button type="button" id="lr-pdf">⬇️ PDF</button>
+        <input type="hidden" id="lr-csrf" value="{{ admin_csrf.token }}">
     </div>
 
     <div class="lr-layout">
@@ -120,7 +121,24 @@
 
         go.addEventListener('click', start);
         q.addEventListener('keydown', function (e) { if (e.key === 'Enter') start(); });
-        document.getElementById('lr-print').addEventListener('click', function () { window.print(); });
+        document.getElementById('lr-pdf').addEventListener('click', function () {
+            var btn = document.getElementById('lr-pdf'); btn.disabled = true;
+            var body = new URLSearchParams();
+            body.set('topic', topic); body.set('markdown', full);
+            body.set('sources', JSON.stringify(sources));
+            body.set('_csrf', document.getElementById('lr-csrf').value);
+            fetch('{{ path('literature_review_pdf') }}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: body.toString(),
+                credentials: 'same-origin'
+            }).then(function (r) { return r.ok ? r.blob() : Promise.reject(); }).then(function (blob) {
+                var a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+                a.download = 'revue-litterature.pdf'; document.body.appendChild(a); a.click();
+                setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+            }).catch(function () { statusEl.textContent = 'Échec de la génération du PDF.'; })
+              .finally(function () { btn.disabled = false; });
+        });
         document.getElementById('lr-dl').addEventListener('click', function () {
             var blob = new Blob([markdownExport()], { type: 'text/markdown;charset=utf-8' });
             var a = document.createElement('a'); a.href = URL.createObjectURL(blob);

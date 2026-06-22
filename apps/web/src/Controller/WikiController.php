@@ -20,6 +20,7 @@ final class WikiController extends AbstractController
     public function __construct(
         private readonly ApiClient $api,
         private readonly \App\Service\UserApiClient $user,
+        private readonly \App\Service\AdminCsrf $csrf,
     ) {
     }
 
@@ -53,6 +54,42 @@ final class WikiController extends AbstractController
         }
 
         return $this->render('wiki/literature_review.html.twig');
+    }
+
+    /** Export PDF propre d'une revue de littérature (dompdf, markdown rendu serveur). */
+    #[Route('/{_locale}/chercheur/revue-litterature/pdf', name: 'literature_review_pdf', requirements: ['_locale' => 'fr'], methods: ['POST'])]
+    public function literatureReviewPdf(Request $request): Response
+    {
+        if (!$this->user->isLogged() || !$this->user->canResearch()) {
+            throw $this->createAccessDeniedException();
+        }
+        if (!$this->csrf->isValid($request)) {
+            return new Response('Jeton de sécurité invalide.', Response::HTTP_FORBIDDEN);
+        }
+
+        $markdown = (string) $request->request->get('markdown', '');
+        if ('' === trim($markdown)) {
+            return new Response('Revue vide.', Response::HTTP_BAD_REQUEST);
+        }
+        $sources = json_decode((string) $request->request->get('sources', '[]'), true);
+
+        $html = $this->renderView('pdf/literature_review.html.twig', [
+            'topic' => trim((string) $request->request->get('topic', '')) ?: 'Revue de littérature',
+            'markdown' => $markdown,
+            'sources' => \is_array($sources) ? $sources : [],
+            'date' => date('d/m/Y'),
+        ]);
+
+        // dompdf : pas d'accès réseau (anti-SSRF), police DejaVu (Unicode/accents).
+        $dompdf = new \Dompdf\Dompdf(['defaultFont' => 'DejaVu Sans', 'isRemoteEnabled' => false]);
+        $dompdf->loadHtml($html, 'UTF-8');
+        $dompdf->setPaper('A4', 'portrait');
+        $dompdf->render();
+
+        return new Response($dompdf->output(), Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="revue-litterature.pdf"',
+        ]);
     }
 
     #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], methods: ['GET'])]
