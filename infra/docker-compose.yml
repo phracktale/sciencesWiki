@@ -72,6 +72,9 @@ services:
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
       MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
       MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
+      # Recherche tolérante aux fautes (Meilisearch sur Marvin).
+      MEILI_URL: ${MEILI_URL:-}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
       # Cette instance initialise la base (migrations + clés JWT + seed).
       RUN_INIT: "1"
     volumes:
@@ -111,6 +114,8 @@ services:
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      MEILI_URL: ${MEILI_URL:-}
+      MEILI_MASTER_KEY: ${MEILI_MASTER_KEY:-}
       # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
     # memory_limit PHP relevé (embeddings par lots + gros lots de moisson) ; le
     # --memory-limit Messenger (RSS) redémarre proprement avant tout dépassement.
