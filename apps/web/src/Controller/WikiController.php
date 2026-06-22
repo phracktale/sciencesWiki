@@ -219,6 +219,7 @@ final class WikiController extends AbstractController
         $pdf->SetMargins(43, 103, 42);
         $pdf->SetAutoPageBreak(true, 59);
         $pdf->SetFont('dejavusans', '', 10.5);
+        $pdf->setFooterDate(date('d/m/Y'));
         $pdf->loadTemplate($this->pdfAssets->templatePath());
         $pdf->AddPage();
         $pdf->writeHTML($html, true, false, true, false, '');
