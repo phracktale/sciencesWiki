@@ -145,9 +145,17 @@
             <a href="{{ path('wiki_search') }}"{{ route == 'wiki_search' ? ' class="is-active"' : '' }}>Rechercher</a>
             <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
             <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
+            {% if current_user.isLogged %}
+                <a href="{{ path('logout') }}" title="Connecté·e : {{ current_user.displayName }}">Déconnexion</a>
+            {% else %}
+                <a href="{{ path('login') }}"{{ route == 'login' ? ' class="is-active"' : '' }}>Connexion</a>
+            {% endif %}
         </nav>
     </header>
-    <main>{% block body %}{% endblock %}</main>
+    <main>
+        {% for t in ['success', 'error'] %}{% for m in app.flashes(t) %}<p class="badge {{ t == 'success' ? 'ok' : 'warn' }}">{{ m }}</p>{% endfor %}{% endfor %}
+        {% block body %}{% endblock %}
+    </main>
     <footer>
         Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique ·
         projet libre, gratuit et open source. <a href="{{ path('project') }}">En savoir plus</a>

@@ -46,6 +46,7 @@ class TreeNode
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['node:item'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255, unique: true)]

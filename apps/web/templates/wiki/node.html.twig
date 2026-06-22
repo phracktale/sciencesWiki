@@ -46,6 +46,33 @@
         </article>
     {% endif %}
 
+    {% if current_user.canEdit and node.id %}
+        <div style="margin:1rem 0 2rem">
+            <button type="button" onclick="var e=document.getElementById('art-edit');e.hidden=!e.hidden" style="background:#fff;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:.5rem 1rem;cursor:pointer;font:inherit;font-weight:600">✏️ {{ node.articleMd ? 'Éditer l’article' : 'Rédiger l’article' }}</button>
+            <div id="art-edit" hidden style="margin-top:.7rem; border:1px solid var(--line); border-radius:10px; padding:1rem; background:#fafafa">
+                <form method="post" action="{{ path('article_edit', { id: node.id }) }}">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <input type="hidden" name="back" value="{{ app.request.uri }}">
+                    <textarea name="article_md" style="width:100%; min-height:32rem; font-family:ui-monospace,monospace; font-size:.85rem; line-height:1.5">{{ node.articleMd }}</textarea>
+                    <div style="display:flex; gap:.8rem; align-items:center; margin-top:.6rem; flex-wrap:wrap">
+                        <button type="submit">💾 Enregistrer</button>
+                        {% if current_user.canValidate %}
+                            <label style="font-size:.85rem; cursor:pointer"><input type="checkbox" name="validate" value="1"> et marquer « relu »</label>
+                        {% endif %}
+                        <span class="muted" style="font-size:.8rem">Markdown · lien interne : <code>[texte](/fr/slug)</code></span>
+                    </div>
+                </form>
+                {% if current_user.canValidate and node.articleMd and node.articleStatus != 'valide' %}
+                    <form method="post" action="{{ path('article_validate', { id: node.id }) }}" style="margin-top:.6rem">
+                        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                        <input type="hidden" name="back" value="{{ app.request.uri }}">
+                        <button type="submit" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:.45rem .9rem;cursor:pointer">✅ Valider sans modifier</button>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    {% endif %}
+
     {% if node.children is not empty %}
         <h2>Sous-rubriques</h2>
         <div class="grid">

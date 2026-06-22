@@ -75,6 +75,26 @@
         </div>
     {% endif %}
 
+    {% if current_user.canEdit and answer.id %}
+        <div style="margin:1rem 0">
+            <button type="button" onclick="var e=document.getElementById('ans-edit');e.hidden=!e.hidden" style="background:#fff;border:1px solid var(--accent);color:var(--accent);border-radius:8px;padding:.5rem 1rem;cursor:pointer;font:inherit;font-weight:600">✏️ Réviser cette réponse</button>
+            <div id="ans-edit" hidden style="margin-top:.7rem; border:1px solid var(--line); border-radius:10px; padding:1rem; background:#fafafa">
+                <form method="post" action="{{ path('answer_edit', { id: answer.id }) }}">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <input type="hidden" name="back" value="{{ app.request.uri }}">
+                    <label>Vulgarisation (Markdown)</label>
+                    <textarea name="vulgarization" style="width:100%; min-height:11rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ answer.vulgarizationContent }}</textarea>
+                    <label style="margin-top:.5rem; display:block">Faits établis / académique (Markdown)</label>
+                    <textarea name="academic" style="width:100%; min-height:11rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ answer.academicContent }}</textarea>
+                    <label style="margin-top:.5rem; display:block">Résumé de la modification</label>
+                    <input type="text" name="summary" placeholder="ex. : reformulation, correction d'une erreur…">
+                    <button type="submit" style="margin-top:.6rem">💾 Enregistrer la révision</button>
+                    <span class="muted" style="font-size:.8rem; margin-left:.5rem">Crée une nouvelle révision (historique conservé).</span>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
     {% if answer.sources is not empty %}
         <div class="sources">
             <h4>📚 Papier{{ answer.sources|length > 1 ? 's' : '' }} de recherche cité{{ answer.sources|length > 1 ? 's' : '' }}</h4>
