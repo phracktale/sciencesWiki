@@ -7,7 +7,7 @@ twig:
         csp_nonce: '@App\Service\CspNonce'
         pdf_assets: '@App\Service\PdfAssets'
         # Tag de version affiché en pied de page. À BUMPER à chaque livraison.
-        app_version: 'v0.52 · PDF : gabarit commun (logo + slogan en-tête, pied de page ligne/page/site/date) (2026-06-22)'
+        app_version: 'v0.53 · PDF : logo dimensionné + marge, pied page courante ; souligné réservé aux liens éditoriaux inline (2026-06-22)'
 
 when@test:
     twig:

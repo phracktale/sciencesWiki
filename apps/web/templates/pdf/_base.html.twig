@@ -1,30 +1,33 @@
 {#
-  Gabarit PDF commun (dompdf). En-tête (logo + slogan) et pied de page (ligne,
-  scienceswiki.eu + date à gauche, numéro de page à droite) RÉPÉTÉS sur chaque
-  page via position:fixed. Les PDF concrets étendent ce gabarit et remplissent
-  {% block content %}. Variable attendue : `date` (jj/mm/aaaa).
+  Gabarit PDF commun (dompdf). En-tête (logo + slogan) répété sur chaque page via
+  position:fixed. Le PIED DE PAGE (filet + scienceswiki.eu/date à gauche, numéro
+  de page à droite avec total CORRECT) est stampé via le canvas dans le contrôleur
+  (WikiController::renderPdf) — counter(pages) CSS étant non fiable sous dompdf.
+  Les PDF concrets étendent ce gabarit et remplissent {% block content %}.
 #}
 <!DOCTYPE html>
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { margin: 132px 56px 84px 56px; }
+        @page { margin: 138px 56px 92px 56px; }
         body { font-family: 'DejaVu Sans', sans-serif; font-size: 11pt; line-height: 1.5; color: #1f2937; }
 
         /* En-tête répété */
-        .pdf-header { position: fixed; top: -104px; left: 0; right: 0; height: 80px; }
+        .pdf-header { position: fixed; top: -110px; left: 0; right: 0; height: 92px; }
         .pdf-header table { width: 100%; border: 0; border-collapse: collapse; }
-        .pdf-header img { height: 46px; }
-        .pdf-header .slogan { color: #02356c; font-size: 10pt; font-style: italic; padding-left: 14px; vertical-align: middle; }
-        .pdf-header .rule { border-bottom: 2px solid #019fb9; height: 8px; }
+        .pdf-header .logo-cell { width: 160px; vertical-align: middle; }
+        .pdf-header img { width: 150px; height: 44px; }
+        .pdf-header .slogan { color: #02356c; font-size: 10pt; font-style: italic; vertical-align: middle; padding-left: 16px; }
+        .pdf-header .rule { border-bottom: 2px solid #019fb9; margin-top: 16px; }
 
-        /* Pied de page répété */
+        /* Pied de page répété : filet, scienceswiki.eu + date à gauche, page courante à droite.
+           (On affiche uniquement la page COURANTE : counter(page) est fiable, pas counter(pages).) */
         .pdf-footer { position: fixed; bottom: -56px; left: 0; right: 0; height: 40px;
             border-top: 1px solid #cbd5e1; padding-top: 6px; color: #64748b; font-size: 8.5pt; }
         .pdf-footer table { width: 100%; border: 0; border-collapse: collapse; }
         .pdf-footer .right { text-align: right; }
-        .pdf-footer .page:after { content: "page " counter(page) " / " counter(pages); }
+        .pdf-footer .page:after { content: "page " counter(page); }
 
         /* Contenu — styles communs (titres, sauts de page, bibliographie) */
         h1 { font-size: 18pt; color: #02356c; margin: 0 0 4pt; }
@@ -42,9 +45,7 @@
 <body>
     <header class="pdf-header">
         <table><tr>
-            <td style="width: 1%; white-space: nowrap; vertical-align: middle;">
-                {% if pdf_assets.logo %}<img src="{{ pdf_assets.logo }}" alt="SciencesWiki">{% endif %}
-            </td>
+            <td class="logo-cell">{% if pdf_assets.logo %}<img src="{{ pdf_assets.logo }}" alt="SciencesWiki">{% endif %}</td>
             <td class="slogan">— le savoir scientifique, libre et vulgarisé</td>
         </tr></table>
         <div class="rule"></div>
