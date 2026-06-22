@@ -117,6 +117,22 @@
         .admin-nav a.active { background:var(--accent); color:#fff; }
         .admin-nav-logout { margin-left:auto; color:#fca5a5 !important; }
         .admin-nav-logout:hover { background:#7f1d1d !important; color:#fff !important; }
+        /* Rendu Markdown (articles wiki + réponses) */
+        .md { line-height:1.7; }
+        .md h2 { margin:1.8rem 0 .6rem; font-size:1.5rem; border-bottom:2px solid var(--line); padding-bottom:.25rem; }
+        .md h3 { margin:1.3rem 0 .4rem; font-size:1.2rem; }
+        .md h4 { margin:1.1rem 0 .3rem; font-size:1.05rem; }
+        .md p { margin:.7rem 0; }
+        .md ul, .md ol { margin:.6rem 0 .6rem 1.4rem; }
+        .md li { margin:.25rem 0; }
+        .md a { color:var(--accent); }
+        .md blockquote { border-left:4px solid var(--line); margin:.8rem 0; padding:.2rem 0 .2rem 1rem; color:#475569; }
+        .md table { border-collapse:collapse; margin:.8rem 0; width:100%; }
+        .md th, .md td { border:1px solid var(--line); padding:.4rem .6rem; text-align:left; }
+        .md code { background:#f1f5f9; padding:.1rem .35rem; border-radius:6px; font-size:.9em; }
+        .md pre { background:#f1f5f9; padding:.8rem; border-radius:8px; overflow:auto; }
+        .wiki-article { margin:1.5rem 0 2rem; max-width:80ch; }
+        .article-paternity { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:.3rem 0 1.2rem; }
     </style>
 </head>
 <body>
@@ -126,6 +142,7 @@
         {% set route = app.request.attributes.get('_route') %}
         <nav>
             <a href="{{ path('home') }}"{{ route in ['home','node'] ? ' class="is-active"' : '' }}>Accueil</a>
+            <a href="{{ path('wiki_search') }}"{{ route == 'wiki_search' ? ' class="is-active"' : '' }}>Rechercher</a>
             <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
             <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
         </nav>

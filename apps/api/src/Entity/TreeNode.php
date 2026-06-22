@@ -96,6 +96,89 @@ class TreeNode
     #[Groups(['node:read'])]
     private ?\DateTimeImmutable $lastHarvestedAt = null;
 
+    /** Article encyclopédique long (Markdown), rédigé par IA puis relu. */
+    #[ORM\Column(name: 'article_md', type: Types::TEXT, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?string $articleMd = null;
+
+    /** Paternité (comme les réponses) : 'non_relu' (IA seule) | 'valide' (relu humain). */
+    #[ORM\Column(name: 'article_status', length: 20, options: ['default' => 'non_relu'])]
+    #[Groups(['node:read'])]
+    private string $articleStatus = 'non_relu';
+
+    /** Modèle d'IA ayant rédigé l'article (paternité). */
+    #[ORM\Column(name: 'article_model', length: 120, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?string $articleModel = null;
+
+    #[ORM\Column(name: 'article_generated_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $articleGeneratedAt = null;
+
+    #[ORM\Column(name: 'article_reviewed_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?\DateTimeImmutable $articleReviewedAt = null;
+
+    public function getArticleMd(): ?string
+    {
+        return $this->articleMd;
+    }
+
+    public function setArticleMd(?string $md): self
+    {
+        $this->articleMd = $md;
+
+        return $this;
+    }
+
+    public function getArticleStatus(): string
+    {
+        return $this->articleStatus;
+    }
+
+    public function setArticleStatus(string $status): self
+    {
+        $this->articleStatus = $status;
+
+        return $this;
+    }
+
+    public function getArticleModel(): ?string
+    {
+        return $this->articleModel;
+    }
+
+    public function setArticleModel(?string $model): self
+    {
+        $this->articleModel = $model;
+
+        return $this;
+    }
+
+    public function getArticleGeneratedAt(): ?\DateTimeImmutable
+    {
+        return $this->articleGeneratedAt;
+    }
+
+    public function setArticleGeneratedAt(?\DateTimeImmutable $at): self
+    {
+        $this->articleGeneratedAt = $at;
+
+        return $this;
+    }
+
+    public function getArticleReviewedAt(): ?\DateTimeImmutable
+    {
+        return $this->articleReviewedAt;
+    }
+
+    public function setArticleReviewedAt(?\DateTimeImmutable $at): self
+    {
+        $this->articleReviewedAt = $at;
+
+        return $this;
+    }
+
     public function __construct(string $slug, string $label)
     {
         $this->slug = $slug;

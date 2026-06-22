@@ -31,6 +31,21 @@
         <p class="muted" style="font-size:.85rem">Concept de référence : <a href="{{ node.openalexUrl }}" rel="noopener" target="_blank">OpenAlex ↗</a></p>
     {% endif %}
 
+    {% if node.articleMd %}
+        <article class="md wiki-article">
+            <div class="article-paternity">
+                {% if node.articleStatus == 'valide' %}
+                    <span class="badge ok">✅ relu par le comité</span>
+                {% else %}
+                    <span class="badge warn">⚠️ rédigé par IA · non relu</span>
+                {% endif %}
+                {% if node.articleModel %}<span class="pill">🤖 {{ node.articleModel }}</span>{% endif %}
+                {% if node.articleGeneratedAt %}<span class="muted" style="font-size:.82rem">· {{ node.articleGeneratedAt|date('d/m/Y') }}</span>{% endif %}
+            </div>
+            {{ node.articleMd|md }}
+        </article>
+    {% endif %}
+
     {% if node.children is not empty %}
         <h2>Sous-rubriques</h2>
         <div class="grid">

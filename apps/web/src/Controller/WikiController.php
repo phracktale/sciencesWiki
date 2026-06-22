@@ -55,6 +55,15 @@ final class WikiController extends AbstractController
         ]);
     }
 
+    /** Moteur de recherche des articles encyclopédiques (rendu JS via /api/wiki/search). */
+    #[Route('/{_locale}/wiki', name: 'wiki_search', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function wikiSearch(): Response
+    {
+        return $this->render('wiki/search.html.twig', [
+            'domains' => $this->api->domains(),
+        ]);
+    }
+
     /**
      * Explorateur d'articles d'un sous-domaine (recherche plein-texte + fiche
      * détaillée façon OpenAlex). Interactif : la liste et la fiche sont chargées

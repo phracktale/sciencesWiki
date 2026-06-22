@@ -64,14 +64,14 @@
     {% if answer.vulgarizationContent %}
         <div class="block-vul">
             <h4>Vulgarisation</h4>
-            <p>{{ answer.vulgarizationContent|nl2br }}</p>
+            <div class="md">{{ answer.vulgarizationContent|md }}</div>
         </div>
     {% endif %}
 
     {% if answer.academicContent %}
         <div class="block-aca">
             <h4>Faits établis (sourcés)</h4>
-            <p>{{ answer.academicContent|nl2br }}</p>
+            <div class="md">{{ answer.academicContent|md }}</div>
         </div>
     {% endif %}
 

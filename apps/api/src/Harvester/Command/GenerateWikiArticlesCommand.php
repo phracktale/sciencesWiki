@@ -1,0 +1,195 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Harvester\Command;
+
+use App\Ai\Llm\LlmClient;
+use App\Ai\Llm\LlmMessage;
+use App\Entity\TreeNode;
+use App\Harvester\Ai\EmbeddingClientFactory;
+use App\Repository\PublicationRepository;
+use App\Repository\TreeNodeRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
+/**
+ * Rédige, pour chaque nœud de l'arbre, un article encyclopédique long (~20 000
+ * signes, ~10 intertitres) décrivant le domaine scientifique, de qualité type
+ * Wikipédia, ANCRÉ sur le corpus (sources réelles récupérées par recherche
+ * sémantique) et truffé de LIENS INTERNES vers les domaines liés.
+ *
+ * Paternité : article_status='non_relu' (IA seule) + article_model (modèle).
+ * Idempotent et borné ; reprend les nœuds sans article (ou --force).
+ *
+ *   bin/console app:wiki:generate --limit=3
+ */
+#[AsCommand(name: 'app:wiki:generate', description: 'Rédige les articles encyclopédiques des domaines (IA, ancrés corpus, liens internes).')]
+final class GenerateWikiArticlesCommand extends Command
+{
+    public function __construct(
+        private readonly TreeNodeRepository $nodes,
+        private readonly PublicationRepository $publications,
+        private readonly EmbeddingClientFactory $embeddings,
+        private readonly LlmClient $llm,
+        private readonly EntityManagerInterface $em,
+    ) {
+        parent::__construct();
+    }
+
+    protected function configure(): void
+    {
+        $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Nombre d’articles à générer', '3');
+        $this->addOption('force', null, InputOption::VALUE_NONE, 'Régénère même les nœuds ayant déjà un article');
+        $this->addOption('slug', null, InputOption::VALUE_REQUIRED, 'Cible un nœud précis (par slug)');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        @set_time_limit(0);
+        $io = new SymfonyStyle($input, $output);
+        $limit = max(1, (int) $input->getOption('limit'));
+
+        if (null !== ($slug = $input->getOption('slug'))) {
+            $node = $this->nodes->findOneBy(['slug' => $slug]);
+            $targets = null !== $node ? [$node] : [];
+        } else {
+            $criteria = $input->getOption('force') ? [] : ['articleMd' => null];
+            // Domaines d'abord (niveau bas), puis on descend.
+            $targets = $this->nodes->findBy($criteria, ['level' => 'ASC', 'id' => 'ASC'], $limit);
+        }
+
+        if ([] === $targets) {
+            $io->success('Aucun nœud à rédiger.');
+
+            return Command::SUCCESS;
+        }
+
+        $embedder = $this->embeddings->create();
+        $done = 0;
+        foreach ($targets as $node) {
+            $io->writeln(\sprintf('• %s (niveau %d)…', $node->getLabel(), $node->getLevel()));
+            try {
+                $sources = $this->sources($node, $embedder);
+                $related = $this->relatedLinks($node);
+                $completion = $this->llm->complete(
+                    $this->buildMessages($node, $sources, $related),
+                    ['temperature' => 0.3, 'max_tokens' => 8000],
+                );
+                $md = trim($completion->content);
+                if (mb_strlen($md) < 800) {
+                    $io->warning(\sprintf('  réponse trop courte (%d car.), ignorée.', mb_strlen($md)));
+                    continue;
+                }
+                $node->setArticleMd($md)
+                    ->setArticleModel($completion->model)
+                    ->setArticleStatus('non_relu')
+                    ->setArticleGeneratedAt(new \DateTimeImmutable());
+                $this->em->flush();
+                ++$done;
+                $io->writeln(\sprintf('  ✓ %d signes', mb_strlen($md)));
+            } catch (\Throwable $e) {
+                $io->warning(\sprintf('  échec : %s', $e->getMessage()));
+            }
+        }
+
+        $io->success(\sprintf('%d article(s) rédigé(s).', $done));
+
+        return Command::SUCCESS;
+    }
+
+    /** Sources réelles du corpus pour ancrer l'article (recherche sémantique). */
+    private function sources(TreeNode $node, $embedder): string
+    {
+        $query = $node->getLabel().'. '.(string) $node->getDescription();
+        $embedding = $embedder->embed($query);
+        $hits = $this->publications->nearestTo($embedding, 12);
+
+        $lines = [];
+        foreach ($hits as $i => $hit) {
+            $p = $hit['publication'];
+            $year = $p->getPublicationDate()?->format('Y') ?? 's.d.';
+            $doi = $p->getDoi() ? 'https://doi.org/'.$p->getDoi() : '';
+            $lines[] = \sprintf('[%d] %s (%s)%s', $i + 1, $p->getTitle(), $year, '' !== $doi ? ' — '.$doi : '');
+        }
+
+        return [] === $lines ? '(aucune source trouvée dans le corpus)' : implode("\n", $lines);
+    }
+
+    /** Liens internes proposés (parents, enfants, frères) : label → /fr/slug. */
+    private function relatedLinks(TreeNode $node): string
+    {
+        $seen = [];
+        $out = [];
+        $add = function (array $n) use (&$seen, &$out): void {
+            $slug = $n['slug'] ?? null;
+            if (null === $slug || isset($seen[$slug]) || $slug === null) {
+                return;
+            }
+            $seen[$slug] = true;
+            $out[] = \sprintf('- %s → /fr/%s', $n['label'] ?? $slug, $slug);
+        };
+        foreach ($node->getParents() as $n) {
+            $add($n);
+        }
+        foreach (\array_slice($node->getChildren(), 0, 20) as $n) {
+            $add($n);
+        }
+        // Frères : enfants du premier parent.
+        $parents = $node->getParents();
+        if (isset($parents[0]['slug']) && null !== ($parent = $this->nodes->findOneBy(['slug' => $parents[0]['slug']]))) {
+            foreach (\array_slice($parent->getChildren(), 0, 12) as $n) {
+                $add($n);
+            }
+        }
+
+        return [] === $out ? '(aucun)' : implode("\n", \array_slice($out, 0, 30));
+    }
+
+    /** @return list<LlmMessage> */
+    private function buildMessages(TreeNode $node, string $sources, string $related): array
+    {
+        $system = <<<'SYS'
+            Tu es un rédacteur encyclopédique scientifique francophone, du niveau de Wikipédia.
+            Tu rédiges des articles LONGS, précis, neutres, structurés et sourcés, en Markdown.
+            Règles STRICTES :
+            - Longueur cible ≈ 20 000 signes (article complet et fouillé).
+            - Environ 10 intertitres de niveau 2 (## …), éventuellement des ### pour les sous-parties.
+            - Pas de titre de niveau 1 (#) : commence directement par un paragraphe d'introduction.
+            - Style : rigoureux, factuel, accessible mais exact. Pas de « je », pas de méta-commentaire.
+            - Cite les travaux fournis dans le texte sous la forme [n] et termine par une section « ## Références »
+              listant ces sources (numéro, titre, année, lien DOI s'il existe).
+            - Insère des LIENS INTERNES en Markdown vers les domaines liés fournis, là où c'est pertinent,
+              au fil du texte : [libellé](/fr/slug). N'invente JAMAIS d'autre lien interne que ceux fournis.
+            - N'invente pas de faits ni de chiffres : reste fidèle au sujet et aux sources.
+            - Réponds UNIQUEMENT par l'article en Markdown, sans préambule ni conclusion hors-sujet.
+            SYS;
+
+        $breadcrumb = implode(' › ', array_map(static fn (array $b): string => $b['label'] ?? '', $node->getBreadcrumb()));
+
+        $user = <<<TXT
+            Rédige l'article encyclopédique du domaine scientifique suivant.
+
+            DOMAINE : {$node->getLabel()}
+            POSITION DANS L'ARBRE : {$breadcrumb}
+            DESCRIPTION EXISTANTE : {$node->getDescription()}
+
+            SOURCES DU CORPUS (à citer en [n], réutilise-les dans « ## Références ») :
+            {$sources}
+
+            LIENS INTERNES AUTORISÉS (à placer naturellement dans le texte) :
+            {$related}
+
+            Décris avec précision en quoi consiste ce domaine : objet d'étude, histoire et grandes
+            étapes, concepts et théories fondamentales, méthodes, sous-disciplines, applications,
+            débats/limites actuels, et liens avec les domaines voisins. Vise ≈ 20 000 signes.
+            TXT;
+
+        return [LlmMessage::system($system), LlmMessage::user($user)];
+    }
+}

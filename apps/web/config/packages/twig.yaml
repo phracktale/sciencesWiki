@@ -4,7 +4,7 @@ twig:
         admin_csrf: '@App\Service\AdminCsrf'
         admin_session: '@App\Service\AdminApiClient'
         # Tag de version affiché en pied de page. À BUMPER à chaque livraison.
-        app_version: 'v0.22 · BO instantané (vues matérialisées) (2026-06-22)'
+        app_version: 'v0.23 · articles wiki (IA) + recherche + markdown (2026-06-22)'
 
 when@test:
     twig:
