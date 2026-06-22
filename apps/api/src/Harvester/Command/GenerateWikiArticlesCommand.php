@@ -213,38 +213,71 @@ final class GenerateWikiArticlesCommand extends Command
     {
         $system = <<<'SYS'
             Tu es un rédacteur encyclopédique scientifique francophone, du niveau de Wikipédia.
-            Tu rédiges des articles LONGS, précis, neutres, structurés et sourcés, en Markdown.
-            Règles STRICTES :
-            - Longueur cible ≈ 20 000 signes (article complet et fouillé).
-            - Environ 10 intertitres de niveau 2 (## …), éventuellement des ### pour les sous-parties.
-            - Pas de titre de niveau 1 (#) : commence directement par un paragraphe d'introduction.
-            - Style : rigoureux, factuel, accessible mais exact. Pas de « je », pas de méta-commentaire.
-            - Cite les travaux fournis dans le texte sous la forme [n] et termine par une section « ## Références »
-              listant ces sources (numéro, titre, année, lien DOI s'il existe).
-            - Insère des LIENS INTERNES en Markdown vers les domaines liés fournis, là où c'est pertinent,
-              au fil du texte : [libellé](/fr/slug). N'invente JAMAIS d'autre lien interne que ceux fournis.
-            - N'invente pas de faits ni de chiffres : reste fidèle au sujet et aux sources.
-            - Réponds UNIQUEMENT par l'article en Markdown, sans préambule ni conclusion hors-sujet.
+            Tu rédiges un article de RÉFÉRENCE, LONG, EXHAUSTIF, précis, neutre et sourcé, en Markdown.
+
+            OBJECTIF
+            - Synthétiser TOUS les sujets essentiels du domaine : un lecteur doit en ressortir avec une
+              vue complète et structurée, sans angle mort majeur.
+            - Longueur cible : 20 000 signes minimum (article fouillé ; n'abrège pas, développe chaque section).
+
+            STYLE
+            - Rigoureux, factuel, dense mais clair ; vulgarisation exacte (définis les termes techniques).
+            - Ton neutre et encyclopédique. Jamais de « je », pas d'adresse au lecteur, pas de méta-commentaire
+              (n'écris pas « dans cet article… »), pas de conclusion bavarde.
+            - Français soigné. Unités SI. Pas de listes à puces pour le corps du texte : rédige des paragraphes
+              (les puces sont réservées aux sections finales Chercheurs et Applications).
+
+            STRUCTURE (Markdown)
+            - PAS de titre de niveau 1 (#). Commence par 2–3 paragraphes d'introduction (définition, périmètre, enjeux).
+            - Puis ~10 intertitres de niveau 2 (## …), avec des ### pour les sous-parties si utile, couvrant :
+              objet et périmètre d'étude ; histoire et grandes étapes ; concepts et théories fondamentales ;
+              formalismes/lois clés ; méthodes et instruments ; principales sous-disciplines ; résultats et
+              découvertes majeurs ; débats, limites et questions ouvertes ; liens avec les domaines voisins.
+            - AVANT-DERNIÈRE section « ## Chercheurs essentiels » : une liste de 10 chercheurs marquants du domaine,
+              une puce chacun, au format :
+              « - **Prénom Nom** (année de naissance–année de mort, ou « né en … » si vivant) — connu·e pour … — prix majeur(s) le cas échéant ».
+            - DERNIÈRE section « ## Applications essentielles » : une liste à puces des applications concrètes
+              majeures du domaine (technologies, usages, retombées), chacune en une phrase explicative.
+            - Termine par « ## Références » listant les sources fournies (numéro, titre, année, lien DOI s'il existe).
+
+            SOURCES & LIENS
+            - Appuie les affirmations importantes sur les sources fournies, citées en [n] dans le texte.
+            - Insère des LIENS INTERNES Markdown vers les domaines liés fournis, là où c'est pertinent :
+              [libellé](/fr/slug). N'invente JAMAIS d'autre lien interne que ceux fournis.
+
+            GARDE-FOUS (anti-hallucination — IMPÉRATIF)
+            - N'invente AUCUN fait, chiffre, citation ou référence. Reste fidèle au sujet et aux sources.
+            - Pour les chercheurs : n'inscris une date de naissance/mort ou un prix QUE si tu en es sûr ;
+              en cas de doute, OMETS le détail incertain plutôt que de l'inventer (mieux vaut « — prix : (n.d.) »
+              qu'une information fausse). Choisis des chercheurs réellement emblématiques du domaine.
+            - Ne fabrique pas de DOI ; n'ajoute pas de sources qui ne te sont pas fournies.
+
+            SORTIE
+            - Réponds UNIQUEMENT par l'article en Markdown (de l'introduction à « ## Références »),
+              sans préambule, sans bloc de code englobant, sans commentaire.
             SYS;
 
         $breadcrumb = implode(' › ', array_map(static fn (array $b): string => $b['label'] ?? '', $node->getBreadcrumb()));
 
         $user = <<<TXT
-            Rédige l'article encyclopédique du domaine scientifique suivant.
+            Rédige l'article encyclopédique de RÉFÉRENCE du domaine scientifique suivant, en respectant
+            scrupuleusement la structure et les garde-fous.
 
             DOMAINE : {$node->getLabel()}
             POSITION DANS L'ARBRE : {$breadcrumb}
             DESCRIPTION EXISTANTE : {$node->getDescription()}
 
-            SOURCES DU CORPUS (à citer en [n], réutilise-les dans « ## Références ») :
+            SOURCES DU CORPUS (à citer en [n], à reprendre dans « ## Références ») :
             {$sources}
 
             LIENS INTERNES AUTORISÉS (à placer naturellement dans le texte) :
             {$related}
 
-            Décris avec précision en quoi consiste ce domaine : objet d'étude, histoire et grandes
-            étapes, concepts et théories fondamentales, méthodes, sous-disciplines, applications,
-            débats/limites actuels, et liens avec les domaines voisins. Vise ≈ 20 000 signes.
+            Sois EXHAUSTIF : couvre l'ensemble des sujets essentiels du domaine (objet, histoire, concepts et
+            théories, formalismes, méthodes, sous-disciplines, découvertes majeures, débats et limites, liens
+            avec les domaines voisins). Termine impérativement par « ## Chercheurs essentiels » (liste de 10,
+            avec dates naissance–mort et prix quand tu en es sûr), puis « ## Applications essentielles »
+            (liste des applications concrètes majeures), puis « ## Références ». Vise au moins 20 000 signes.
             TXT;
 
         return [LlmMessage::system($system), LlmMessage::user($user)];
