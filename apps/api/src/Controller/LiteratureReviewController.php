@@ -91,7 +91,12 @@ final class LiteratureReviewController
 
                 $send(['sources' => $this->sourcesPayload($sources)]);
 
-                $opts = ['temperature' => $this->settings->temperature(), 'max_tokens' => $this->settings->maxTokens()];
+                // Plafond raisonnable : une revue tient en ~2500 tokens ; éviter un
+                // num_predict démesuré (génération de plusieurs minutes + file Ollama).
+                $opts = [
+                    'temperature' => $this->settings->temperature(),
+                    'max_tokens' => min($this->settings->maxTokens(), 2500),
+                ];
                 if (null !== $this->settings->model()) {
                     $opts['model'] = $this->settings->model();
                 }
