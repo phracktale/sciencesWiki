@@ -67,11 +67,11 @@ final class SearchIndexCommand extends Command
                         p.type, p.oa_status, p.cited_by_count, p.fwci, p.oa_url, p.retraction_status
                    FROM publication p
                    LEFT JOIN journal j ON j.id = p.journal_id
-                  WHERE p.id > :from AND p.type IN (:types) AND p.title IS NOT NULL
+                  WHERE p.id > ".$fromId.' AND p.type IN (:types) AND p.title IS NOT NULL
                   ORDER BY p.id ASC
-                  LIMIT :batch",
-                ['from' => $fromId, 'types' => $types, 'batch' => $batch],
-                ['types' => ArrayParameterType::STRING, 'batch' => \PDO::PARAM_INT, 'from' => \PDO::PARAM_INT],
+                  LIMIT '.$batch,
+                ['types' => $types],
+                ['types' => ArrayParameterType::STRING],
             )->fetchAllAssociative();
 
             if ([] === $rows) {
