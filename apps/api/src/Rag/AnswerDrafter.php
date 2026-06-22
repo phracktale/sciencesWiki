@@ -28,13 +28,19 @@ final class AnswerDrafter
         private readonly LlmClient $llm,
         private readonly EmbeddingClientFactory $embeddingFactory,
         private readonly EntityManagerInterface $em,
+        private readonly \App\Service\SettingsService $settings,
     ) {
     }
 
     public function draft(Question $question, AnswerType $type, int $k = 5): Answer
     {
         $sources = $this->retrieveSources($question, $k);
-        $completion = $this->llm->complete($this->buildMessages($question, $sources), ['temperature' => 0.2, 'max_tokens' => 1200]);
+        // Respecte le modèle Q/R choisi en back-office (rag.model) ; sinon LLM_MODEL.
+        $opts = ['temperature' => 0.2, 'max_tokens' => 1200];
+        if (null !== ($m = $this->settings->model())) {
+            $opts['model'] = $m;
+        }
+        $completion = $this->llm->complete($this->buildMessages($question, $sources), $opts);
 
         return $this->persistFromText($question, $type, $sources, $completion->content);
     }
@@ -82,7 +88,7 @@ final class AnswerDrafter
         $revision = (new AnswerRevision(RevisionAuthorType::Ai))
             ->setAcademicContent($parsed['academic'])
             ->setVulgarizationContent($parsed['vulgarization'])
-            ->setChangeSummary(\sprintf('Brouillon initial généré par IA (%s)', $this->llm->model()));
+            ->setChangeSummary(\sprintf('Brouillon initial généré par IA (%s)', $this->settings->model() ?? $this->llm->model()));
         $answer->addRevision($revision);
 
         foreach ($parsed['footnotes'] as $footnote) {
