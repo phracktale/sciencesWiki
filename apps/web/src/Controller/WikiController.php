@@ -39,6 +39,22 @@ final class WikiController extends AbstractController
         return $this->render('wiki/researcher.html.twig');
     }
 
+    /** Revue de littérature assistée (RAG sourcé, flux SSE) — réservé ROLE_RESEARCHER. */
+    #[Route('/{_locale}/chercheur/revue-litterature', name: 'literature_review', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function literatureReview(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/chercheur/revue-litterature']);
+        }
+        if (!$this->user->canResearch()) {
+            $this->addFlash('error', 'Espace réservé aux chercheurs (ROLE_RESEARCHER).');
+
+            return $this->redirectToRoute('home');
+        }
+
+        return $this->render('wiki/literature_review.html.twig');
+    }
+
     #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function home(): Response
     {
