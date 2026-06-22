@@ -35,7 +35,7 @@
         <article class="md wiki-article">
             <div class="article-paternity">
                 {% if node.articleStatus == 'valide' %}
-                    <span class="badge ok">✅ relu par le comité</span>
+                    <span class="badge ok">🛡️ Garanti par le comité scientifique</span>
                 {% else %}
                     <span class="badge warn">⚠️ rédigé par IA · non relu</span>
                 {% endif %}
@@ -43,6 +43,18 @@
                 {% if node.articleGeneratedAt %}<span class="muted" style="font-size:.82rem">· {{ node.articleGeneratedAt|date('d/m/Y') }}</span>{% endif %}
             </div>
             {{ node.articleMd|md }}
+
+            {% if node.articleStatus != 'valide' %}
+                <aside class="ai-banner">
+                    <strong>⚠️ Contenu assisté par IA — non garanti par le comité scientifique.</strong>
+                    Cet article a été {{ node.articleModel ? 'rédigé par une intelligence artificielle (' ~ node.articleModel ~ ')' : 'généré automatiquement' }} et peut comporter des imprécisions ou des erreurs. Sa fiabilité n'engage pas le comité tant qu'il n'est pas validé.
+                    {% if current_user.canEdit %}
+                        <a href="#" onclick="var e=document.getElementById('art-edit');if(e){e.hidden=false;e.scrollIntoView({behavior:'smooth'});}return false;">✏️ Relire et corriger cet article</a>.
+                    {% else %}
+                        Vous êtes chercheur·e ou contributeur·rice&nbsp;? <a href="{{ path('login', { back: app.request.uri }) }}">Connectez-vous pour le relire et le corriger</a>.
+                    {% endif %}
+                </aside>
+            {% endif %}
         </article>
     {% endif %}
 
