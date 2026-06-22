@@ -26,6 +26,8 @@ framework:
             App\Harvester\Message\ResolveOpenAccess: harvester
             App\Harvester\Message\HarvestRubric: harvester
             App\Harvester\Message\IngestFulltext: fulltext
+            # Analyse « controverses & pistes » d'un nœud (cf. spec controverses §7bis).
+            App\Analysis\Message\AnalyzeNodeMessage: harvester
 
 # when@test:
 #    framework:

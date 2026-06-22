@@ -344,6 +344,7 @@ final class WikiController extends AbstractController
         $answers = $this->api->answers($slug);
         $ids = array_values(array_filter(array_map(static fn (array $a): int => (int) ($a['id'] ?? 0), $answers)));
         $votes = $this->api->answerVotes($ids, $this->user->token(), $request->getClientIp());
+        $controversies = $this->api->controversies($slug);
 
         return $this->render('wiki/node.html.twig', [
             'node' => $node,
@@ -353,6 +354,8 @@ final class WikiController extends AbstractController
             'myVotes' => $votes['mine'],
             'corpusCount' => $this->api->nodeCorpus($slug),
             'childrenStats' => $this->api->nodeChildrenStats($slug),
+            'analysis' => $controversies['node'],
+            'controversies' => $controversies['controversies'],
         ]);
     }
 }

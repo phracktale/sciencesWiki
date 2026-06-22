@@ -1,0 +1,125 @@
+{# Panneau « Controverses & pistes » d'un nœud (cf. docs/spec-controverses-lacunes.md §8.2).
+   Affichage piloté par analysis.analysisStatus : not_analyzed → CTA, analyzing →
+   progression, ready → fiches, stale → bandeau de ré-analyse. Le déclenchement et
+   le polling se font côté navigateur (même origine /api), comme « poser une question ». #}
+{% set status = analysis.analysisStatus|default('not_analyzed') %}
+{% set analysable = analysis.analysable|default(0) %}
+{% set isAnalysable = analysis.isAnalysable|default(false) %}
+{% set threshold = analysis.threshold|default(30) %}
+
+<style>
+    .cv-state { border:1px solid var(--line); border-radius:12px; padding:1.4rem 1.3rem; background:#fafcff; margin:1rem 0; }
+    .cv-cta { display:inline-block; background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.7rem 1.3rem; font:inherit; font-weight:600; cursor:pointer; }
+    .cv-cta[disabled] { opacity:.55; cursor:not-allowed; }
+    .cv-card { border:1px solid var(--line); border-radius:12px; padding:1rem 1.2rem; margin:1rem 0; background:#fff; }
+    .cv-card h3 { margin:.1rem 0 .6rem; font-size:1.08rem; color:var(--ink); }
+    .cv-gauge { height:.7rem; border-radius:999px; background:linear-gradient(90deg,#dc2626,#f59e0b,#16a34a); position:relative; margin:.4rem 0 .2rem; }
+    .cv-gauge > i { position:absolute; top:-3px; width:3px; height:calc(.7rem + 6px); background:#0f172a; border-radius:2px; }
+    .cv-axis { display:inline-block; font-size:.78rem; font-weight:700; padding:.12rem .55rem; border-radius:999px; background:#eef2ff; color:#3730a3; }
+    .cv-camps { display:grid; grid-template-columns:repeat(3,1fr); gap:.6rem; margin:.8rem 0; }
+    .cv-camp { border:1px solid var(--line); border-radius:9px; padding:.5rem .6rem; text-align:center; }
+    .cv-camp b { display:block; font-size:1.4rem; }
+    .cv-camp.pos { background:#f0fdf4; } .cv-camp.neg { background:#fef2f2; } .cv-camp.nul { background:#f8fafc; }
+    .cv-summary { border-left:3px solid var(--accent); padding:.2rem 0 .2rem .8rem; margin:.6rem 0; color:#334155; }
+    .cv-sources { font-size:.85rem; margin:.4rem 0 0; padding-left:1.1rem; }
+    .cv-sources li { margin:.25rem 0; }
+    .cv-meta { font-size:.82rem; color:#64748b; }
+</style>
+
+{% if status == 'ready' %}
+    {% if controversies is empty %}
+        <p class="muted">Aucune controverse détectée : sur ce sujet, les études convergent (ou trop peu d'assertions opposées ont été extraites).</p>
+    {% else %}
+        <p class="muted" style="font-size:.9rem">{{ controversies|length }} relation(s) au résultat disputé. Les plus contestées d'abord. Chaque affirmation est ancrée à une publication ; ce panneau n'est pas garanti par le comité.</p>
+        {% for c in controversies %}
+            {% set pct = (c.consensusScore * 100)|round %}
+            <article class="cv-card">
+                <h3>{{ c.exposure }} <span class="muted">vs</span> {{ c.outcome }}</h3>
+                <div class="cv-meta">Consensus {{ pct }}% · <span class="cv-axis">axe : {{ c.disagreementAxis }}</span></div>
+                <div class="cv-gauge" role="img" aria-label="Score de consensus {{ pct }}%"><i style="left:{{ pct }}%"></i></div>
+                <div class="cv-camps">
+                    <div class="cv-camp pos"><b>{{ c.countPositive }}</b>en faveur</div>
+                    <div class="cv-camp neg"><b>{{ c.countNegative }}</b>en défaveur</div>
+                    <div class="cv-camp nul"><b>{{ c.countNull }}</b>sans effet</div>
+                </div>
+                {% if c.summary %}<p class="cv-summary">{{ c.summary }}</p>{% endif %}
+                {% if c.claims is not empty %}
+                    <details>
+                        <summary style="cursor:pointer; font-weight:600">Sources ({{ c.claims|length }})</summary>
+                        <ol class="cv-sources">
+                            {% for cl in c.claims %}
+                                <li>
+                                    <strong>{{ cl.direction }}</strong>{% if cl.method %} · {{ cl.method }}{% endif %}{% if cl.population %} · {{ cl.population }}{% endif %}{% if cl.effectSize %} · {{ cl.effectSize }}{% endif %}
+                                    {% if cl.oaUrl %}— <a href="{{ cl.oaUrl }}" rel="noopener" target="_blank">{{ cl.title }}</a>
+                                    {% elseif cl.doi %}— <a href="https://doi.org/{{ cl.doi }}" rel="noopener" target="_blank">{{ cl.title }}</a>
+                                    {% else %}— {{ cl.title }}{% endif %}
+                                    {% if cl.year %}<span class="muted">({{ cl.year }})</span>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ol>
+                    </details>
+                {% endif %}
+            </article>
+        {% endfor %}
+    {% endif %}
+{% elseif status == 'analyzing' %}
+    <div class="cv-state" id="cv-progress" data-slug="{{ node.slug }}">
+        <p><span class="loader"></span> <strong>Analyse en cours…</strong></p>
+        <p class="muted" style="font-size:.9rem">Extraction des assertions puis détection des désaccords. Vous pouvez quitter la page : le résultat est mis en cache pour tous les visiteurs.</p>
+    </div>
+{% else %}
+    {# not_analyzed ou stale #}
+    <div class="cv-state" data-slug="{{ node.slug }}" id="cv-cta-box">
+        {% if status == 'stale' %}
+            <p><strong>De nouvelles études ont été moissonnées</strong> depuis la dernière analyse.</p>
+            <button type="button" class="cv-cta" id="cv-analyze-btn"{% if not isAnalysable %} disabled{% endif %}>🔄 Ré-analyser ce sujet</button>
+        {% else %}
+            <p><strong>Ce sujet n'a pas encore été analysé.</strong> Lancez la cartographie des résultats contradictoires.</p>
+            <button type="button" class="cv-cta" id="cv-analyze-btn"{% if not isAnalysable %} disabled{% endif %}>🔬 Analyser ce sujet</button>
+        {% endif %}
+        <p class="cv-meta" style="margin-top:.7rem">
+            {% if isAnalysable %}
+                {{ analysable }} publication(s) validée(s) dans cette rubrique.
+            {% else %}
+                Trop peu de publications validées ({{ analysable }}/{{ threshold }}) pour une analyse significative. Essayez une rubrique parente.
+            {% endif %}
+        </p>
+        <span id="cv-msg" class="muted" role="status" aria-live="polite"></span>
+    </div>
+{% endif %}
+
+<script nonce="{{ csp_nonce.value }}">
+(function () {
+    var box = document.getElementById('cv-cta-box');
+    var progress = document.getElementById('cv-progress');
+    var slug = (box && box.dataset.slug) || (progress && progress.dataset.slug);
+    if (!slug) { return; }
+
+    // Polling : tant que le nœud est « analyzing », on interroge l'API puis on
+    // recharge la page dès que l'analyse est prête (les fiches sont alors servies).
+    function poll() {
+        fetch('/api/tree_nodes/' + encodeURIComponent(slug) + '/controversies', { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var st = d.node && d.node.analysisStatus;
+                if (st === 'ready' || st === 'stale') { window.location.reload(); }
+                else { setTimeout(poll, 4000); }
+            })
+            .catch(function () { setTimeout(poll, 8000); });
+    }
+    if (progress) { setTimeout(poll, 4000); }
+
+    var btn = document.getElementById('cv-analyze-btn');
+    if (btn) {
+        btn.addEventListener('click', function () {
+            var msg = document.getElementById('cv-msg');
+            btn.disabled = true;
+            if (msg) { msg.innerHTML = '<span class="loader"></span> Lancement…'; }
+            fetch('/api/tree_nodes/' + encodeURIComponent(slug) + '/analyze', { method: 'POST', headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function () { window.location.reload(); })
+                .catch(function () { btn.disabled = false; if (msg) { msg.textContent = 'Échec du lancement, réessayez.'; } });
+        });
+    }
+})();
+</script>

@@ -213,6 +213,53 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Publications placées (validées) dans un nœud — périmètre de l'analyse de
+     * controverses (cf. spec controverses §0.1 / §6.1). Une placement_suggestion
+     * « accepted » fait foi du placement validé. Hors rétractations.
+     *
+     * @return list<Publication>
+     */
+    public function findAcceptedInNode(int $nodeId, int $limit): array
+    {
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                "SELECT p.id
+                 FROM publication p
+                 JOIN placement_suggestion ps ON ps.publication_id = p.id
+                 WHERE ps.tree_node_id = :node AND ps.status = 'accepted'
+                   AND p.retraction_status = 'none'
+                 ORDER BY p.cited_by_count DESC, p.id DESC
+                 LIMIT %d",
+                max(1, $limit),
+            ),
+            ['node' => $nodeId],
+        )->fetchFirstColumn();
+
+        $out = [];
+        foreach ($ids as $id) {
+            $pub = $this->find((int) $id);
+            if (null !== $pub) {
+                $out[] = $pub;
+            }
+        }
+
+        return $out;
+    }
+
+    /** Nombre de publications validées (placées) directement dans un nœud. */
+    public function countAcceptedInNode(int $nodeId): int
+    {
+        return (int) $this->getEntityManager()->getConnection()->executeQuery(
+            "SELECT count(*)
+             FROM placement_suggestion ps
+             JOIN publication p ON p.id = ps.publication_id
+             WHERE ps.tree_node_id = :node AND ps.status = 'accepted'
+               AND p.retraction_status = 'none'",
+            ['node' => $nodeId],
+        )->fetchOne();
+    }
+
+    /**
      * Recherche plein-texte simple (titre + résumé).
      *
      * @return list<Publication>

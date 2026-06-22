@@ -108,6 +108,24 @@ final class ApiClient
         }
     }
 
+    /**
+     * Controverses d'un nœud + état d'analyse (cf. spec controverses §8.1).
+     * Le déclenchement (POST .../analyze) et le polling sont faits côté navigateur
+     * (même origine /api), comme « poser une question ».
+     *
+     * @return array{node:array<string,mixed>,controversies:list<array<string,mixed>>}
+     */
+    public function controversies(string $slug): array
+    {
+        try {
+            $data = $this->get('/api/tree_nodes/'.rawurlencode($slug).'/controversies');
+
+            return ['node' => $data['node'] ?? [], 'controversies' => $data['controversies'] ?? []];
+        } catch (\Throwable) {
+            return ['node' => [], 'controversies' => []];
+        }
+    }
+
     /** Nombre de publications d'une branche (nœud + descendants). */
     public function nodeCorpus(string $slug): int
     {

@@ -10,6 +10,7 @@ use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use App\Enum\AnalysisStatus;
 use App\Repository\TreeNodeRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -96,6 +97,20 @@ class TreeNode
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     #[Groups(['node:read'])]
     private ?\DateTimeImmutable $lastHarvestedAt = null;
+
+    /**
+     * Cycle de vie de l'analyse « controverses & pistes » de ce nœud
+     * (cf. docs/spec-controverses-lacunes.md §0.2 / §7bis). Sert aussi de verrou :
+     * un seul job d'analyse par nœud à la fois (état Analyzing).
+     */
+    #[ORM\Column(name: 'analysis_status', length: 16, enumType: AnalysisStatus::class, options: ['default' => 'not_analyzed'])]
+    #[Groups(['node:read'])]
+    private AnalysisStatus $analysisStatus = AnalysisStatus::NotAnalyzed;
+
+    /** Fin de la dernière analyse réussie ; comparé à lastHarvestedAt pour détecter Stale. */
+    #[ORM\Column(name: 'analyzed_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $analyzedAt = null;
 
     /** Article encyclopédique long (Markdown), rédigé par IA puis relu. */
     #[ORM\Column(name: 'article_md', type: Types::TEXT, nullable: true)]
@@ -394,5 +409,44 @@ class TreeNode
         $this->lastHarvestedAt = new \DateTimeImmutable();
 
         return $this;
+    }
+
+    public function getAnalysisStatus(): AnalysisStatus
+    {
+        return $this->analysisStatus;
+    }
+
+    public function setAnalysisStatus(AnalysisStatus $status): self
+    {
+        $this->analysisStatus = $status;
+
+        return $this;
+    }
+
+    public function getAnalyzedAt(): ?\DateTimeImmutable
+    {
+        return $this->analyzedAt;
+    }
+
+    /** Fin d'une analyse réussie : passe le nœud à Ready et horodate. */
+    public function markAnalyzed(): self
+    {
+        $this->analysisStatus = AnalysisStatus::Ready;
+        $this->analyzedAt = new \DateTimeImmutable();
+
+        return $this;
+    }
+
+    /**
+     * Le nœud a-t-il été moissonné depuis sa dernière analyse ? (⇒ Stale).
+     * Sans analyse antérieure, rien à rafraîchir.
+     */
+    public function isAnalysisStale(): bool
+    {
+        if (null === $this->analyzedAt || null === $this->lastHarvestedAt) {
+            return false;
+        }
+
+        return $this->lastHarvestedAt > $this->analyzedAt;
     }
 }
