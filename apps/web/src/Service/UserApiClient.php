@@ -23,10 +23,12 @@ final class UserApiClient
 
     /** Hiérarchie des rôles (miroir de security.yaml côté API). */
     private const HIERARCHY = [
-        'ROLE_ADMIN' => ['ROLE_MODERATEUR', 'ROLE_COMITE'],
+        'ROLE_ADMIN' => ['ROLE_MODERATEUR', 'ROLE_COMITE', 'ROLE_RESEARCHER'],
         'ROLE_MODERATEUR' => ['ROLE_REDACTEUR'],
         'ROLE_COMITE' => ['ROLE_REDACTEUR'],
-        'ROLE_REDACTEUR' => ['ROLE_USER'],
+        'ROLE_REDACTEUR' => ['ROLE_AUTEUR'],
+        'ROLE_RESEARCHER' => ['ROLE_AUTEUR'],
+        'ROLE_AUTEUR' => ['ROLE_USER'],
     ];
 
     public function __construct(
@@ -122,6 +124,12 @@ final class UserApiClient
     public function canValidate(): bool
     {
         return $this->hasRole('ROLE_MODERATEUR') || $this->hasRole('ROLE_COMITE') || $this->hasRole('ROLE_ADMIN');
+    }
+
+    /** Accès à l'espace chercheur (outils de recherche). */
+    public function canResearch(): bool
+    {
+        return $this->hasRole('ROLE_RESEARCHER');
     }
 
     /**

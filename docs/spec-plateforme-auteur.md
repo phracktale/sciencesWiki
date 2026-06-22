@@ -9,14 +9,14 @@
 
 ## 0. Rôle et accès
 
-### 0.1 Rôle `ROLE_AUTEUR`
-- **Nouveau rôle** distinct de `ROLE_REDACTEUR` (qui édite le wiki) : l'auteur est un
-  **chercheur** qui utilise les outils de recherche, pas forcément un rédacteur du wiki.
-- Hiérarchie proposée (security.yaml) : `ROLE_AUTEUR: [ROLE_USER]` ; un `ROLE_REDACTEUR`
-  ou `ROLE_COMITE` peut aussi être auteur (on ajoute `ROLE_AUTEUR` à leurs rôles, ou on
-  l'inclut dans la hiérarchie `ROLE_REDACTEUR: [ROLE_AUTEUR]`). **Décision A** (cf. fin).
-- Attribution : via la promotion BO « Demandes » existante (ajouter `ROLE_AUTEUR` aux
-  rôles attribuables) + auto-attribution possible à l'inscription « chercheur vérifié ».
+### 0.1 Rôles — `ROLE_RESEARCHER` (chercheur) + `ROLE_AUTEUR` (générique)
+- **`ROLE_AUTEUR`** = rôle **générique** : tout contributeur identifié produisant du contenu.
+- **`ROLE_RESEARCHER`** = **chercheur** ; accès aux **outils de recherche** (ce dashboard).
+- Hiérarchie (security.yaml, en place) :
+  `ROLE_AUTEUR → ROLE_USER` ; `ROLE_RESEARCHER → ROLE_AUTEUR` ; `ROLE_REDACTEUR → ROLE_AUTEUR` ;
+  `ROLE_COMITE/MODERATEUR → ROLE_REDACTEUR` ; `ROLE_ADMIN → … + ROLE_RESEARCHER`.
+- Attribution : via la promotion BO « Demandes » (les rôles suivent `UserRole`, donc
+  `ROLE_RESEARCHER`/`ROLE_AUTEUR` sont déjà attribuables).
 
 ### 0.2 Tableau de bord auteur (séparé)
 - URL : `/{_locale}/auteur` (front, session `user_jwt` déjà en place), réservé `ROLE_AUTEUR`.

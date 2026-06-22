@@ -10,11 +10,16 @@ security:
                 property: email
 
     # Hiérarchie des rôles (cf. spec §4).
+    # ROLE_AUTEUR = générique (contributeur identifié produisant du contenu) ;
+    # ROLE_RESEARCHER (chercheur, outils de recherche) et ROLE_REDACTEUR (éditeur
+    # wiki) en héritent.
     role_hierarchy:
-        ROLE_REDACTEUR:   [ROLE_USER]
+        ROLE_AUTEUR:      [ROLE_USER]
+        ROLE_RESEARCHER:  [ROLE_AUTEUR]
+        ROLE_REDACTEUR:   [ROLE_AUTEUR]
         ROLE_COMITE:      [ROLE_REDACTEUR]
         ROLE_MODERATEUR:  [ROLE_REDACTEUR]
-        ROLE_ADMIN:       [ROLE_MODERATEUR, ROLE_COMITE]
+        ROLE_ADMIN:       [ROLE_MODERATEUR, ROLE_COMITE, ROLE_RESEARCHER]
 
     firewalls:
         dev:

@@ -11,6 +11,8 @@ namespace App\Enum;
 enum UserRole: string
 {
     case User = 'ROLE_USER';
+    case Auteur = 'ROLE_AUTEUR';
+    case Researcher = 'ROLE_RESEARCHER';
     case Redacteur = 'ROLE_REDACTEUR';
     case Comite = 'ROLE_COMITE';
     case Moderateur = 'ROLE_MODERATEUR';

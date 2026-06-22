@@ -158,6 +158,7 @@
             <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
             <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
             {% if current_user.isLogged %}
+                {% if current_user.canResearch %}<a href="{{ path('researcher_dashboard') }}"{{ route == 'researcher_dashboard' ? ' class="is-active"' : '' }}>🔬 Espace chercheur</a>{% endif %}
                 {% if current_user.hasRole('ROLE_ADMIN') %}<a href="{{ path('admin_dashboard') }}">⚙️ Tableau de bord</a>{% endif %}
                 <a href="{{ path('logout') }}" title="Déconnexion">⏻ {{ current_user.displayName }}</a>
             {% else %}

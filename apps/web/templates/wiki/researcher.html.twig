@@ -1,0 +1,77 @@
+{% extends 'base.html.twig' %}
+{% block title %}Espace chercheur — SciencesWiki{% endblock %}
+{% block body %}
+    <h1>Espace chercheur</h1>
+    <p class="muted">Outils de recherche sur le corpus scientifique ({{ current_user.displayName }}).</p>
+
+    <style>
+        .rs-search { display:flex; gap:.5rem; flex-wrap:wrap; align-items:center; margin:1rem 0 .4rem }
+        .rs-modes { display:flex; gap:.3rem; font-size:.85rem; margin-bottom:.6rem }
+        .rs-modes label { border:1px solid var(--line); border-radius:999px; padding:.25rem .7rem; cursor:pointer }
+        .rs-tools { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:.8rem; margin-top:1.5rem }
+        .rs-card { border:1px solid var(--line); border-radius:12px; padding:1rem; background:#fafcff }
+        .rs-card h3 { margin:.2rem 0 .4rem; font-size:1.05rem }
+        .rs-soon { font-size:.72rem; background:#e2e8f0; color:#475569; border-radius:999px; padding:.05rem .5rem }
+        .rs-ok { font-size:.72rem; background:#dcfce7; color:#166534; border-radius:999px; padding:.05rem .5rem }
+    </style>
+
+    <h2>Recherche du corpus</h2>
+    <div class="rs-modes" role="radiogroup" aria-label="Mode de recherche">
+        <label><input type="radio" name="rs-mode" value="keyword" checked> Mot-clé (tolérant aux fautes)</label>
+        <label><input type="radio" name="rs-mode" value="semantic"> Par le sens (sémantique)</label>
+    </div>
+    <div class="rs-search">
+        <input type="text" id="rs-q" placeholder="Ex. : jeûne intermittent mortalité…" autocomplete="off"
+               style="flex:1; min-width:260px; padding:.6rem .8rem; border:1px solid #d1d5db; border-radius:9px; font:inherit">
+        <button id="rs-go" style="background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.6rem 1.2rem; cursor:pointer; font:inherit">Rechercher</button>
+    </div>
+    <p id="rs-count" class="muted" style="font-size:.85rem" role="status" aria-live="polite"></p>
+    <div id="rs-results"></div>
+
+    <h2 style="margin-top:2rem">Outils</h2>
+    <div class="rs-tools">
+        <div class="rs-card"><span class="rs-ok">disponible</span><h3>🔎 Recherche &amp; sémantique</h3><p class="muted" style="font-size:.88rem">Mot-clé tolérant aux fautes + recherche par le sens, trans-domaine.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>📄 Related work</h3><p class="muted" style="font-size:.88rem">Collez un résumé → articles proches (kNN) &amp; références manquantes.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>📚 Revue de littérature</h3><p class="muted" style="font-size:.88rem">Synthèse RAG sourcée d'un sous-domaine + export Markdown/PDF.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⚖️ Consensus vs contradictions</h3><p class="muted" style="font-size:.88rem">Regroupe conclusions concordantes/divergentes + niveau de preuve.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>🔔 Veille &amp; alertes</h3><p class="muted" style="font-size:.88rem">Alertes e-mail : sous-domaine, auteur ou revue suivie.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>🕸️ Cartographie</h3><p class="muted" style="font-size:.88rem">Éditeurs / revues / auteurs &amp; graphes de collaboration.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⛔ Détecteur de rétractations</h3><p class="muted" style="font-size:.88rem">Collez des DOIs → études rétractées / sous « expression of concern ».</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⭐ Favoris</h3><p class="muted" style="font-size:.88rem">Vos articles, auteurs et revues mis de côté.</p></div>
+        <div class="rs-card"><span class="rs-soon">à venir</span><h3>⚙️ Profil &amp; e-mails</h3><p class="muted" style="font-size:.88rem">Domaines d'expertise, préférences de réception d'e-mails.</p></div>
+    </div>
+
+    <script>
+    (function () {
+        var q = document.getElementById('rs-q'), go = document.getElementById('rs-go'),
+            results = document.getElementById('rs-results'), countEl = document.getElementById('rs-count');
+        function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+        function mode(){ var el=document.querySelector('input[name="rs-mode"]:checked'); return el?el.value:'keyword'; }
+        function row(it){
+            var meta = [it.journal || it.venue, it.year].filter(Boolean).join(' · ');
+            var url = it.url || (it.doi ? 'https://doi.org/' + it.doi : '#');
+            return '<div style="padding:.6rem 0; border-bottom:1px solid var(--line)">'
+                + '<a class="q-title" href="' + url + '" target="_blank" rel="noopener">' + esc(it.title) + '</a>'
+                + (meta ? '<div class="muted" style="font-size:.85rem">' + esc(meta) + '</div>' : '')
+                + (it.citedByCount ? '<span class="pill">' + it.citedByCount.toLocaleString('fr-FR') + ' citations</span>' : '')
+                + '</div>';
+        }
+        function load() {
+            var term = q.value.trim();
+            if (!term) { results.innerHTML=''; countEl.textContent=''; return; }
+            results.innerHTML = '<p class="muted">Recherche…</p>';
+            var url = mode() === 'semantic'
+                ? '/api/search?q=' + encodeURIComponent(term) + '&limit=20'
+                : '/api/search/keyword?q=' + encodeURIComponent(term) + '&sort=cited';
+            fetch(url).then(function(r){ return r.json(); }).then(function(d){
+                var items = d.items || d.results || d.publications || [];
+                countEl.textContent = (d.total != null ? d.total.toLocaleString('fr-FR') + ' résultat(s)' : items.length + ' résultat(s)');
+                results.innerHTML = items.length ? items.map(row).join('') : '<p class="muted">Aucun résultat.</p>';
+            }).catch(function(){ results.innerHTML='<p class="muted">Erreur de recherche.</p>'; });
+        }
+        go.addEventListener('click', load);
+        q.addEventListener('keydown', function(e){ if (e.key==='Enter') load(); });
+        document.querySelectorAll('input[name="rs-mode"]').forEach(function(r){ r.addEventListener('change', load); });
+    })();
+    </script>
+{% endblock %}

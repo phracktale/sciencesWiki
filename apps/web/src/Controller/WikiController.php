@@ -15,8 +15,26 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class WikiController extends AbstractController
 {
-    public function __construct(private readonly ApiClient $api)
+    public function __construct(
+        private readonly ApiClient $api,
+        private readonly \App\Service\UserApiClient $user,
+    ) {
+    }
+
+    /** Espace chercheur (réservé ROLE_RESEARCHER) : outils de recherche. */
+    #[Route('/{_locale}/chercheur', name: 'researcher_dashboard', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function researcher(): Response
     {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/chercheur']);
+        }
+        if (!$this->user->canResearch()) {
+            $this->addFlash('error', 'Espace réservé aux chercheurs (ROLE_RESEARCHER).');
+
+            return $this->redirectToRoute('home');
+        }
+
+        return $this->render('wiki/researcher.html.twig');
     }
 
     #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], methods: ['GET'])]
