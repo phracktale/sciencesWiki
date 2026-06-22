@@ -22,13 +22,20 @@
                style="flex:1; min-width:260px; padding:.6rem .8rem; border:1px solid #d1d5db; border-radius:9px; font:inherit">
         <button id="rs-go" style="background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.6rem 1.2rem; cursor:pointer; font:inherit">Rechercher</button>
     </div>
-    <div class="rs-filters" style="display:flex; gap:1.2rem; flex-wrap:wrap; font-size:.88rem; margin:.1rem 0 .6rem">
+    <div class="rs-filters" style="display:flex; gap:1.2rem; flex-wrap:wrap; align-items:center; font-size:.88rem; margin:.1rem 0 .6rem">
         <label style="cursor:pointer"><input type="checkbox" id="rs-t-article" checked> Articles</label>
         <label style="cursor:pointer"><input type="checkbox" id="rs-t-preprint" checked> Preprints</label>
-        <label style="cursor:pointer" title="À pertinence comparable, remonte les articles les plus cités"><input type="checkbox" id="rs-boost"> 🎯 Privilégier les articles cités</label>
+        <label style="cursor:pointer">Trier&nbsp;:
+            <select id="rs-sort" style="font:inherit; padding:.2rem .4rem; border:1px solid #d1d5db; border-radius:7px">
+                <option value="relevance">Pertinence</option>
+                <option value="cited">🎯 Les plus cités</option>
+                <option value="recent">📅 Les plus récents</option>
+            </select>
+        </label>
     </div>
     <p id="rs-count" class="muted" style="font-size:.85rem" role="status" aria-live="polite"></p>
     <div id="rs-results"></div>
+    <nav id="rs-pager" aria-label="Pagination des résultats" style="display:flex; gap:.6rem; align-items:center; justify-content:center; margin:1rem 0"></nav>
 
     <h2 style="margin-top:2rem">Outils</h2>
     <div class="rs-tools">
@@ -46,15 +53,23 @@
     <script>
     (function () {
         var q = document.getElementById('rs-q'), go = document.getElementById('rs-go'),
-            results = document.getElementById('rs-results'), countEl = document.getElementById('rs-count');
+            results = document.getElementById('rs-results'), countEl = document.getElementById('rs-count'),
+            pager = document.getElementById('rs-pager'), sortEl = document.getElementById('rs-sort');
+        var page = 1;
         function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
+        function frDate(iso){
+            if (!iso) return '';
+            var p = String(iso).split('-');
+            return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(iso);
+        }
         function row(it){
             var url = it.url || (it.doi ? 'https://doi.org/' + it.doi : '#');
             var lead = it.leadAuthor || (it.authors && it.authors[0]) || '';
             var metaArr = [];
             if (lead) metaArr.push('✍️ ' + lead);
             if (it.journal || it.venue) metaArr.push(it.journal || it.venue);
-            if (it.year) metaArr.push(it.year);
+            var dval = it.date ? frDate(it.date) : it.year;
+            if (dval) metaArr.push('📅 ' + dval);
             var rel = (it.relevance != null) ? it.relevance : it.score; // 0–1
             var badges = '';
             if (it.citedByCount != null) badges += '<span class="pill" title="Citations">📊 ' + (it.citedByCount||0).toLocaleString('fr-FR') + ' citations</span> ';
@@ -66,23 +81,45 @@
                 + (badges ? '<div style="margin-top:.25rem">' + badges + '</div>' : '')
                 + '</div>';
         }
-        function load() {
+        function pageBtn(label, disabled, onClick){
+            var b = document.createElement('button');
+            b.textContent = label; b.disabled = disabled;
+            b.style.cssText = 'font:inherit; padding:.35rem .9rem; border:1px solid var(--line); border-radius:8px; background:#fff; cursor:' + (disabled?'default':'pointer') + '; opacity:' + (disabled?'.5':'1');
+            if (!disabled) b.addEventListener('click', onClick);
+            return b;
+        }
+        function renderPager(d){
+            pager.innerHTML = '';
+            var per = d.perPage || 20, total = d.total || 0;
+            if (total <= per) return;
+            var pages = Math.max(1, Math.ceil(total / per));
+            pager.appendChild(pageBtn('‹ Précédent', page <= 1, function(){ page--; run(); }));
+            var info = document.createElement('span'); info.className = 'muted';
+            info.textContent = 'Page ' + page + ' / ' + pages;
+            pager.appendChild(info);
+            pager.appendChild(pageBtn('Suivant ›', !d.hasMore, function(){ page++; run(); }));
+        }
+        function run(){
             var term = q.value.trim();
-            if (!term) { results.innerHTML=''; countEl.textContent=''; return; }
-            results.innerHTML = '<p class="muted">Recherche…</p>';
-            var url = '/api/search?q=' + encodeURIComponent(term) + '&limit=20';
+            if (!term) { results.innerHTML=''; countEl.textContent=''; pager.innerHTML=''; return; }
+            results.innerHTML = '<p class="muted">Recherche…</p>'; pager.innerHTML = '';
+            var url = '/api/search?q=' + encodeURIComponent(term) + '&page=' + page + '&sort=' + sortEl.value;
             if (document.getElementById('rs-t-article').checked) url += '&types[]=article';
             if (document.getElementById('rs-t-preprint').checked) url += '&types[]=preprint';
-            if (document.getElementById('rs-boost').checked) url += '&boost=1';
             fetch(url).then(function(r){ return r.json(); }).then(function(d){
-                var items = d.items || d.results || d.publications || [];
-                countEl.textContent = (d.total != null ? d.total.toLocaleString('fr-FR') + ' résultat(s)' : items.length + ' résultat(s)');
+                var items = d.results || [];
+                var total = (d.total != null) ? d.total : items.length;
+                countEl.textContent = total.toLocaleString('fr-FR') + ' résultat(s) les plus pertinents';
                 results.innerHTML = items.length ? items.map(row).join('') : '<p class="muted">Aucun résultat.</p>';
-            }).catch(function(){ results.innerHTML='<p class="muted">Erreur de recherche.</p>'; });
+                renderPager(d);
+                if (page > 1) results.scrollIntoView({ behavior:'smooth', block:'start' });
+            }).catch(function(){ results.innerHTML='<p class="muted">Erreur de recherche.</p>'; pager.innerHTML=''; });
         }
+        // Toute nouvelle recherche / changement de filtre repart à la page 1.
+        function load(){ page = 1; run(); }
         go.addEventListener('click', load);
         q.addEventListener('keydown', function(e){ if (e.key==='Enter') load(); });
-        ['rs-t-article','rs-t-preprint','rs-boost'].forEach(function(id){ document.getElementById(id).addEventListener('change', load); });
+        ['rs-t-article','rs-t-preprint','rs-sort'].forEach(function(id){ document.getElementById(id).addEventListener('change', load); });
     })();
     </script>
 {% endblock %}
