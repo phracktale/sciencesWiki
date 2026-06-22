@@ -11,6 +11,7 @@ use App\Harvester\Ai\EmbeddingClientFactory;
 use App\Repository\PublicationRepository;
 use App\Repository\TreeNodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -38,6 +39,8 @@ final class GenerateWikiArticlesCommand extends Command
         private readonly EmbeddingClientFactory $embeddings,
         private readonly LlmClient $llm,
         private readonly EntityManagerInterface $em,
+        #[Autowire(env: 'LLM_MODEL')]
+        private readonly string $llmModel,
     ) {
         parent::__construct();
     }
@@ -77,17 +80,22 @@ final class GenerateWikiArticlesCommand extends Command
             try {
                 $sources = $this->sources($node, $embedder);
                 $related = $this->relatedLinks($node);
-                $completion = $this->llm->complete(
+                // Streaming : la rédaction longue dépasse le timeout idle d'un appel
+                // non-streamé ; le flux remet le compteur à zéro à chaque jeton.
+                $md = '';
+                foreach ($this->llm->stream(
                     $this->buildMessages($node, $sources, $related),
                     ['temperature' => 0.3, 'max_tokens' => 8000],
-                );
-                $md = trim($completion->content);
+                ) as $delta) {
+                    $md .= $delta;
+                }
+                $md = trim($md);
                 if (mb_strlen($md) < 800) {
                     $io->warning(\sprintf('  réponse trop courte (%d car.), ignorée.', mb_strlen($md)));
                     continue;
                 }
                 $node->setArticleMd($md)
-                    ->setArticleModel($completion->model)
+                    ->setArticleModel($this->llmModel)
                     ->setArticleStatus('non_relu')
                     ->setArticleGeneratedAt(new \DateTimeImmutable());
                 $this->em->flush();
