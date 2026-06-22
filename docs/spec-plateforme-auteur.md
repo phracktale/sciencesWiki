@@ -35,15 +35,20 @@
 - Service Docker sur **Marvin** (RAM dispo), lié au réseau privé ; jamais exposé
   publiquement (l'API passe par un endpoint Symfony qui filtre/limite).
 
-### 1.2 Périmètre d'indexation → **DÉCISION B**
-| Option | Docs | RAM/disque estimés | Usage |
-|---|--:|--:|---|
-| **B1 — Articles wiki seulement** | ~quelques centaines | négligeable | recherche grand public des articles encyclopédiques |
-| **B2 — Corpus complet** | ~1,3 M (titre+résumé+méta) | ~6–15 Go index | recherche bibliographique chercheurs (le cœur des features 1–7) |
-| **B3 — Sous-ensemble** (OA + top-cités, ex. ≥ N citations) | ~200–400 k | ~2–4 Go | compromis |
+### 1.2 Périmètre d'indexation → **DÉCISION B** — choisi : **B3 (sous-ensemble)**
+Meilisearch n'indexe que le **texte cherché** (titre + résumé + métas) — pas les
+embeddings, ni les index HNSW (~1,4 Go), ni `author`/`authorship` (3,3 M lignes). Le
+texte indexable est une petite fraction de la base (11,95 Go). Estimations corrigées :
 
-> Les 7 fonctionnalités auteur visent le **corpus** → **B2** (ou B3 pour démarrer).
-> Indexation initiale en arrière-plan (curseur), puis maintenue par la moisson.
+| Option | Docs | Index Meilisearch réel | Usage |
+|---|--:|--:|---|
+| **B1 — Articles wiki seulement** | ~centaines | négligeable | grand public |
+| **B2 — Corpus complet** | ~1,3 M | **~3–6 Go** | couverture chercheurs totale |
+| **B3 — Sous-ensemble** (OA + cités ≥ N) | ~200–400 k | **~1–2 Go** | compromis (choisi) |
+
+> Implémentation : la commande `app:search:index` prend un **seuil paramétrable**
+> (`--min-citations`, `--oa-only`) ; passer de B3 à B2 = relancer sans le filtre.
+> Indexation initiale en arrière-plan (curseur), maintenue ensuite par la moisson.
 
 ### 1.3 Champs indexés (corpus)
 `id, doi, title, abstract, authors[], journal, publisher, year, type, oa_status,
