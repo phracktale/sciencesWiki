@@ -38,6 +38,9 @@ final class SettingsService
     public const MAIL_REROUTE_ENABLED = 'mail.reroute_enabled'; // '0' | '1'
     public const MAIL_REROUTE_TO = 'mail.reroute_to';           // adresse de réacheminement
 
+    // Notifier les modérateurs par e-mail des nouvelles propositions de correction/contenu.
+    public const MOD_NOTIFY_ENABLED = 'mod.notify_enabled';     // '0' | '1'
+
     public const DEFAULT_SYSTEM_PROMPT = <<<'TXT'
         Tu es un rédacteur de vulgarisation scientifique pour SciencesWiki, une
         encyclopédie libre d'éducation populaire en français.
@@ -81,6 +84,7 @@ final class SettingsService
         self::HARVEST_MAX_PER_RUN => '500',
         self::MAIL_REROUTE_ENABLED => '0',
         self::MAIL_REROUTE_TO => '',
+        self::MOD_NOTIFY_ENABLED => '1',
     ];
 
     /** @var array<string,string>|null */
@@ -176,6 +180,11 @@ final class SettingsService
         return trim((string) ($this->get(self::MAIL_REROUTE_TO) ?? ''));
     }
 
+    public function moderatorNotifyEnabled(): bool
+    {
+        return '1' === trim((string) ($this->get(self::MOD_NOTIFY_ENABLED) ?? '1'));
+    }
+
     public function get(string $name): ?string
     {
         $this->cache ??= $this->repository->allAsMap();
@@ -205,13 +214,14 @@ final class SettingsService
             self::HARVEST_MAX_PER_RUN => (string) $this->harvestMaxPerRun(),
             self::MAIL_REROUTE_ENABLED => $this->mailRerouteEnabled() ? '1' : '0',
             self::MAIL_REROUTE_TO => $this->mailRerouteTo(),
+            self::MOD_NOTIFY_ENABLED => $this->moderatorNotifyEnabled() ? '1' : '0',
         ];
     }
 
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

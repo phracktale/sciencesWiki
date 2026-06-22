@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Paramètres › Général{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>Paramètres › Général</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <form class="ask" method="post" action="{{ path('admin_settings_general') }}" style="max-width:640px">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+
+        <h2 style="margin-top:0">Notifications des modérateurs</h2>
+        <p class="muted" style="font-size:.85rem">À chaque nouvelle proposition de correction/contenu, le modérateur de la branche concernée reçoit un e-mail. Décochez pour suspendre ces envois.</p>
+        <label style="display:flex; align-items:center; gap:.5rem; margin:.4rem 0">
+            <input type="checkbox" name="mod_notify_enabled" value="1" {{ settings['mod.notify_enabled'] == '1' ? 'checked' }}>
+            Notifier les modérateurs par e-mail des nouvelles propositions
+        </label>
+
+        <h2 style="margin-top:1.4rem">Réacheminement des e-mails</h2>
+        <p class="muted" style="font-size:.85rem">Si activé, <strong>tous</strong> les e-mails sortants sont redirigés vers l'adresse ci-dessous (tests / pré-prod / supervision). Les destinataires réels sont conservés dans l'en-tête <code>X-Original-Recipients</code>.</p>
+        <label style="display:flex; align-items:center; gap:.5rem; margin:.4rem 0">
+            <input type="checkbox" name="reroute_enabled" value="1" {{ settings['mail.reroute_enabled'] == '1' ? 'checked' }}>
+            Rerouter tous les e-mails vers une seule adresse
+        </label>
+        <label>Adresse de réacheminement</label>
+        <input type="email" name="reroute_to" value="{{ settings['mail.reroute_to'] }}" placeholder="ex. phracktale@gmail.com">
+
+        <button type="submit" style="margin-top:1rem">Enregistrer</button>
+    </form>
+{% endblock %}

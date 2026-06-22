@@ -1,0 +1,38 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Paramètres › Moisson{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>Paramètres › Moisson</h1>
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+
+    <form class="ask" method="post" action="{{ path('admin_settings_harvest') }}">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+
+        <h2 style="margin-top:0">Cadence d'interrogation OpenAlex</h2>
+        <p class="muted" style="font-size:.85rem">Garde-fou interne (polite pool : ~10 req/s, ~10000/jour sans clé). Reste du jour visible dans le <a href="{{ path('admin_harvest') }}">suivi de la moisson</a>.</p>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem">
+            <div><label>Requêtes par minute (max)</label><input type="text" name="openalex_per_minute" value="{{ settings['openalex.per_minute'] }}" placeholder="540"></div>
+            <div><label>Requêtes par jour (plafond)</label><input type="text" name="openalex_per_day" value="{{ settings['openalex.per_day'] }}" placeholder="10000"></div>
+        </div>
+
+        <h2 style="margin-top:1.4rem">Stratégie de moisson</h2>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.8rem">
+            <div>
+                <label>Tri OpenAlex</label>
+                {% set hsort = settings['harvest.sort'] %}
+                <select name="harvest_sort">
+                    <option value="cited_by_count:desc" {{ hsort == 'cited_by_count:desc' ? 'selected' }}>Les plus cités</option>
+                    <option value="publication_date:desc" {{ hsort == 'publication_date:desc' ? 'selected' }}>Les plus récents</option>
+                    <option value="relevance_score:desc" {{ hsort == 'relevance_score:desc' ? 'selected' }}>Pertinence</option>
+                    <option value="" {{ hsort == '' ? 'selected' }}>Ordre par défaut</option>
+                </select>
+            </div>
+            <div><label>Récence (années, 0 = illimité)</label><input type="text" name="harvest_recent_years" value="{{ settings['harvest.recent_years'] }}" placeholder="5"></div>
+            <div><label>Plafond par rubrique (0 = illimité)</label><input type="text" name="harvest_cap_per_rubric" value="{{ settings['harvest.cap_per_rubric'] }}" placeholder="3000"></div>
+            <div><label>Articles par exécution</label><input type="text" name="harvest_max_per_run" value="{{ settings['harvest.max_per_run'] }}" placeholder="500"></div>
+        </div>
+
+        <button type="submit" style="margin-top:1rem">Enregistrer</button>
+    </form>
+{% endblock %}

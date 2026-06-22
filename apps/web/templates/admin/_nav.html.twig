@@ -1,20 +1,38 @@
-{# Menu principal du back-office, identique sur toutes les pages (état actif/hover). #}
+{# Menu principal du back-office : regroupé en menus déroulants. #}
 {% set r = app.request.attributes.get('_route') %}
-{% set items = [
-    { label: 'Tableau de bord', route: 'admin_dashboard', match: ['admin_dashboard'] },
-    { label: 'Articles', route: 'admin_articles', match: ['admin_articles', 'admin_article'] },
-    { label: 'Articles wiki', route: 'admin_wiki', match: ['admin_wiki', 'admin_wiki_detail'] },
-    { label: 'Auteurs', route: 'admin_authors', match: ['admin_authors'] },
-    { label: 'Moisson', route: 'admin_harvest', match: ['admin_harvest'] },
-    { label: 'Journal', route: 'admin_activity', match: ['admin_activity'] },
-    { label: 'Utilisateurs', route: 'admin_users', match: ['admin_users'] },
-    { label: 'Demandes', route: 'admin_join', match: ['admin_join'] },
-    { label: 'Paramètres IA', route: 'admin_settings', match: ['admin_settings'] },
+{% set groups = [
+    { label: 'Corpus', match: ['admin_articles', 'admin_article', 'admin_authors', 'admin_harvest'], items: [
+        { label: 'Articles', route: 'admin_articles' },
+        { label: 'Auteurs', route: 'admin_authors' },
+        { label: 'Moisson (suivi)', route: 'admin_harvest' },
+    ] },
+    { label: 'Wiki', match: ['admin_wiki', 'admin_wiki_detail', 'admin_questions'], items: [
+        { label: 'Articles wiki', route: 'admin_wiki' },
+        { label: 'Questions / Réponses', route: 'admin_questions' },
+    ] },
+    { label: 'Administration', match: ['admin_users', 'admin_join', 'admin_activity'], items: [
+        { label: 'Utilisateurs', route: 'admin_users' },
+        { label: 'Demandes', route: 'admin_join' },
+        { label: 'Journal', route: 'admin_activity' },
+    ] },
+    { label: 'Paramétrages', match: ['admin_settings', 'admin_settings_general', 'admin_settings_ai', 'admin_settings_harvest'], items: [
+        { label: 'Général', route: 'admin_settings_general' },
+        { label: 'Configuration IA', route: 'admin_settings_ai' },
+        { label: 'Moisson', route: 'admin_settings_harvest' },
+    ] },
 ] %}
 <nav class="admin-nav">
     <span class="admin-nav-brand">⚙️ Administration</span>
-    {% for it in items %}
-        <a href="{{ path(it.route) }}"{{ r in it.match ? ' class="active"' : '' }}>{{ it.label }}</a>
+    <a href="{{ path('admin_dashboard') }}"{{ r == 'admin_dashboard' ? ' class="active"' : '' }}>Tableau de bord</a>
+    {% for g in groups %}
+        <div class="dd">
+            <span class="dd-top{{ r in g.match ? ' active' : '' }}" tabindex="0">{{ g.label }} ▾</span>
+            <div class="dd-menu">
+                {% for it in g.items %}
+                    <a href="{{ path(it.route) }}"{{ r == it.route ? ' class="active"' : '' }}>{{ it.label }}</a>
+                {% endfor %}
+            </div>
+        </div>
     {% endfor %}
     <a href="{{ path('admin_logout') }}" class="admin-nav-logout">déconnexion</a>
 </nav>

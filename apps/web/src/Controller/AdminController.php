@@ -76,43 +76,83 @@ final class AdminController extends AbstractController
         ]);
     }
 
-    #[Route('/admin/settings', name: 'admin_settings', methods: ['GET', 'POST'])]
-    public function settings(Request $request): Response
+    /** Ancienne URL : redirige vers Paramétrages › Général. */
+    #[Route('/admin/settings', name: 'admin_settings', methods: ['GET'])]
+    public function settings(): Response
+    {
+        return $this->admin->isLogged() ? $this->redirectToRoute('admin_settings_general') : $this->redirectToRoute('admin_login');
+    }
+
+    #[Route('/admin/settings/general', name: 'admin_settings_general', methods: ['GET', 'POST'])]
+    public function settingsGeneral(Request $request): Response
+    {
+        return $this->saveSettingsPage($request, 'admin_settings_general', 'admin/settings_general.html.twig', static fn (Request $r): array => [
+            'mail.reroute_enabled' => $r->request->get('reroute_enabled') ? '1' : '0',
+            'mail.reroute_to' => trim((string) $r->request->get('reroute_to')),
+            'mod.notify_enabled' => $r->request->get('mod_notify_enabled') ? '1' : '0',
+        ]);
+    }
+
+    #[Route('/admin/settings/ia', name: 'admin_settings_ai', methods: ['GET', 'POST'])]
+    public function settingsAi(Request $request): Response
+    {
+        return $this->saveSettingsPage($request, 'admin_settings_ai', 'admin/settings_ai.html.twig', static fn (Request $r): array => [
+            'rag.system_prompt' => (string) $r->request->get('system_prompt'),
+            'rag.temperature' => (string) $r->request->get('temperature'),
+            'rag.max_tokens' => (string) $r->request->get('max_tokens'),
+            'rag.neighbors' => (string) $r->request->get('neighbors'),
+            'rag.model' => (string) $r->request->get('model'),
+            'wiki.model' => (string) $r->request->get('wiki_model'),
+        ], withModels: true);
+    }
+
+    #[Route('/admin/settings/moisson', name: 'admin_settings_harvest', methods: ['GET', 'POST'])]
+    public function settingsHarvest(Request $request): Response
+    {
+        return $this->saveSettingsPage($request, 'admin_settings_harvest', 'admin/settings_harvest.html.twig', static fn (Request $r): array => [
+            'openalex.per_minute' => (string) $r->request->get('openalex_per_minute'),
+            'openalex.per_day' => (string) $r->request->get('openalex_per_day'),
+            'harvest.sort' => (string) $r->request->get('harvest_sort'),
+            'harvest.recent_years' => (string) $r->request->get('harvest_recent_years'),
+            'harvest.cap_per_rubric' => (string) $r->request->get('harvest_cap_per_rubric'),
+            'harvest.max_per_run' => (string) $r->request->get('harvest_max_per_run'),
+        ]);
+    }
+
+    /** @param callable(Request):array<string,string> $extract */
+    private function saveSettingsPage(Request $request, string $route, string $template, callable $extract, bool $withModels = false): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if ($request->isMethod('POST')) {
+            if (!$this->csrf->isValid($request)) {
+                $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+                return $this->redirectToRoute($route);
+            }
+            $result = $this->admin->saveSettings($extract($request));
+            $this->addFlash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Paramètres enregistrés.' : 'Échec de l\'enregistrement.');
+
+            return $this->redirectToRoute($route);
+        }
+        $params = ['settings' => $this->admin->getSettings()];
+        if ($withModels) {
+            $params['models'] = $this->admin->models();
+        }
+
+        return $this->render($template, $params);
+    }
+
+    #[Route('/admin/questions', name: 'admin_questions', methods: ['GET'])]
+    public function questions(Request $request): Response
     {
         if (!$this->admin->isLogged()) {
             return $this->redirectToRoute('admin_login');
         }
 
-        if ($request->isMethod('POST')) {
-            if (!$this->csrf->isValid($request)) {
-                $this->addFlash('error', 'Jeton de sécurité invalide.');
-
-                return $this->redirectToRoute('admin_settings');
-            }
-            $result = $this->admin->saveSettings([
-                'rag.system_prompt' => (string) $request->request->get('system_prompt'),
-                'rag.temperature' => (string) $request->request->get('temperature'),
-                'rag.max_tokens' => (string) $request->request->get('max_tokens'),
-                'rag.neighbors' => (string) $request->request->get('neighbors'),
-                'rag.model' => (string) $request->request->get('model'),
-                'wiki.model' => (string) $request->request->get('wiki_model'),
-                'openalex.per_minute' => (string) $request->request->get('openalex_per_minute'),
-                'openalex.per_day' => (string) $request->request->get('openalex_per_day'),
-                'harvest.sort' => (string) $request->request->get('harvest_sort'),
-                'harvest.recent_years' => (string) $request->request->get('harvest_recent_years'),
-                'harvest.cap_per_rubric' => (string) $request->request->get('harvest_cap_per_rubric'),
-                'harvest.max_per_run' => (string) $request->request->get('harvest_max_per_run'),
-                'mail.reroute_enabled' => $request->request->get('reroute_enabled') ? '1' : '0',
-                'mail.reroute_to' => trim((string) $request->request->get('reroute_to')),
-            ]);
-            $this->addFlash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Paramètres IA enregistrés.' : 'Échec de l\'enregistrement.');
-
-            return $this->redirectToRoute('admin_settings');
-        }
-
-        return $this->render('admin/settings.html.twig', [
-            'settings' => $this->admin->getSettings(),
-            'models' => $this->admin->models(),
+        return $this->render('admin/questions.html.twig', [
+            'data' => $this->api->latestQuestionsPage(30, max(1, (int) $request->query->get('page', '1'))),
         ]);
     }
 
