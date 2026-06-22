@@ -64,6 +64,16 @@ class Answer
     #[Groups(['answer:read'])]
     private bool $generatedByAi = true;
 
+    /** Modèle d'IA ayant rédigé la réponse, figé à la génération (immuable ensuite). */
+    #[ORM\Column(length: 120, nullable: true)]
+    #[Groups(['answer:read'])]
+    private ?string $generationModel = null;
+
+    /** Durée de génération en millisecondes (rédaction LLM). */
+    #[ORM\Column(nullable: true)]
+    #[Groups(['answer:read'])]
+    private ?int $generationMs = null;
+
     /** Vrai si une source citée a été rétractée/signalée après validation : à revalider. */
     #[ORM\Column(options: ['default' => false])]
     #[Groups(['answer:read'])]
@@ -270,6 +280,30 @@ class Answer
     public function isGeneratedByAi(): bool
     {
         return $this->generatedByAi;
+    }
+
+    public function getGenerationModel(): ?string
+    {
+        return $this->generationModel;
+    }
+
+    public function setGenerationModel(?string $generationModel): self
+    {
+        $this->generationModel = $generationModel;
+
+        return $this;
+    }
+
+    public function getGenerationMs(): ?int
+    {
+        return $this->generationMs;
+    }
+
+    public function setGenerationMs(?int $generationMs): self
+    {
+        $this->generationMs = null !== $generationMs ? max(0, $generationMs) : null;
+
+        return $this;
     }
 
     public function isAcademicBlockValidated(): bool

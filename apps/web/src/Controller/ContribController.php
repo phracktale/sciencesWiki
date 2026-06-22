@@ -88,6 +88,19 @@ final class ContribController extends AbstractController
         return $this->back($request);
     }
 
+    #[Route('/{_locale}/reponse/{id}/valider', name: 'answer_validate', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['POST'])]
+    public function validateAnswer(int $id, Request $request): Response
+    {
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+        } else {
+            $res = $this->user->send('POST', '/api/answers/'.$id.'/validate', []);
+            $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Réponse validée par le comité.' : ('Échec : '.($res['data']['error'] ?? 'erreur')));
+        }
+
+        return $this->back($request);
+    }
+
     #[Route('/{_locale}/reponse/{id}/edit', name: 'answer_edit', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['POST'])]
     public function editAnswer(int $id, Request $request): Response
     {

@@ -40,9 +40,11 @@ final class AnswerDrafter
         if (null !== ($m = $this->settings->model())) {
             $opts['model'] = $m;
         }
+        $start = hrtime(true);
         $completion = $this->llm->complete($this->buildMessages($question, $sources), $opts);
+        $ms = (int) round((hrtime(true) - $start) / 1e6);
 
-        return $this->persistFromText($question, $type, $sources, $completion->content);
+        return $this->persistFromText($question, $type, $sources, $completion->content, $ms);
     }
 
     /**
@@ -76,7 +78,7 @@ final class AnswerDrafter
      *
      * @param list<Publication> $sources
      */
-    public function persistFromText(Question $question, AnswerType $type, array $sources, string $content): Answer
+    public function persistFromText(Question $question, AnswerType $type, array $sources, string $content, ?int $generationMs = null): Answer
     {
         $parsed = $this->analyze($content, $sources);
 
@@ -84,11 +86,16 @@ final class AnswerDrafter
             $question->setTitle($parsed['title']);
         }
 
+        // Modèle effectif FIGÉ à la génération : un changement de réglage ultérieur
+        // ne modifie pas la signature des réponses déjà rédigées.
+        $model = $this->settings->model() ?? $this->llm->model();
+
         $answer = new Answer($question, $type);
+        $answer->setGenerationModel($model)->setGenerationMs($generationMs);
         $revision = (new AnswerRevision(RevisionAuthorType::Ai))
             ->setAcademicContent($parsed['academic'])
             ->setVulgarizationContent($parsed['vulgarization'])
-            ->setChangeSummary(\sprintf('Brouillon initial généré par IA (%s)', $this->settings->model() ?? $this->llm->model()));
+            ->setChangeSummary(\sprintf('Brouillon initial généré par IA (%s)', $model));
         $answer->addRevision($revision);
 
         foreach ($parsed['footnotes'] as $footnote) {

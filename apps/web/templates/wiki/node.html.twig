@@ -176,7 +176,7 @@
                             </ol>
                         {% endif %}
                         <div class="qa-warn">
-                            ⚠️ <strong>Réponse générée par IA</strong> à partir des sources citées{% if a.validationStatus != 'valide' %}, <strong>non encore relue</strong> par le comité scientifique{% endif %} — elle peut comporter des imprécisions.
+                            ⚠️ <strong>Réponse générée par IA</strong>{% if a.generationModel %} ({{ a.generationModel|split(':')|first }}{% if a.generationMs %}, {{ (a.generationMs / 1000)|round(1) }}&nbsp;s{% endif %}){% endif %} à partir des sources citées{% if a.validationStatus != 'valide' %}, <strong>non encore relue</strong> par le comité scientifique{% endif %} — elle peut comporter des imprécisions.
                         </div>
                         {{ vote.widget(a.id, votes, myVotes) }}
                         <p style="margin-top:.6rem"><a href="{{ path('answer', { id: a.id }) }}">Ouvrir la page dédiée ↗</a></p>

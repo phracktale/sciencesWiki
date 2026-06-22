@@ -28,6 +28,15 @@
         {% endif %}
     </p>
 
+    {% if current_user.canValidate and (answer.validationStatus != 'valide' or (answer.needsRevalidation ?? false)) %}
+        <form method="post" action="{{ path('answer_validate', { id: answer.id }) }}" style="margin:.4rem 0">
+            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+            <input type="hidden" name="back" value="{{ app.request.uri }}">
+            <button type="submit" style="background:#16a34a; color:#fff; border:0; border-radius:8px; padding:.5rem 1rem; cursor:pointer; font:inherit; font-weight:700">✅ Valider cette réponse (comité)</button>
+            <span class="muted" style="font-size:.82rem; margin-left:.5rem">Marque la réponse comme relue et validée scientifiquement.</span>
+        </form>
+    {% endif %}
+
     {% if answer.needsRevalidation ?? false %}
         <div style="border:1px solid #fca5a5; background:#fef2f2; color:#991b1b; border-radius:10px; padding:.8rem 1rem; margin:.8rem 0">
             ⚠️ <strong>Source devenue non fiable.</strong> Une des publications citées dans cette réponse a été
@@ -146,7 +155,7 @@ L'équipe SciencesWiki
     <div class="cartouche">
         <div class="avatar">IA</div>
         <div>
-            <div class="who">Rédigé par GEMMA 4 <span class="muted">— modèle d'IA open source auto-hébergé</span></div>
+            <div class="who">Rédigé par <strong>{{ answer.generationModel ? (answer.generationModel|split(':')|first) : 'IA' }}</strong> <span class="muted">— modèle d'IA open source auto-hébergé{% if answer.generationMs %}, généré en {{ (answer.generationMs / 1000)|round(1) }}&nbsp;s{% endif %}</span></div>
             <div class="note">
                 ⚠️ <strong>Précaution d'usage :</strong> cette réponse est générée automatiquement à partir des
                 sources citées et n'a pas encore été relue par le comité scientifique. Elle peut comporter des

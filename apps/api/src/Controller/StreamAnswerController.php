@@ -94,11 +94,13 @@ final class StreamAnswerController
                     $opts['model'] = $this->settings->model();
                 }
 
+                $start = hrtime(true);
                 $full = '';
                 foreach ($this->llmFactory->create()->stream($messages, $opts) as $chunk) {
                     $full .= $chunk;
                     $send(['delta' => $chunk]);
                 }
+                $generationMs = (int) round((hrtime(true) - $start) / 1e6);
 
                 // Garde-fou aval : si la rédaction ne cite aucune source, elle est
                 // jugée non ancrée => non publiée.
@@ -109,7 +111,7 @@ final class StreamAnswerController
                     return;
                 }
 
-                $answer = $this->drafter->persistFromText($question, AnswerType::Free, $sources, $full);
+                $answer = $this->drafter->persistFromText($question, AnswerType::Free, $sources, $full, $generationMs);
                 $this->em->flush();
 
                 $send([
