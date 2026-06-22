@@ -34,7 +34,7 @@ final class Version20260622210000 extends AbstractMigration
         $this->addSql('CREATE INDEX idx_answer_vote_user ON answer_vote (user_id)');
         $this->addSql('CREATE UNIQUE INDEX uniq_answer_voter ON answer_vote (answer_id, voter_key)');
         $this->addSql('ALTER TABLE answer_vote ADD CONSTRAINT fk_answer_vote_answer FOREIGN KEY (answer_id) REFERENCES answer (id) ON DELETE CASCADE NOT DEFERRABLE INITIALLY IMMEDIATE');
-        $this->addSql('ALTER TABLE answer_vote ADD CONSTRAINT fk_answer_vote_user FOREIGN KEY (user_id) REFERENCES "user" (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE');
+        $this->addSql('ALTER TABLE answer_vote ADD CONSTRAINT fk_answer_vote_user FOREIGN KEY (user_id) REFERENCES app_user (id) ON DELETE SET NULL NOT DEFERRABLE INITIALLY IMMEDIATE');
     }
 
     public function down(Schema $schema): void
