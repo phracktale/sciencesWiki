@@ -28,29 +28,15 @@ final class AdminController extends AbstractController
     ) {
     }
 
-    #[Route('/admin/login', name: 'admin_login', methods: ['GET', 'POST'])]
-    public function login(Request $request): Response
+    /** Connexion UNIQUE : on redirige l'ancienne URL BO vers le formulaire commun. */
+    #[Route('/admin/login', name: 'admin_login', methods: ['GET'])]
+    public function login(): Response
     {
-        if ($request->isMethod('POST')) {
-            if (!$this->csrf->isValid($request)) {
-                $this->addFlash('error', 'Jeton de sécurité invalide, réessayez.');
-
-                return $this->redirectToRoute('admin_login');
-            }
-            $email = (string) $request->request->get('email');
-            $password = (string) $request->request->get('password');
-            $ok = $this->admin->login($email, $password);
-            if ($ok) {
-                // Pose aussi la session front (user_jwt + /api/me) → état de connexion
-                // cohérent entre back-office et front (plus de « déconnexion » apparente).
-                $this->user->login($email, $password);
-
-                return $this->redirectToRoute('admin_dashboard');
-            }
-            $this->addFlash('error', 'Identifiants invalides ou compte non administrateur.');
+        if ($this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_dashboard');
         }
 
-        return $this->render('admin/login.html.twig');
+        return $this->redirectToRoute('login', ['back' => '/admin']);
     }
 
     #[Route('/admin/logout', name: 'admin_logout', methods: ['GET'])]

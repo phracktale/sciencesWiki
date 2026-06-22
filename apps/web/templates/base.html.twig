@@ -164,7 +164,6 @@
         <nav>
             <a href="{{ path('home') }}"{{ route in ['home','node'] ? ' class="is-active"' : '' }}>Accueil</a>
             <a href="{{ path('wiki_search') }}"{{ route == 'wiki_search' ? ' class="is-active"' : '' }}>Rechercher</a>
-            <a href="{{ path('pub_search') }}"{{ route == 'pub_search' ? ' class="is-active"' : '' }}>Publications</a>
             <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
             <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
             {% if current_user.isLogged %}

@@ -82,14 +82,7 @@ final class WikiController extends AbstractController
         ]);
     }
 
-    /** Recherche plein-texte tolérante aux fautes dans les publications (Meilisearch). */
-    #[Route('/{_locale}/publications', name: 'pub_search', requirements: ['_locale' => 'fr'], methods: ['GET'])]
-    public function pubSearch(): Response
-    {
-        return $this->render('wiki/pub_search.html.twig');
-    }
-
-    /**
+/**
      * Explorateur d'articles d'un sous-domaine (recherche plein-texte + fiche
      * détaillée façon OpenAlex). Interactif : la liste et la fiche sont chargées
      * côté navigateur depuis l'API publique.

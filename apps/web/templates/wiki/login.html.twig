@@ -2,7 +2,7 @@
 {% block title %}Connexion — SciencesWiki{% endblock %}
 {% block body %}
     <h1>Connexion</h1>
-    <p class="muted">Espace réservé aux contributeurs (rédacteurs, comité, modération, administration).</p>
+    <p class="muted">Connectez-vous à votre compte SciencesWiki. Vos accès dépendent de vos rôles (chercheur, rédacteur, comité, administration).</p>
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
 
     <form class="ask" method="post" action="{{ path('login') }}" style="max-width:420px">

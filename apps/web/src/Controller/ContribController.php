@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Service\AdminApiClient;
 use App\Service\AdminCsrf;
 use App\Service\UserApiClient;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -21,7 +20,6 @@ final class ContribController extends AbstractController
 {
     public function __construct(
         private readonly UserApiClient $user,
-        private readonly AdminApiClient $admin,
         private readonly AdminCsrf $csrf,
     ) {
     }
@@ -35,15 +33,11 @@ final class ContribController extends AbstractController
 
                 return $this->redirectToRoute('login');
             }
-            $email = (string) $request->request->get('email');
-            $password = (string) $request->request->get('password');
-            $ok = $this->user->login($email, $password);
+            $ok = $this->user->login(
+                (string) $request->request->get('email'),
+                (string) $request->request->get('password'),
+            );
             if ($ok) {
-                // Un admin connecté côté front ouvre aussi la session back-office
-                // (mêmes identifiants) → accès direct au tableau de bord.
-                if ($this->user->hasRole('ROLE_ADMIN')) {
-                    $this->admin->login($email, $password);
-                }
                 $this->addFlash('success', 'Connecté·e en tant que '.$this->user->displayName().'.');
                 $back = (string) $request->request->get('back', '');
 
@@ -59,7 +53,6 @@ final class ContribController extends AbstractController
     public function logout(Request $request): Response
     {
         $this->user->logout();
-        $this->admin->logout();
         $this->addFlash('success', 'Déconnecté·e.');
 
         return $this->redirect($request->headers->get('referer') ?: $this->generateUrl('home'));

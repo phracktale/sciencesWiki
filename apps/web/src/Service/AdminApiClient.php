@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -15,45 +14,29 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class AdminApiClient
 {
-    private const SESSION_KEY = 'admin_jwt';
-
     public function __construct(
         private readonly HttpClientInterface $httpClient,
-        private readonly RequestStack $requestStack,
+        private readonly UserApiClient $user,
         #[Autowire(env: 'API_BASE_URL')]
         private readonly string $baseUrl,
     ) {
     }
 
-    /** Authentifie l'admin et stocke le JWT en session. Retourne true si OK. */
+    /** Connexion unique (déléguée) ; le jeton est partagé front + back-office. */
     public function login(string $email, string $password): bool
     {
-        try {
-            $data = $this->httpClient->request('POST', $this->baseUrl.'/api/login_check', [
-                'json' => ['email' => $email, 'password' => $password],
-                'timeout' => 10,
-            ])->toArray(false);
-        } catch (\Throwable) {
-            return false;
-        }
-
-        $token = $data['token'] ?? null;
-        if (!\is_string($token) || '' === $token) {
-            return false;
-        }
-        $this->session()->set(self::SESSION_KEY, $token);
-
-        return true;
+        return $this->user->login($email, $password);
     }
 
     public function logout(): void
     {
-        $this->session()->remove(self::SESSION_KEY);
+        $this->user->logout();
     }
 
+    /** Accès back-office = connecté ET ROLE_ADMIN (ce sont les rôles qui décident). */
     public function isLogged(): bool
     {
-        return \is_string($this->session()->get(self::SESSION_KEY));
+        return $this->user->isLogged() && $this->user->hasRole('ROLE_ADMIN');
     }
 
     /** @return array{ok:bool,status:int,data:array<string,mixed>} */
@@ -308,7 +291,7 @@ final class AdminApiClient
      */
     private function send(string $method, string $path, ?array $body, int $timeout = 20): array
     {
-        $token = $this->session()->get(self::SESSION_KEY);
+        $token = $this->user->token();
         if (!\is_string($token)) {
             return ['ok' => false, 'status' => 401, 'data' => ['error' => 'Non authentifié.']];
         }
@@ -327,10 +310,5 @@ final class AdminApiClient
         }
 
         return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'data' => $data];
-    }
-
-    private function session(): \Symfony\Component\HttpFoundation\Session\SessionInterface
-    {
-        return $this->requestStack->getSession();
     }
 }

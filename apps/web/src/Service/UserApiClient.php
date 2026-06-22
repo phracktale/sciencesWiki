@@ -18,8 +18,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class UserApiClient
 {
-    private const TOKEN_KEY = 'user_jwt';
-    private const ME_KEY = 'user_me';
+    // Jeton de session UNIQUE (front + back-office) : les rôles décident des accès.
+    private const TOKEN_KEY = 'auth_jwt';
+    private const ME_KEY = 'auth_me';
 
     /** Hiérarchie des rôles (miroir de security.yaml côté API). */
     private const HIERARCHY = [
@@ -74,6 +75,14 @@ final class UserApiClient
     public function isLogged(): bool
     {
         return \is_string($this->session()->get(self::TOKEN_KEY));
+    }
+
+    /** Jeton JWT courant (partagé front + back-office), ou null. */
+    public function token(): ?string
+    {
+        $t = $this->session()->get(self::TOKEN_KEY);
+
+        return \is_string($t) ? $t : null;
     }
 
     /** @return array<string,mixed> */
