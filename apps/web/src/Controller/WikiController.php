@@ -71,6 +71,10 @@ final class WikiController extends AbstractController
         if ('' === trim($markdown)) {
             return new Response('Revue vide.', Response::HTTP_BAD_REQUEST);
         }
+        // Garde-fou : CommonMark exige de l'UTF-8 valide (sinon exception).
+        if (!mb_check_encoding($markdown, 'UTF-8')) {
+            $markdown = mb_convert_encoding($markdown, 'UTF-8', 'UTF-8');
+        }
         $sources = json_decode((string) $request->request->get('sources', '[]'), true);
 
         $html = $this->renderView('pdf/literature_review.html.twig', [
