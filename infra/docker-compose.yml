@@ -236,9 +236,37 @@ services:
       - "${ADMINER_PORT:-8091}:8080"
     restart: unless-stopped
 
+  # Open WebUI : interface de chat pour les profils connectés (cf.
+  # docs/spec-openwebui-rag.md). Étape pilote : branché UNIQUEMENT sur notre
+  # endpoint RAG (/api/rag/chat, via le service « api » du réseau interne) ;
+  # l'API Ollama directe est désactivée (tout passe par le RAG sourcé). Exposé
+  # pour l'instant sur le LAN seulement (Heimdall /chat + SSO viennent ensuite).
+  openwebui:
+    # TODO: épingler un tag de release après validation (cf. spec) ; « main » = pilote.
+    image: ghcr.io/open-webui/open-webui:main
+    depends_on:
+      api:
+        condition: service_started
+    environment:
+      # Notre endpoint RAG (compatible OpenAI) : Open WebUI y ajoute /chat/completions et /models.
+      OPENAI_API_BASE_URL: "http://api/api/rag"
+      OPENAI_API_KEY: "sk-scienceswiki-rag"
+      # Durcissement : pas d'accès Ollama direct (uniquement le RAG sourcé).
+      ENABLE_OLLAMA_API: "false"
+      # Pilote LAN : auth désactivée pour tester le chat tout de suite. NE PAS
+      # exposer publiquement ainsi — le SSO forward-auth (Heimdall) la remplacera.
+      WEBUI_AUTH: "false"
+      WEBUI_NAME: "SciencesWiki — Assistant"
+    volumes:
+      - openwebui_data:/app/backend/data
+    ports:
+      - "${OPENWEBUI_PORT:-8092}:8080"
+    restart: unless-stopped
+
 volumes:
   database_data:
   jwt_keys:
   secrets_vault:
   web_sessions:
   web_uploads:
+  openwebui_data:
