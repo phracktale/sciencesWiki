@@ -8,7 +8,7 @@ twig:
         pdf_assets: '@App\Service\PdfAssets'
         # Tag de version affiché en pied de page (visible des visiteurs).
         # GARDER COURT : numéro + date uniquement, JAMAIS de description technique.
-        app_version: 'v0.59 · 22 juin 2026'
+        app_version: 'v0.60 · 23 juin 2026'
 
 when@test:
     twig:

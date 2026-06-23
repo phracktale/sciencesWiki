@@ -1,0 +1,62 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Contact{% endblock %}
+{% block cwd %}contact{% endblock %}
+{% block command %}mail -s "bonjour" contact@scienceswiki.eu{% endblock %}
+{% block description %}Contactez l'équipe SciencesWiki : question, suggestion, signalement d'erreur, presse, partenariat ou don. Formulaire de contact.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Contact — laissez un message après le bip." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">Une question, une suggestion, une erreur à signaler, une demande presse ou un
+    soutien à proposer&nbsp;? Remplissez le terminal ci-dessous. On lit tout.</p>
+
+    <form class="dosform" id="contact-form" novalidate>
+        <span class="form-ttl">┌─ NOUVEAU MESSAGE ─────────────────────────┐</span>
+
+        <div class="field">
+            <label for="c-name">Nom</label>
+            <input id="c-name" name="name" type="text" maxlength="120" autocomplete="name" placeholder="votre nom (optionnel)">
+        </div>
+        <div class="field">
+            <label for="c-email">E-mail</label>
+            <input id="c-email" name="email" type="email" maxlength="180" autocomplete="email" required placeholder="vous@exemple.fr">
+        </div>
+        <div class="field">
+            <label for="c-subject">Objet</label>
+            <select id="c-subject" name="subject">
+                <option value="question">Question générale</option>
+                <option value="signalement">Signaler une erreur / source</option>
+                <option value="presse">Demande presse</option>
+                <option value="acces">Demande d'accès (chercheur)</option>
+                <option value="don">Don / mécénat / hébergement</option>
+                <option value="autre">Autre</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="c-message">Message</label>
+            <textarea id="c-message" name="message" maxlength="5000" required placeholder="tapez ici… (Ctrl+Entrée pour les pros)"></textarea>
+        </div>
+
+        {# Pot de miel anti-spam : invisible pour l'humain, rempli par les bots. #}
+        <div class="hp" aria-hidden="true">
+            <label for="c-website">Ne pas remplir</label>
+            <input id="c-website" class="hp" name="website" type="text" tabindex="-1" autocomplete="off">
+        </div>
+
+        <p class="hint">Vos informations servent uniquement à traiter votre demande — jamais revendues. Voir <a href="{{ path('crt_legal') }}">mentions légales</a>.</p>
+
+        <div class="btn-row" style="margin-bottom:.4rem;">
+            <button class="btn primary" type="submit">Transmettre</button>
+        </div>
+        <div id="contact-status" role="status" aria-live="polite"></div>
+
+        <span class="form-ttl" style="margin:.6rem 0 0;">└────────────────────────────────────────────┘</span>
+    </form>
+
+    <div class="box">
+        <span class="box-ttl">Voies directes</span>
+        <pre class="out">E-mail ....... contact@scienceswiki.eu
+Rejoindre .... formulaire « Nous rejoindre » sur l'accueil du wiki
+Soutenir ..... page /soutenir (cagnotte, comme Wikipédia)</pre>
+    </div>
+{% endblock %}

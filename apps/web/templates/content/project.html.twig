@@ -1,14 +1,16 @@
-{% extends 'base.html.twig' %}
+{% extends 'crt/base.html.twig' %}
 
-{% block title %}Le projet — SciencesWiki{% endblock %}
+{% block title %}Le projet{% endblock %}
+{% block cwd %}le-projet{% endblock %}
+{% block command %}cat le-projet.md{% endblock %}
 {% block description %}SciencesWiki : une encyclopédie scientifique libre, gratuite et open source, qui vulgarise la recherche en s'appuyant sur des publications en accès ouvert.{% endblock %}
 
 {% block body %}
-    <h1>Le projet</h1>
-    <p class="muted" style="font-size:1.05rem">
+    <h1 data-typewriter data-text="Le projet — le savoir scientifique en bien commun." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">
         <strong>SciencesWiki</strong> est une encyclopédie scientifique <strong>libre, gratuite et open source</strong>,
-        au service de l'<strong>éducation populaire</strong> : rendre le savoir scientifique compréhensible par toutes et tous,
-        sans jamais s'éloigner des sources.
+        au service de l'<strong>éducation populaire</strong> : rendre le savoir scientifique compréhensible par
+        toutes et tous, sans jamais s'éloigner des sources.
     </p>
 
     <h2>Notre but</h2>
@@ -20,7 +22,7 @@
     </p>
 
     <h2>Notre philosophie</h2>
-    <ul>
+    <ul class="doslist">
         <li><strong>Savoir libre.</strong> Contenu sous licence CC BY-SA 4.0, code open source.</li>
         <li><strong>Sources ouvertes et légales.</strong> Nous ne nous appuyons que sur des travaux diffusés en
             <strong>accès ouvert légal</strong> (OpenAlex, Unpaywall, arXiv, dépôts d'auteurs…). Jamais de copie illicite.</li>
@@ -34,22 +36,26 @@
     </ul>
 
     <h2>Comment ça marche</h2>
-    <ol>
+    <ol class="dosnum">
         <li>Une <strong>moissonneuse</strong> collecte des publications en accès ouvert et les classe dans l'arbre.</li>
         <li>Vous posez une question sur une rubrique ; une <strong>IA open source</strong> rédige une réponse
             <strong>niveau collège</strong>, <strong>ancrée sur les sources</strong> récupérées (RAG).</li>
         <li>La réponse est publiée avec ses sources, puis peut être <strong>relue et validée</strong> par le comité.</li>
     </ol>
+    <p class="dim">Le détail, étape par étape : <a href="{{ path('process') }}">process de publication</a>.</p>
 
     <h2>À l'origine</h2>
-    <p>
+    <div class="box">
+        <span class="box-ttl">origine.log</span>
         SciencesWiki est un projet <strong>citoyen et indépendant</strong>, initié par passion pour la science et
         l'éducation populaire, avec la conviction que la recherche — souvent financée par l'argent public —
         devrait être accessible à toutes et tous. Le projet est <strong>ouvert aux contributions</strong> :
         chercheurs, vulgarisateurs et curieux y sont les bienvenus.
-    </p>
+    </div>
 
-    <p style="margin-top:1.5rem">
-        <a class="card" style="display:inline-block" href="{{ path('home') }}">← Explorer l'encyclopédie</a>
-    </p>
+    <div class="btn-row">
+        <a class="btn primary" href="{{ path('home') }}">← Explorer l'encyclopédie</a>
+        <a class="btn" href="{{ path('crt_donate') }}">★ Soutenir le projet</a>
+        <a class="btn" href="{{ path('crt_discover') }}">Découvrir les usages</a>
+    </div>
 {% endblock %}

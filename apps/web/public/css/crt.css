@@ -1,0 +1,423 @@
+/* ============================================================================
+   SciencesWiki — Thème CRT « IBM monochrome blanchâtre »
+   Surface marketing/éditoriale (landing, tarifs, soutien, mentions, contact).
+   Phosphore blanc-gris sur tube cathodique : scanlines, bombage, vignette,
+   persistance, scintillement. Interface façon shell bash amélioré.
+   Le wiki fonctionnel garde son thème clair (base.html.twig) — ceci est séparé.
+   ========================================================================== */
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+   ║  TABLEAU DE BORD DES EFFETS — éditez librement les valeurs ci-dessous.  ║
+   ║  Ou réglez en direct via le bouton ⚙ (en haut à droite du terminal),    ║
+   ║  puis « copier le CSS » pour coller vos valeurs ici et les rendre       ║
+   ║  permanentes. Une valeur à 0 désactive l'effet correspondant.          ║
+   ╚══════════════════════════════════════════════════════════════════════╝ */
+:root {
+    /* ─────────────────────────── COULEURS ─────────────────────────────── */
+    /* Phosphore P4 (blanc-gris légèrement chaud), typique des écrans IBM mono. */
+    --phos:        #d7d8cf;   /* texte principal */
+    --phos-dim:    #8f968c;   /* texte secondaire / commentaires */
+    --phos-bright: #f4f5ee;   /* surbrillance / titres */
+    --phos-faint:  #5c635b;   /* lignes, bordures sourdes */
+    --bg:          #0a0d0b;   /* fond du tube (presque noir, nuance verte froide) */
+    --bg-soft:     #11161300; /* fond panneau (transparent, le grain passe à travers) */
+    --bezel:       #16191a;   /* plastique du moniteur */
+    --glow:        rgba(215, 216, 207, .45); /* teinte du halo phosphore */
+    --accent:      #b9f0c9;   /* vert phosphore d'appoint (statuts OK, liens actifs) */
+    --warn:        #f0d8a0;   /* ambre d'appoint (alertes) */
+
+    /* ───────────────────────── EFFETS DU TUBE ─────────────────────────── */
+    --scan-opacity:    .22;   /* scanlines : intensité       (0 → .6) */
+    --scan-gap:        3px;   /* scanlines : espacement      (2px → 6px) */
+    --scan-thickness:  1px;   /* scanlines : épaisseur de la ligne sombre */
+    --rgb-opacity:     .025;  /* masque sub-pixel RVB        (0 → .08) */
+    --vignette:        .6;    /* assombrissement des bords   (0 → 1) */
+    --curve:           6%;    /* bombage du verre            (0% → 14%) */
+    --flicker:         .012;  /* scintillement luminosité    (0 → .05) */
+    --flicker-speed:   .12s;  /* vitesse du scintillement */
+    --roll:            .035;  /* barre de balayage descendante (0 → .12) */
+    --roll-speed:      7s;    /* durée d'un passage de la barre */
+    --glow-blur:       6px;   /* halo phosphore : rayon de flou (0 → 16px) */
+    --glow-strength:   .18;   /* halo phosphore : intensité  (0 → .6) */
+
+    /* ───────────────────────── ANIMATIONS UI ──────────────────────────── */
+    --boot-duration:   1.1s;  /* allumage du tube au chargement (0s = instantané) */
+    --cursor-speed:    1.05s; /* clignotement du curseur bloc (.2s → 2s) */
+    --tw-speed:        24;    /* machine à écrire : ms / caractère (lu par le JS) */
+
+    /* ──────────────────────────── TYPO ────────────────────────────────── */
+    --font: 'Roboto Mono', 'Cascadia Code', 'Consolas', ui-monospace, monospace;
+    --ch: 0.62rem; /* approx largeur d'un caractère mono à 1rem */
+}
+
+@font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
+@font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
+
+* { box-sizing: border-box; }
+
+html { background: #000; scroll-behavior: smooth; }
+
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: var(--font);
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--phos);
+    background: var(--bg);
+    /* Légère courbure : dégradé radial qui assombrit les bords (vignette tube). */
+    background-image:
+        radial-gradient(120% 130% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
+    text-shadow: 0 0 1px var(--glow), 0 0 var(--glow-blur) rgba(215,216,207,var(--glow-strength));
+    letter-spacing: .02em;
+    -webkit-font-smoothing: none;
+    overflow-x: hidden;
+}
+
+/* --- Surcouches CRT : scanlines + grain + scintillement (pseudo-éléments fixes) --- */
+.crt-overlay, .crt-flicker {
+    position: fixed; inset: 0; pointer-events: none; z-index: 9000;
+}
+/* Scanlines horizontales fines + masque RGB léger. */
+.crt-overlay {
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(0,0,0,0)                    0,
+            rgba(0,0,0,0)                    calc(var(--scan-gap) - var(--scan-thickness)),
+            rgba(0,0,0,var(--scan-opacity))  calc(var(--scan-gap) - var(--scan-thickness)),
+            rgba(0,0,0,var(--scan-opacity))  var(--scan-gap)),
+        repeating-linear-gradient(
+            to right,
+            rgba(255,80,80,var(--rgb-opacity)),
+            rgba(80,255,80,var(--rgb-opacity)) 1px,
+            rgba(80,80,255,var(--rgb-opacity)) 2px);
+    mix-blend-mode: multiply;
+    z-index: 9001;
+}
+/* Vignette + bombage du verre (highlight diagonal). */
+.crt-overlay::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+        radial-gradient(140% 140% at 50% -10%, rgba(255,255,255,.05), transparent 40%),
+        radial-gradient(120% 120% at 50% 50%, transparent 60%, rgba(0,0,0,var(--vignette)) 100%);
+    border-radius: 50% / var(--curve);
+    box-shadow: inset 0 0 120px 30px rgba(0,0,0,calc(var(--vignette) * .92));
+}
+/* Scintillement de la luminosité (très subtil). */
+.crt-flicker {
+    background: rgba(215,216,207,var(--flicker));
+    z-index: 9002;
+    animation: crt-flick var(--flicker-speed) steps(2) infinite;
+}
+@keyframes crt-flick {
+    0%   { opacity: .92; }
+    50%  { opacity: 1; }
+    100% { opacity: .96; }
+}
+/* Balayage de rafraîchissement qui descend lentement (la « barre » du tube). */
+.crt-flicker::before {
+    content: ''; position: absolute; left: 0; right: 0; height: 28vh;
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,var(--roll)), rgba(255,255,255,0));
+    animation: crt-roll var(--roll-speed) linear infinite;
+}
+@keyframes crt-roll { 0% { top: -30vh; } 100% { top: 100vh; } }
+
+/* Allumage du tube au chargement (flash + expansion verticale). */
+body.crt-boot { animation: crt-power var(--boot-duration) ease-out 1; }
+@keyframes crt-power {
+    0%   { filter: brightness(6) blur(2px); transform: scaleY(.004); opacity: 0; }
+    8%   { filter: brightness(6) blur(2px); transform: scaleY(.004); opacity: 1; }
+    32%  { transform: scaleY(1.04); filter: brightness(2.2); }
+    55%  { transform: scaleY(.997); }
+    100% { transform: scaleY(1); filter: brightness(1); }
+}
+
+/* ============================ MISE EN PAGE SHELL ========================== */
+
+.scr {
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 1.2rem 1.4rem 5rem;
+    position: relative;
+    z-index: 10;
+}
+
+/* Barre de titre du « terminal » (façon xterm / DOS). */
+.term-bar {
+    display: flex; align-items: center; gap: .6rem;
+    border: 1px solid var(--phos-faint);
+    border-bottom: none;
+    padding: .35rem .7rem;
+    background: linear-gradient(var(--bezel), #0c0f0d);
+    font-size: .82rem; color: var(--phos-dim);
+}
+.term-bar .dots { display: flex; gap: .35rem; }
+.term-bar .dots i { width: .62rem; height: .62rem; border: 1px solid var(--phos-faint); border-radius: 50%; display: inline-block; }
+.term-bar .ttl { letter-spacing: .12em; text-transform: uppercase; }
+.term-bar .clock { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.term {
+    border: 1px solid var(--phos-faint);
+    padding: 1.2rem 1.4rem 1.6rem;
+    background:
+        repeating-linear-gradient(to bottom, transparent 0 22px, rgba(215,216,207,.008) 22px 23px);
+    box-shadow: inset 0 0 60px rgba(0,0,0,.5);
+    min-height: 60vh;
+}
+
+/* En-tête : prompt + navigation shell. */
+.prompt-line { white-space: pre-wrap; word-break: break-word; }
+.ps1 { color: var(--accent); }
+.ps1 .at { color: var(--phos-dim); }
+.ps1 .path { color: var(--phos-bright); }
+.cmd { color: var(--phos-bright); font-weight: 700; }
+
+nav.shell-nav {
+    display: flex; flex-wrap: wrap; gap: .2rem 1.1rem;
+    margin: .4rem 0 1.4rem;
+    padding-bottom: .8rem;
+    border-bottom: 1px dashed var(--phos-faint);
+    font-size: .92rem;
+}
+nav.shell-nav a { color: var(--phos); text-decoration: none; padding: .1rem 0; position: relative; }
+nav.shell-nav a::before { content: './'; color: var(--phos-dim); }
+nav.shell-nav a:hover, nav.shell-nav a:focus { color: var(--phos-bright); background: var(--phos-faint); outline: none; }
+nav.shell-nav a[aria-current="page"] { color: var(--accent); }
+nav.shell-nav a[aria-current="page"]::before { content: '>'; color: var(--accent); margin-right: .15rem; }
+nav.shell-nav .sep { color: var(--phos-faint); }
+
+/* ============================== TYPO ===================================== */
+
+h1, h2, h3, h4 { font-weight: 700; line-height: 1.2; color: var(--phos-bright); letter-spacing: .03em; }
+h1 { font-size: 1.55rem; margin: .2rem 0 .6rem; text-transform: uppercase; }
+h2 { font-size: 1.18rem; margin: 2rem 0 .7rem; }
+h2::before { content: '## '; color: var(--phos-dim); }
+h3 { font-size: 1.02rem; margin: 1.3rem 0 .4rem; }
+h3::before { content: '> '; color: var(--accent); }
+p { margin: .6rem 0; }
+a { color: var(--accent); text-decoration: none; border-bottom: 1px dotted var(--phos-faint); }
+a:hover, a:focus { color: var(--phos-bright); border-bottom-color: var(--accent); outline: none; }
+strong, b { color: var(--phos-bright); font-weight: 700; }
+em { color: var(--warn); font-style: normal; }
+.dim, .muted { color: var(--phos-dim); }
+.bright { color: var(--phos-bright); }
+small { font-size: .8rem; color: var(--phos-dim); }
+hr { border: none; border-top: 1px dashed var(--phos-faint); margin: 1.6rem 0; }
+
+ul.doslist { list-style: none; padding: 0; margin: .6rem 0; }
+ul.doslist li { padding: .15rem 0 .15rem 1.4rem; position: relative; }
+ul.doslist li::before { content: '■'; position: absolute; left: .2rem; color: var(--accent); font-size: .7rem; top: .35rem; }
+ol.dosnum { list-style: none; counter-reset: d; padding: 0; margin: .6rem 0; }
+ol.dosnum li { counter-increment: d; padding: .15rem 0 .15rem 2.2rem; position: relative; }
+ol.dosnum li::before { content: '[' counter(d, decimal-leading-zero) ']'; position: absolute; left: 0; color: var(--phos-dim); }
+
+/* Curseur bloc clignotant avec persistance phosphore. */
+.cursor {
+    display: inline-block; width: .58em; height: 1.05em; vertical-align: -.18em;
+    background: var(--phos-bright);
+    box-shadow: 0 0 6px var(--glow), 0 0 14px rgba(215,216,207,.35);
+    animation: blink var(--cursor-speed) steps(1) infinite;
+    margin-left: .04em;
+}
+@keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+/* Persistance : un sillage qui s'estompe derrière le texte qui s'affiche. */
+.persist { animation: persist-fade 1.4s ease-out forwards; }
+@keyframes persist-fade {
+    0%   { color: var(--phos-bright); text-shadow: 0 0 8px var(--glow), 0 0 18px rgba(215,216,207,.55); }
+    100% { color: var(--phos); text-shadow: 0 0 1px var(--glow); }
+}
+
+/* Élément en cours de frappe (machine à écrire) : caché jusqu'à révélation JS. */
+[data-typewriter] { white-space: pre-wrap; }
+
+/* ============================== BOÎTES =================================== */
+
+/* Cadre ASCII double-ligne (façon menus DOS). */
+.box {
+    border: 1px solid var(--phos-faint);
+    padding: .9rem 1.1rem;
+    margin: 1rem 0;
+    position: relative;
+    background: rgba(215,216,207,.012);
+}
+.box.dbl { border-style: double; border-width: 3px; }
+.box .box-ttl {
+    position: absolute; top: -.72rem; left: .8rem;
+    background: var(--bg); padding: 0 .5rem;
+    color: var(--phos-bright); font-size: .82rem; letter-spacing: .12em; text-transform: uppercase;
+}
+.box.ok    { border-color: var(--accent); }
+.box.ok    .box-ttl { color: var(--accent); }
+.box.warn  { border-color: var(--warn); }
+.box.warn  .box-ttl { color: var(--warn); }
+
+.grid {
+    display: grid; gap: 1rem;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    margin: 1.2rem 0;
+}
+.tile {
+    border: 1px solid var(--phos-faint); padding: 1rem 1.1rem;
+    background: rgba(215,216,207,.014);
+    transition: background .12s steps(2), box-shadow .12s steps(2);
+    text-decoration: none; color: var(--phos); display: block;
+}
+.tile:hover, .tile:focus {
+    background: rgba(215,216,207,.06);
+    box-shadow: inset 0 0 0 1px var(--accent), 0 0 18px rgba(185,240,201,.12);
+    outline: none;
+}
+.tile h3 { margin-top: 0; }
+.tile .ico { font-size: 1.4rem; color: var(--accent); display: block; margin-bottom: .3rem; }
+
+/* Badges / statuts. */
+.tag {
+    display: inline-block; border: 1px solid var(--phos-faint);
+    padding: .02rem .45rem; font-size: .76rem; letter-spacing: .06em;
+    color: var(--phos-dim); text-transform: uppercase; vertical-align: .08em;
+}
+.tag.ok   { color: var(--accent); border-color: var(--accent); }
+.tag.warn { color: var(--warn); border-color: var(--warn); }
+
+/* Tableau façon `column -t`. */
+table.dos { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: .92rem; }
+table.dos th, table.dos td { text-align: left; padding: .4rem .7rem; border-bottom: 1px dashed var(--phos-faint); }
+table.dos th { color: var(--phos-bright); text-transform: uppercase; font-size: .78rem; letter-spacing: .08em; border-bottom-style: solid; }
+table.dos tr:hover td { background: rgba(215,216,207,.04); }
+
+/* Bloc « sortie de commande » préformaté. */
+pre.out, .out {
+    border-left: 2px solid var(--phos-faint);
+    padding: .3rem 0 .3rem 1rem; margin: .8rem 0;
+    color: var(--phos-dim); white-space: pre-wrap;
+}
+
+/* Chiffres-clés (compteurs). */
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: .8rem; margin: 1.2rem 0; }
+.stats .s { border: 1px solid var(--phos-faint); padding: .7rem .9rem; }
+.stats .s b { display: block; font-size: 1.6rem; color: var(--phos-bright); line-height: 1.1; }
+.stats .s span { font-size: .8rem; color: var(--phos-dim); }
+
+/* ============================== BOUTONS ================================== */
+
+.btn, button.btn, a.btn {
+    display: inline-block; font-family: var(--font); font-size: .95rem; font-weight: 700;
+    color: var(--phos-bright); background: transparent;
+    border: 1px solid var(--phos); padding: .5rem 1rem; cursor: pointer;
+    text-decoration: none; letter-spacing: .04em; text-transform: uppercase;
+    transition: background .1s steps(2), color .1s steps(2);
+}
+.btn::before { content: '[ '; color: var(--phos-dim); }
+.btn::after  { content: ' ]'; color: var(--phos-dim); }
+.btn:hover, .btn:focus { background: var(--phos); color: var(--bg); outline: none; text-shadow: none; }
+.btn:hover::before, .btn:hover::after, .btn:focus::before, .btn:focus::after { color: var(--bg); }
+.btn.primary { border-color: var(--accent); color: var(--accent); }
+.btn.primary:hover, .btn.primary:focus { background: var(--accent); color: var(--bg); }
+.btn-row { display: flex; flex-wrap: wrap; gap: .8rem; margin: 1.2rem 0; }
+
+/* ============================ FORMULAIRE DOS ============================= */
+
+.dosform { border: 3px double var(--phos); padding: 1.4rem 1.5rem; margin: 1.4rem 0; background: rgba(215,216,207,.015); }
+.dosform legend, .dosform .form-ttl { color: var(--phos-bright); letter-spacing: .14em; text-transform: uppercase; font-size: .9rem; margin-bottom: 1rem; display: block; }
+.field { display: grid; grid-template-columns: 12rem 1fr; align-items: baseline; gap: .4rem .8rem; margin: .55rem 0; }
+.field label { color: var(--phos-dim); text-transform: uppercase; font-size: .82rem; letter-spacing: .04em; }
+.field label::after { content: ' :'; }
+.dosform input, .dosform textarea, .dosform select {
+    font-family: var(--font); font-size: .95rem; color: var(--phos-bright);
+    background: rgba(0,0,0,.35); border: 1px solid var(--phos-faint);
+    padding: .35rem .5rem; width: 100%;
+    text-shadow: 0 0 4px var(--glow);
+}
+.dosform input:focus, .dosform textarea:focus, .dosform select:focus {
+    outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent), inset 0 0 12px rgba(185,240,201,.08);
+    background: rgba(185,240,201,.04);
+}
+.dosform textarea { min-height: 6rem; resize: vertical; }
+.dosform .hint { color: var(--phos-faint); font-size: .78rem; }
+.hp { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+#contact-status { margin-top: 1rem; min-height: 1.4rem; white-space: pre-wrap; }
+#contact-status.ok  { color: var(--accent); }
+#contact-status.err { color: var(--warn); }
+
+@media (max-width: 620px) { .field { grid-template-columns: 1fr; } .field label::after { content: ''; } }
+
+/* ============================ PROMPT INTERACTIF ========================== */
+
+.shell-io { margin-top: 2.2rem; border-top: 1px dashed var(--phos-faint); padding-top: 1rem; }
+#shell-log { white-space: pre-wrap; margin: 0 0 .4rem; min-height: 1.2rem; color: var(--phos-dim); }
+.shell-input-line { display: flex; align-items: baseline; gap: .5rem; }
+.shell-input-line .ps1 { flex: 0 0 auto; }
+#shell-cmd {
+    flex: 1 1 auto; font-family: var(--font); font-size: 1rem; color: var(--phos-bright);
+    background: transparent; border: none; outline: none; caret-color: transparent;
+    text-shadow: 0 0 4px var(--glow);
+}
+
+/* ============================== FOOTER =================================== */
+
+.scr-footer {
+    margin-top: 2.4rem; border-top: 1px solid var(--phos-faint);
+    padding-top: 1rem; font-size: .8rem; color: var(--phos-dim);
+    display: flex; flex-wrap: wrap; gap: .4rem 1.4rem; align-items: center;
+}
+.scr-footer a { color: var(--phos-dim); border: none; }
+.scr-footer a:hover { color: var(--phos-bright); }
+.scr-footer .ver { margin-left: auto; font-variant-numeric: tabular-nums; }
+
+.center { text-align: center; }
+.lead { font-size: 1.05rem; color: var(--phos); max-width: 70ch; }
+
+/* ====================== SCROLL SACCADÉ (par paliers) ===================== */
+/* Le JS gère le pas ; ici on garantit un rendu net non antialiasé du défilement. */
+html.stepped { scroll-behavior: auto; }
+
+/* ======================= ACCESSIBILITÉ / MOTION ========================= */
+@media (prefers-reduced-motion: reduce) {
+    body, body.crt-boot { animation: none !important; }
+    .crt-flicker, .crt-flicker::before { animation: none !important; }
+    .cursor { animation: none; opacity: 1; }
+    .persist { animation: none; }
+    html, html.stepped { scroll-behavior: auto; }
+}
+/* Option « confort » : l'utilisateur peut couper les effets (corps .no-crt). */
+body.no-crt .crt-overlay, body.no-crt .crt-flicker { display: none; }
+body.no-crt { text-shadow: none; }
+
+/* ===================== PANNEAU DE RÉGLAGE EN DIRECT (⚙) ================== */
+/* Injecté par crt.js dans la barre de titre. Permet d'ajuster chaque effet,
+   persiste dans localStorage, et propose « copier le CSS » pour figer les
+   valeurs dans le bloc :root ci-dessus. */
+.crt-gear {
+    margin-left: .6rem; background: transparent; border: 1px solid var(--phos-faint);
+    color: var(--phos-dim); font-family: var(--font); font-size: .82rem; line-height: 1;
+    padding: .15rem .4rem; cursor: pointer;
+}
+.crt-gear:hover, .crt-gear:focus { color: var(--phos-bright); border-color: var(--phos); outline: none; }
+
+#crt-panel {
+    position: fixed; top: 0; right: 0; z-index: 9500;
+    width: min(340px, 92vw); max-height: 100vh; overflow-y: auto;
+    background: #0c100e; border-left: 1px solid var(--phos-faint);
+    box-shadow: -8px 0 40px rgba(0,0,0,.6);
+    padding: 1rem 1.1rem 2rem; font-size: .85rem;
+    transform: translateX(100%); transition: transform .18s steps(4);
+}
+#crt-panel.open { transform: translateX(0); }
+#crt-panel h2 { font-size: .95rem; margin: .2rem 0 1rem; }
+#crt-panel h2::before { content: '⚙ '; }
+#crt-panel .pclose { float: right; background: none; border: none; color: var(--phos-dim); cursor: pointer; font-family: var(--font); font-size: 1rem; }
+#crt-panel .pclose:hover { color: var(--warn); }
+.crt-knob { margin: .55rem 0; }
+.crt-knob label { display: flex; justify-content: space-between; color: var(--phos-dim); text-transform: uppercase; font-size: .74rem; letter-spacing: .04em; }
+.crt-knob label b { color: var(--phos-bright); font-weight: 400; font-variant-numeric: tabular-nums; }
+.crt-knob input[type=range] { width: 100%; accent-color: var(--accent); background: transparent; margin: .2rem 0 0; }
+.crt-knob.toggle { display: flex; align-items: center; gap: .5rem; border: 1px solid var(--phos-faint); padding: .4rem .6rem; }
+.crt-knob.toggle label { flex: 1; }
+#crt-panel .pactions { display: flex; gap: .5rem; margin-top: 1.1rem; flex-wrap: wrap; }
+#crt-panel .pactions button { flex: 1; min-width: 8rem; }
+#crt-panel .phint { color: var(--phos-faint); font-size: .74rem; margin-top: .8rem; }
+#crt-css-out { width: 100%; min-height: 7rem; margin-top: .6rem; display: none;
+    font-family: var(--font); font-size: .72rem; color: var(--accent);
+    background: rgba(0,0,0,.4); border: 1px solid var(--phos-faint); padding: .5rem; resize: vertical; }

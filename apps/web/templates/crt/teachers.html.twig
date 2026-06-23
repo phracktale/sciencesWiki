@@ -1,0 +1,43 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Enseignants & élèves{% endblock %}
+{% block cwd %}pour/enseignants{% endblock %}
+{% block command %}man enseignant{% endblock %}
+{% block description %}SciencesWiki pour les enseignants et leurs élèves : fiches de révision sourcées, quiz auto-générés, réécriture par niveau (primaire → terminale), séquences pédagogiques et sujets de Grand Oral adossés à des sources fiables.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Enseignants & élèves — la science au bon niveau." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">Un même savoir, reformulé du primaire à la terminale. Des supports
+    <strong>adossés à des sources vérifiées</strong> (rétractations exclues), avec barème et quiz —
+    pour préparer un cours, réviser, ou bâtir un Grand Oral solide.</p>
+
+    <h2>Bénéfices</h2>
+    <ul class="doslist">
+        <li><strong>Le curseur de niveau de lecture</strong> — chercheur → grand public → collège → primaire, d'un clic.</li>
+        <li><strong>Des supports prêts à l'emploi</strong> — fiches, quiz, séquences générés depuis le corpus.</li>
+        <li><strong>Des sources fiables</strong> — pas de hoax : les études rétractées sont exclues des supports.</li>
+        <li><strong>Un espace modéré</strong> — Q&R filtré, vocabulaire adapté pour les plus jeunes.</li>
+    </ul>
+
+    <h2>Fonctionnalités</h2>
+    <table class="dos">
+        <thead><tr><th>#</th><th>Niveau</th><th>Outil</th><th>Statut</th></tr></thead>
+        <tbody>
+            <tr><td>17</td><td>Lycée</td><td>Fiches de révision sourcées, « explique-moi niveau Terminale », quiz auto-générés, sujets de Grand Oral.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>18</td><td>Collège</td><td>Réécriture « niveau collège » (vocabulaire adapté, analogies), Q&R modéré, mini-dossiers.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>19</td><td>Élémentaire</td><td>« Explique comme à un enfant de 8 ans », questions filtrées/modérées, format « Pourquoi… ? ».</td><td><span class="tag warn">à venir</span></td></tr>
+            <tr><td>20</td><td>Boîte à outils profs</td><td>Générateur de séquences et de sujets d'exposé par niveau, sources vérifiées, barème/quiz.</td><td><span class="tag warn">à venir</span></td></tr>
+        </tbody>
+    </table>
+
+    <div class="box ok">
+        <span class="box-ttl">Curseur de niveau</span>
+        <pre class="out">[ chercheur ]──[ grand public ]──[ collège ]──[●primaire ]
+> « Pourquoi le ciel est bleu ? » → réécrit pour un enfant de 8 ans, avec une analogie et la source.</pre>
+    </div>
+
+    <div class="btn-row">
+        <a class="btn primary" href="{{ path('wiki_search') }}">Explorer un thème</a>
+        <a class="btn" href="{{ path('crt_contact') }}">Suggérer un usage en classe</a>
+    </div>
+{% endblock %}

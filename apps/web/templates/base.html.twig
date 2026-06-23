@@ -205,6 +205,8 @@
             <a href="{{ path('wiki_search') }}"{{ route == 'wiki_search' ? ' class="is-active"' : '' }}>Rechercher</a>
             <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
             <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
+            <a href="{{ path('crt_discover') }}"{{ route starts with 'crt_' ? ' class="is-active"' : '' }}>Découvrir</a>
+            <a href="{{ path('crt_donate') }}" style="color:var(--vul); font-weight:700">★ Soutenir</a>
             {% if current_user.isLogged %}
                 <div class="nav-dd">
                     <button type="button" class="nav-dd-top" aria-haspopup="true">Mon compte<span class="nav-email">{{ current_user.displayName }}</span></button>
@@ -226,6 +228,12 @@
     <footer>
         Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique ·
         projet libre, gratuit et open source. <a href="{{ path('project') }}">En savoir plus</a>
+        <br>
+        <a href="{{ path('crt_discover') }}">Découvrir</a> ·
+        <a href="{{ path('crt_pricing') }}">Tarifs</a> ·
+        <a href="{{ path('crt_donate') }}">Soutenir</a> ·
+        <a href="{{ path('crt_contact') }}">Contact</a> ·
+        <a href="{{ path('crt_legal') }}">Mentions légales</a>
         <br><span class="muted" style="font-size:.78rem">SciencesWiki · {{ app_version }}</span>
     </footer>
 

@@ -1,0 +1,68 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Mentions légales{% endblock %}
+{% block cwd %}mentions-legales{% endblock %}
+{% block command %}cat mentions-legales.txt{% endblock %}
+{% block description %}Mentions légales de SciencesWiki : éditeur, hébergement, propriété intellectuelle, données personnelles et mesure d'audience.{% endblock %}
+
+{% block body %}
+    <h1>Mentions légales</h1>
+    <p class="dim">Dernière mise à jour : 23 juin 2026. Conformément à la loi n° 2004-575 (LCEN).</p>
+
+    <h2>Éditeur du site</h2>
+    <pre class="out">Nom du site ......... SciencesWiki
+Adresse ............. https://scienceswiki.eu
+Éditeur ............. [À COMPLÉTER : nom / association / structure]
+Statut .............. [À COMPLÉTER : particulier · association loi 1901 · …]
+SIRET / RNA ......... [À COMPLÉTER le cas échéant]
+Directeur de publ. .. [À COMPLÉTER : nom du responsable]
+Contact ............. contact@scienceswiki.eu</pre>
+    <p class="dim"><small>Les champs <strong>[À COMPLÉTER]</strong> doivent être renseignés avec
+    les informations légales réelles de la structure éditrice avant mise en production.</small></p>
+
+    <h2>Hébergement</h2>
+    <pre class="out">Hébergeur ........... [À COMPLÉTER : nom de l'hébergeur]
+Adresse ............. [À COMPLÉTER]
+Infrastructure ...... serveurs dédiés au projet (corpus + base vectorielle + LLM)</pre>
+
+    <h2>Propriété intellectuelle</h2>
+    <ul class="doslist">
+        <li>Les contenus éditoriaux (articles, réponses vulgarisées) sont publiés sous licence
+            <strong>Creative Commons BY-SA 4.0</strong> : réutilisables avec attribution et partage à l'identique.</li>
+        <li>Les métadonnées et résumés bibliographiques proviennent de sources ouvertes (OpenAlex et autres),
+            sous leurs licences respectives.</li>
+        <li>Les marques, logos et éléments d'identité visuelle de SciencesWiki restent la propriété de l'éditeur.</li>
+        <li>Le code de la plateforme est open source, sous sa licence indiquée dans le dépôt.</li>
+    </ul>
+
+    <h2>Données personnelles (RGPD)</h2>
+    <ul class="doslist">
+        <li>La consultation du site ne nécessite aucun compte ni donnée personnelle.</li>
+        <li>Les formulaires (contact, « nous rejoindre ») collectent les informations que vous y saisissez,
+            uniquement pour traiter votre demande. Elles ne sont ni revendues, ni cédées à des tiers.</li>
+        <li>Conformément au RGPD, vous disposez d'un droit d'accès, de rectification et de suppression :
+            écrivez à <a href="mailto:contact@scienceswiki.eu">contact@scienceswiki.eu</a>.</li>
+        <li>Durée de conservation : limitée au traitement de la demande, puis suppression.</li>
+    </ul>
+
+    <h2>Mesure d'audience &amp; cookies</h2>
+    <div class="box ok">
+        <span class="box-ttl">Sans cookies</span>
+        L'audience est mesurée avec <strong>Plausible Analytics auto-hébergé</strong> : sans cookies,
+        sans collecte de données personnelles, sans pistage inter-sites. Aucun bandeau de consentement
+        n'est requis car aucun traceur publicitaire n'est déposé.
+    </div>
+
+    <h2>Responsabilité</h2>
+    <p>SciencesWiki fournit une vulgarisation sourcée à visée d'information et d'éducation.
+    Les contenus <strong>ne constituent pas un avis médical, juridique ou professionnel</strong>.
+    Malgré le soin apporté au sourçage et à la relecture, des erreurs peuvent subsister :
+    signalez-les via la page <a href="{{ path('crt_contact') }}">contact</a>.</p>
+
+    <h2>Liens</h2>
+    <ul class="doslist">
+        <li><a href="{{ path('project') }}">Le projet</a> — philosophie et fonctionnement</li>
+        <li><a href="{{ path('process') }}">Process de publication</a> — comment le contenu est produit et relu</li>
+        <li><a href="{{ path('crt_contact') }}">Contact</a> · <a href="{{ path('crt_donate') }}">Soutenir</a></li>
+    </ul>
+{% endblock %}

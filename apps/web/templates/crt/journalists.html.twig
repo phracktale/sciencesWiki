@@ -1,0 +1,44 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Journalistes{% endblock %}
+{% block cwd %}pour/journalistes{% endblock %}
+{% block command %}man journaliste{% endblock %}
+{% block description %}SciencesWiki pour les journalistes scientifiques : fact-checking sourcé, briefing express vulgarisé, hype-mètre pour jauger une étude, annuaire d'experts à contacter.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Journalistes — vérifiez vite, citez juste." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">Sous la pression du bouclage, distinguez la percée réelle de la survente.
+    Le corpus vous donne <strong>la source, la solidité et l'expert à appeler</strong> —
+    avec une formulation prudente quand la preuve est mince.</p>
+
+    <h2>Bénéfices</h2>
+    <ul class="doslist">
+        <li><strong>Une enquête plus rapide</strong> — la documentation d'un sujet en minutes, sources en main.</li>
+        <li><strong>Moins d'erreurs</strong> — chaque affirmation rattachée à un papier, son statut et son niveau de preuve.</li>
+        <li><strong>Le bon contact</strong> — les auteurs les plus actifs et cités d'un thème, prêts à être sollicités.</li>
+        <li><strong>Un détecteur de hype</strong> — préprint vs étude évaluée, taille d'échantillon, réplications.</li>
+    </ul>
+
+    <h2>Fonctionnalités</h2>
+    <table class="dos">
+        <thead><tr><th>#</th><th>Outil</th><th>Ce qu'il fait</th><th>Statut</th></tr></thead>
+        <tbody>
+            <tr><td>08</td><td>Fact-checking sourcé</td><td>Une affirmation → articles qui la soutiennent/réfutent, avec fiabilité et formulation prudente.</td><td><span class="tag ok">en ligne</span></td></tr>
+            <tr><td>09</td><td>Briefing express</td><td>Sur un sujet d'actu : synthèse vulgarisée + 5 sources clés + experts à contacter.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>10</td><td>Hype-mètre</td><td>Collez un communiqué/étude → évalue la solidité (préprint vs revue, FWCI, citations, réplications).</td><td><span class="tag warn">à venir</span></td></tr>
+            <tr><td>11</td><td>Annuaire d'experts</td><td>Pour un thème : auteurs les plus actifs/cités + affiliation + lien de sollicitation poli.</td><td><span class="tag">bêta</span></td></tr>
+        </tbody>
+    </table>
+
+    <div class="box warn">
+        <span class="box-ttl">Déontologie</span>
+        SciencesWiki n'écrit pas l'article à votre place : il <strong>trace les sources</strong> et
+        signale l'incertitude. La hiérarchisation, le recoupement et la responsabilité éditoriale
+        restent les vôtres. Les contenus rétractés sont marqués pour éviter de citer une étude invalidée.
+    </div>
+
+    <div class="btn-row">
+        <a class="btn primary" href="{{ path('wiki_search') }}">Vérifier une affirmation</a>
+        <a class="btn" href="{{ path('crt_contact') }}">Demander un accès presse</a>
+    </div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Tarifs{% endblock %}
+{% block cwd %}tarifs{% endblock %}
+{% block command %}cat tarifs.txt{% endblock %}
+{% block description %}Tarifs SciencesWiki : une formule unique, gratuite (0 €). Pas de paywall, pas de pub, pas de revente de données. Le projet vit d'une cagnotte, comme Wikipédia.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Tarifs — une formule, gratuite." data-tw-speed="22" data-tw-cursor></h1>
+    <p class="lead">Pas de palier « premium », pas de fonction bloquée derrière un paywall.
+    Le savoir scientifique est un bien commun : <strong>il reste gratuit pour tout le monde.</strong></p>
+
+    <div class="grid" style="grid-template-columns: minmax(280px, 460px); justify-content: center;">
+        <div class="box dbl" style="text-align:center;">
+            <span class="box-ttl">Formule unique</span>
+            <p style="font-size:.85rem; letter-spacing:.2em; text-transform:uppercase; color:var(--phos-dim); margin:.4rem 0 .2rem;">LIBRE&nbsp;&amp;&nbsp;GRATUIT</p>
+            <p style="font-size:3.2rem; line-height:1; color:var(--phos-bright); margin:.2rem 0;">0&nbsp;€</p>
+            <p class="dim" style="margin-top:0;">pour toujours · sans carte bancaire · sans engagement</p>
+            <hr>
+            <ul class="doslist" style="text-align:left; max-width:30ch; margin:1rem auto;">
+                <li>Recherche sémantique illimitée</li>
+                <li>Q&R vulgarisé et sourcé</li>
+                <li>4 niveaux de lecture</li>
+                <li>Articles encyclopédiques</li>
+                <li>Espace chercheur (sur demande)</li>
+                <li>Aucune publicité, aucun pistage</li>
+                <li>Contenu sous licence CC BY-SA 4.0</li>
+            </ul>
+            <a class="btn primary" href="{{ path('wiki_search') }}">Commencer maintenant</a>
+        </div>
+    </div>
+
+    <h2>Pourquoi gratuit&nbsp;?</h2>
+    <ul class="doslist">
+        <li><strong>La science est financée par le public</strong> — le savoir qui en découle devrait l'être aussi.</li>
+        <li><strong>Pas de modèle publicitaire</strong> — vos questions ne sont pas un produit à revendre.</li>
+        <li><strong>Open source</strong> — le code et le contenu sont ouverts, reproductibles, réutilisables.</li>
+    </ul>
+
+    <div class="box ok">
+        <span class="box-ttl">Mais ça a un coût</span>
+        Héberger des millions d'embeddings, servir un LLM et <strong>sauvegarder le corpus</strong>
+        (sauvegardes chiffrées, redondées) coûte cher chaque mois. Plutôt qu'un abonnement,
+        on a choisi le modèle Wikipédia : une cagnotte alimentée par celles et ceux qui le peuvent.
+        <div class="btn-row" style="margin-bottom:0;">
+            <a class="btn primary" href="{{ path('crt_donate') }}">★ Soutenir SciencesWiki</a>
+        </div>
+    </div>
+
+    <table class="dos">
+        <thead><tr><th>Comparatif</th><th>SciencesWiki</th><th>Bases payantes</th></tr></thead>
+        <tbody>
+            <tr><td>Prix</td><td><span class="tag ok">0 €</span></td><td>abonnement / article</td></tr>
+            <tr><td>Publicité</td><td>aucune</td><td>fréquente</td></tr>
+            <tr><td>Revente de données</td><td>jamais</td><td>variable</td></tr>
+            <tr><td>Sources citées</td><td>systématique</td><td>variable</td></tr>
+            <tr><td>Licence du contenu</td><td>CC BY-SA 4.0</td><td>propriétaire</td></tr>
+        </tbody>
+    </table>
+{% endblock %}

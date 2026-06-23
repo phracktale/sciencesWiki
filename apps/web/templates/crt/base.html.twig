@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr" class="stepped">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csp-nonce" content="{{ csp_nonce.value }}">
+    <meta name="theme-color" content="#0a0d0b">
+    <title>{% block title %}SciencesWiki{% endblock %} :: SciencesWiki</title>
+    <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée aux publications de recherche.{% endblock %}">
+    <link rel="stylesheet" href="/css/crt.css">
+    {# Mesure d'audience sans cookies (Plausible auto-hébergé, RGPD-friendly). #}
+    <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
+    <script nonce="{{ csp_nonce.value }}">
+        window.plausible = window.plausible || function () { (plausible.q = plausible.q || []).push(arguments) }, plausible.init = plausible.init || function (i) { plausible.o = i || {} };
+        plausible.init();
+        {# Index des pages pour le prompt interactif (commande `ls` / `cd`). #}
+        window.CRT_ROUTES = {
+            "accueil": "{{ path('crt_discover') }}",
+            "chercheurs": "{{ path('crt_researchers') }}",
+            "journalistes": "{{ path('crt_journalists') }}",
+            "enseignants": "{{ path('crt_teachers') }}",
+            "grand-public": "{{ path('crt_public') }}",
+            "tarifs": "{{ path('crt_pricing') }}",
+            "soutenir": "{{ path('crt_donate') }}",
+            "contact": "{{ path('crt_contact') }}",
+            "mentions": "{{ path('crt_legal') }}",
+            "wiki": "{{ path('home') }}"
+        };
+    </script>
+</head>
+<body>
+    {# Surcouches CRT (scanlines, vignette, scintillement). #}
+    <div class="crt-overlay" aria-hidden="true"></div>
+    <div class="crt-flicker" aria-hidden="true"></div>
+
+    {% set route = app.request.attributes.get('_route') %}
+    <div class="scr">
+        <div class="term-bar">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="ttl">SciencesWiki — IBM-MONOCHROME · TTY1</span>
+            <span class="clock" aria-hidden="true">--:--:--</span>
+        </div>
+        <div class="term">
+            <p class="prompt-line"><span class="ps1">invité@scienceswiki<span class="at">:</span><span class="path">~/{% block cwd %}{% endblock %}</span>$</span> <span class="cmd">{% block command %}cat readme.txt{% endblock %}</span></p>
+
+            <nav class="shell-nav" aria-label="Navigation principale">
+                <a href="{{ path('crt_discover') }}"{{ route == 'crt_discover' ? ' aria-current="page"' : '' }}>accueil</a>
+                <a href="{{ path('crt_researchers') }}"{{ route == 'crt_researchers' ? ' aria-current="page"' : '' }}>chercheurs</a>
+                <a href="{{ path('crt_journalists') }}"{{ route == 'crt_journalists' ? ' aria-current="page"' : '' }}>journalistes</a>
+                <a href="{{ path('crt_teachers') }}"{{ route == 'crt_teachers' ? ' aria-current="page"' : '' }}>enseignants</a>
+                <a href="{{ path('crt_public') }}"{{ route == 'crt_public' ? ' aria-current="page"' : '' }}>grand-public</a>
+                <a href="{{ path('crt_pricing') }}"{{ route == 'crt_pricing' ? ' aria-current="page"' : '' }}>tarifs</a>
+                <a href="{{ path('crt_donate') }}"{{ route == 'crt_donate' ? ' aria-current="page"' : '' }}>soutenir</a>
+                <a href="{{ path('crt_contact') }}"{{ route == 'crt_contact' ? ' aria-current="page"' : '' }}>contact</a>
+                <span class="sep">|</span>
+                <a href="{{ path('home') }}">⮐ ouvrir le wiki</a>
+            </nav>
+
+            {% for t in ['success', 'error'] %}{% for m in app.flashes(t) %}
+                <div class="box {{ t == 'success' ? 'ok' : 'warn' }}"><span class="box-ttl">{{ t == 'success' ? 'OK' : 'ERREUR' }}</span>{{ m }}</div>
+            {% endfor %}{% endfor %}
+
+            <main>
+                {% block body %}{% endblock %}
+            </main>
+
+            {# Prompt interactif (easter-egg shell : help, ls, cd…). #}
+            <div class="shell-io" aria-hidden="true">
+                <div id="shell-log">tapez « help » puis Entrée — ce terminal répond.</div>
+                <div class="shell-input-line">
+                    <span class="ps1">invité@scienceswiki<span class="at">:</span><span class="path">~</span>$</span>
+                    <input id="shell-cmd" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Invite de commande">
+                    <span class="cursor"></span>
+                </div>
+            </div>
+
+            <footer class="scr-footer">
+                <a href="{{ path('crt_legal') }}">mentions légales</a>
+                <a href="{{ path('crt_contact') }}">contact</a>
+                <a href="{{ path('crt_donate') }}">soutenir</a>
+                <a href="{{ path('project') }}">le projet</a>
+                <span class="ver">SciencesWiki · {{ app_version }} · CC BY-SA 4.0</span>
+            </footer>
+        </div>
+    </div>
+
+    <script src="/js/crt.js" defer></script>
+</body>
+</html>

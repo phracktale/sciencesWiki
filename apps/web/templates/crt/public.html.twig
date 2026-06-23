@@ -1,0 +1,46 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Grand public{% endblock %}
+{% block cwd %}pour/grand-public{% endblock %}
+{% block command %}man curieux{% endblock %}
+{% block description %}SciencesWiki pour le grand public : réponses vulgarisées et sourcées, « décoder une étude », bouclier anti-désinformation contre les affirmations virales, infolettre mensuelle des avancées.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Grand public — comprendre, sans se faire avoir." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">La science en langage clair, <strong>toujours avec ses sources</strong>.
+    Posez une question, décodez une étude, vérifiez une affirmation virale (santé, climat,
+    nutrition) contre le consensus — sans jargon et sans baratin.</p>
+
+    <h2>Bénéfices</h2>
+    <ul class="doslist">
+        <li><strong>Des réponses claires</strong> — langage simple, mais citant les vrais papiers.</li>
+        <li><strong>Un esprit critique outillé</strong> — ce qu'une étude montre… <em>et ne montre pas</em>.</li>
+        <li><strong>Un rempart anti-désinformation</strong> — l'affirmation virale confrontée au consensus.</li>
+        <li><strong>Gratuit et sans pistage</strong> — pas de pub, pas de revente de données.</li>
+    </ul>
+
+    <h2>Fonctionnalités</h2>
+    <table class="dos">
+        <thead><tr><th>#</th><th>Outil</th><th>Ce qu'il fait</th><th>Statut</th></tr></thead>
+        <tbody>
+            <tr><td>12</td><td>Q&R vulgarisé sourcé</td><td>Réponses en langage clair, citant les papiers.</td><td><span class="tag ok">en ligne</span></td></tr>
+            <tr><td>13</td><td>Articles longs de vulgarisation</td><td>L'épine dorsale encyclopédique par thème, RAG multi-sources, relue.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>14</td><td>« Décoder une étude »</td><td>Collez un DOI/lien → résumé clair + ce qu'elle montre et ne montre pas + limites + à qui ça s'applique.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>15</td><td>Bouclier anti-désinformation</td><td>Vérifier une affirmation virale contre le consensus, en une carte simple « ce qu'on sait ».</td><td><span class="tag warn">à venir</span></td></tr>
+            <tr><td>16</td><td>Infolettre thématique</td><td>« Les avancées du mois » d'un domaine, vulgarisées, avec les 3–5 études marquantes.</td><td><span class="tag warn">à venir</span></td></tr>
+        </tbody>
+    </table>
+
+    <div class="box dbl">
+        <span class="box-ttl">Exemple</span>
+        <pre class="out">$ ask "le jeûne intermittent réduit-il la mortalité ?"
+> CONSENSUS PARTIEL — bénéfices métaboliques documentés ;
+  effet sur la mortalité : preuve encore limitée (peu d'essais longs).
+  sources : [1] DOI:10.xxxx … [2] DOI:10.yyyy … (3 concordantes, 1 divergente)</pre>
+    </div>
+
+    <div class="btn-row">
+        <a class="btn primary" href="{{ path('wiki_search') }}">Poser une question</a>
+        <a class="btn" href="{{ path('crt_donate') }}">★ Soutenir le projet</a>
+    </div>
+{% endblock %}

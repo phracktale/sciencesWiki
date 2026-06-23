@@ -1,0 +1,47 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Chercheurs{% endblock %}
+{% block cwd %}pour/chercheurs{% endblock %}
+{% block command %}man chercheur{% endblock %}
+{% block description %}SciencesWiki pour les chercheurs : recherche sémantique trans-domaine, revue de littérature sourcée, « related work » d'un manuscrit, cartographie des auteurs, détecteur de rétractations.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Chercheurs — explorez la littérature par le sens." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">Sortez des silos disciplinaires. Le corpus relie des millions de publications
+    par leur <strong>signification</strong> (embeddings + RAG pgvector), pas par leurs mots-clés.
+    Gagnez des heures de bibliographie — et ne ratez plus l'article voisin que personne ne cite.</p>
+
+    <h2>Bénéfices</h2>
+    <ul class="doslist">
+        <li><strong>Voir au-delà de sa discipline</strong> — les ponts inter-domaines invisibles au mot-clé.</li>
+        <li><strong>Des synthèses traçables</strong> — chaque phrase renvoie à un DOI, jamais d'affirmation hors-sol.</li>
+        <li><strong>Du temps récupéré</strong> — la première passe de revue de littérature en minutes, pas en semaines.</li>
+        <li><strong>De la fiabilité</strong> — niveau de preuve explicite (FWCI, citations, accès ouvert, rétractations).</li>
+    </ul>
+
+    <h2>Fonctionnalités</h2>
+    <table class="dos">
+        <thead><tr><th>#</th><th>Outil</th><th>Ce qu'il fait</th><th>Statut</th></tr></thead>
+        <tbody>
+            <tr><td>01</td><td>Recherche sémantique trans-domaine</td><td>Trouve les articles pertinents par le sens, y compris hors de sa discipline.</td><td><span class="tag ok">en ligne</span></td></tr>
+            <tr><td>02</td><td>Revue de littérature assistée</td><td>Synthèse RAG sourcée d'un sous-domaine (consensus, méthodes, lacunes), export Markdown/PDF + biblio.</td><td><span class="tag ok">espace chercheur</span></td></tr>
+            <tr><td>03</td><td>Consensus vs contradictions</td><td>Une question → conclusions concordantes/divergentes avec niveau de preuve.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>04</td><td>« Related work » d'un manuscrit</td><td>Collez un résumé → articles proches (kNN) pour situer votre travail, trouver les réf. manquantes.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>05</td><td>Veille personnalisée</td><td>Alertes e-mail : nouveaux top-cités d'un sous-domaine, ou citant un auteur/une revue suivie.</td><td><span class="tag warn">à venir</span></td></tr>
+            <tr><td>06</td><td>Cartographie auteurs / revues / éditeurs</td><td>Qui publie quoi, où, avec qui → graphes de collaboration.</td><td><span class="tag">bêta</span></td></tr>
+            <tr><td>07</td><td>Détecteur de rétractations</td><td>Collez une liste de DOIs → signale études rétractées ou sous « expression of concern ».</td><td><span class="tag warn">à venir</span></td></tr>
+        </tbody>
+    </table>
+
+    <div class="box dbl">
+        <span class="box-ttl">Accès chercheur</span>
+        La revue de littérature assistée et la bibliothèque de revues sont réservées au rôle
+        <strong>ROLE_RESEARCHER</strong>. Vous êtes chercheur ou auteur d'une publication citée&nbsp;?
+        <a href="{{ path('home') }}#join">Demandez un accès</a> — c'est gratuit.
+    </div>
+
+    <div class="btn-row">
+        <a class="btn primary" href="{{ path('wiki_search') }}">Tester la recherche sémantique</a>
+        <a class="btn" href="{{ path('crt_contact') }}">Nous écrire</a>
+    </div>
+{% endblock %}

@@ -1,0 +1,60 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Soutenir{% endblock %}
+{% block cwd %}soutenir{% endblock %}
+{% block command %}./donate.sh --comme-wikipedia{% endblock %}
+{% block description %}Soutenez SciencesWiki : une cagnotte, comme Wikipédia, pour couvrir l'hébergement et les sauvegardes du corpus. Le projet est libre, gratuit et sans publicité.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Soutenir SciencesWiki — comme Wikipédia." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">SciencesWiki est <strong>gratuit, sans publicité et sans pistage</strong>.
+    Pour rester libre, il a besoin de vous. Quelques euros suffisent à garder le corpus en ligne
+    et sauvegardé.</p>
+
+    <div class="box dbl">
+        <span class="box-ttl">À quoi sert votre don</span>
+        <pre class="out">$ df -h /corpus
+RUBRIQUE                  USAGE   COÛT/MOIS (estimé)
+serveurs (CPU/GPU LLM)    ████░░  hébergement & inférence
+stockage embeddings       ███░░░  base vectorielle pgvector
+sauvegardes chiffrées     ███░░░  redondance hors-site (3-2-1)
+bande passante & domaine  █░░░░░  diffusion publique
+─────────────────────────────────────────────
+TOTAL                     financé à 100% par les dons</pre>
+        <p class="dim" style="margin-bottom:0;">Pas de salaire, pas de marge : chaque euro va à la machine et aux sauvegardes.</p>
+    </div>
+
+    <h2 id="don">Faire un don</h2>
+    {% if donate_url %}
+        <p class="dim">Choisissez un montant — ou indiquez le vôtre sur la page de la cagnotte. Paiement sécurisé externe.</p>
+        <div class="btn-row">
+            <a class="btn" href="{{ donate_url }}" rel="noopener" target="_blank">5 €</a>
+            <a class="btn" href="{{ donate_url }}" rel="noopener" target="_blank">10 €</a>
+            <a class="btn primary" href="{{ donate_url }}" rel="noopener" target="_blank">20 €</a>
+            <a class="btn" href="{{ donate_url }}" rel="noopener" target="_blank">50 €</a>
+            <a class="btn" href="{{ donate_url }}" rel="noopener" target="_blank">Montant libre</a>
+        </div>
+        <p class="dim"><small>Vous quittez SciencesWiki vers la plateforme de cagnotte sécurisée.</small></p>
+    {% else %}
+        <div class="box warn">
+            <span class="box-ttl">Bientôt</span>
+            La cagnotte est en cours d'ouverture. En attendant, <a href="{{ path('crt_contact') }}">écrivez-nous</a>
+            pour proposer un soutien (don, mécénat, hébergement) — on vous tient au courant du lancement.
+        </div>
+    {% endif %}
+
+    <h2>Autres façons d'aider (gratuites)</h2>
+    <ul class="doslist">
+        <li><strong>Contribuer</strong> — rejoindre le comité scientifique, vulgariser, valider des réponses. <a href="{{ path('home') }}#join">Nous rejoindre</a>.</li>
+        <li><strong>Partager</strong> — faire connaître le projet autour de vous, en cours, en rédaction.</li>
+        <li><strong>Signaler</strong> — une erreur, une source manquante, une étude rétractée à retirer.</li>
+        <li><strong>Réutiliser</strong> — le contenu est sous CC BY-SA 4.0 : citez-le, diffusez-le.</li>
+    </ul>
+
+    <div class="box ok">
+        <span class="box-ttl">Transparence</span>
+        Projet à but non lucratif, libre et open source. Les coûts d'infrastructure et l'usage
+        des dons seront publiés. Aucune donnée personnelle des donateurs n'est revendue.
+        Des questions&nbsp;? <a href="{{ path('crt_contact') }}">Contactez-nous</a>.
+    </div>
+{% endblock %}

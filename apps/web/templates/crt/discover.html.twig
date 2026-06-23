@@ -1,0 +1,76 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Accueil{% endblock %}
+{% block cwd %}{% endblock %}
+{% block command %}./scienceswiki --boot{% endblock %}
+{% block description %}SciencesWiki : le savoir scientifique, libre et vulgarisé. Recherche sémantique, fact-checking sourcé, vulgarisation à 4 niveaux de lecture — pour chercheurs, journalistes, enseignants et grand public.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="SciencesWiki — le savoir scientifique, libre et vulgarisé." data-tw-speed="20" data-tw-cursor></h1>
+
+    <p class="lead">Des millions d'articles de recherche (métadonnées + résumés OpenAlex, texte
+    intégral du haut du panier) vectorisés et reliés à un modèle de langage. On en tire bien
+    plus qu'un moteur de recherche : <strong>une réponse sourcée, à votre niveau de lecture.</strong></p>
+
+    <div class="box dbl">
+        <span class="box-ttl">README.txt</span>
+        <pre class="out">$ whatis scienceswiki
+scienceswiki — encyclopédie scientifique adossée à la littérature évaluée.
+  • recherche par le SENS, pas seulement les mots-clés
+  • réponses CITANT les papiers (DOI, OA, citations, rétractations)
+  • un même contenu décliné en 4 niveaux : chercheur → grand public → collège → primaire
+  • libre (CC BY-SA 4.0), open source, et 100% gratuit
+$ _</pre>
+    </div>
+
+    <h2 id="publics">Choisissez votre profil</h2>
+    <p class="dim">Quatre portes d'entrée, un même corpus. Cliquez (ou tapez <strong>ls</strong> dans l'invite en bas).</p>
+
+    <div class="grid">
+        <a class="tile" href="{{ path('crt_researchers') }}">
+            <span class="ico">🔬</span>
+            <h3>Chercheurs</h3>
+            <p class="dim">Recherche sémantique trans-domaine, revue de littérature sourcée, « related work », détecteur de rétractations.</p>
+            <span class="tag ok">/pour/chercheurs</span>
+        </a>
+        <a class="tile" href="{{ path('crt_journalists') }}">
+            <span class="ico">📰</span>
+            <h3>Journalistes</h3>
+            <p class="dim">Fact-checking sourcé, briefing express, hype-mètre, annuaire d'experts à contacter.</p>
+            <span class="tag ok">/pour/journalistes</span>
+        </a>
+        <a class="tile" href="{{ path('crt_teachers') }}">
+            <span class="ico">🎓</span>
+            <h3>Enseignants & élèves</h3>
+            <p class="dim">Fiches de révision sourcées, quiz auto-générés, réécriture par niveau, séquences pédagogiques.</p>
+            <span class="tag ok">/pour/enseignants</span>
+        </a>
+        <a class="tile" href="{{ path('crt_public') }}">
+            <span class="ico">👥</span>
+            <h3>Grand public</h3>
+            <p class="dim">Q&R vulgarisé, « décoder une étude », bouclier anti-désinformation, infolettre du mois.</p>
+            <span class="tag ok">/pour/grand-public</span>
+        </a>
+    </div>
+
+    <h2 id="pourquoi">Pourquoi c'est différent</h2>
+    <ul class="doslist">
+        <li><strong>Sourcé par construction.</strong> Chaque affirmation renvoie aux publications : DOI, accès ouvert, nombre de citations, statut de rétractation.</li>
+        <li><strong>Le bon niveau de lecture.</strong> Un curseur décline le même savoir du chercheur à l'enfant de 8 ans.</li>
+        <li><strong>Au-delà du mot-clé.</strong> La recherche sémantique trouve par le sens, y compris hors de votre discipline.</li>
+        <li><strong>Honnête sur l'incertitude.</strong> On distingue consensus, controverse et lacune — préprint vs étude évaluée.</li>
+    </ul>
+
+    <div class="box ok">
+        <span class="box-ttl">Modèle</span>
+        Tout est gratuit. Pas de paywall, pas de pub, pas de revente de données.
+        L'hébergement et les sauvegardes du corpus coûtent cher : le projet vit d'une
+        <a href="{{ path('crt_donate') }}">cagnotte, comme Wikipédia</a>. Voir aussi la <a href="{{ path('crt_pricing') }}">grille tarifaire</a> (spoiler : 0&nbsp;€).
+    </div>
+
+    <div class="btn-row">
+        <a class="btn primary" href="{{ path('wiki_search') }}">Lancer une recherche</a>
+        <a class="btn" href="{{ path('crt_donate') }}">★ Soutenir le projet</a>
+        <a class="btn" href="{{ path('crt_pricing') }}">Voir les tarifs</a>
+    </div>
+{% endblock %}
