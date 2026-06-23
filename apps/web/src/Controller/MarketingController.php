@@ -77,9 +77,8 @@ final class MarketingController extends AbstractController
     public function donate(): Response
     {
         return $this->render('crt/donate.html.twig', [
-            // URL de la plateforme de cagnotte (HelloAsso, Liberapay, Stripe…).
-            // Tant qu'elle est null, la page invite à nous écrire (cagnotte en cours d'ouverture).
-            'donate_url' => null,
+            // Cagnotte « OnParticipe ». Quand null, la page invite à nous écrire.
+            'donate_url' => 'https://www.onparticipe.fr/c/42S107cn',
         ]);
     }
 
