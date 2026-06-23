@@ -41,6 +41,21 @@ final class WikiController extends AbstractController
         return $this->render('wiki/researcher.html.twig');
     }
 
+    /**
+     * Assistant IA (Open WebUI en iframe, SSO forward-auth) — tout profil connecté.
+     * La page est protégée par login ; l'iframe ne charge donc que pour un
+     * utilisateur déjà authentifié → pas de redirection dans l'iframe.
+     */
+    #[Route('/{_locale}/chat', name: 'chat', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function chat(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/chat']);
+        }
+
+        return $this->render('wiki/chat.html.twig');
+    }
+
     /** Revue de littérature assistée (RAG sourcé, flux SSE) — réservé ROLE_RESEARCHER. */
     #[Route('/{_locale}/chercheur/revue-litterature', name: 'literature_review', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function literatureReview(): Response

@@ -1,0 +1,34 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Assistant IA — SciencesWiki{% endblock %}
+{% block description %}Assistant IA SciencesWiki : chat multi-modèles auto-hébergé avec accès au corpus (RAG sourcé).{% endblock %}
+
+{% block body %}
+<style>
+    .chat-embed { margin: 0; }
+    .chat-embed-head { display:flex; align-items:baseline; justify-content:space-between; gap:1rem; flex-wrap:wrap; margin-bottom:.6rem; }
+    .chat-embed-head h1 { margin:0; font-size:1.3rem; }
+    .chat-embed-hint { font-size:.85rem; color:var(--muted, #64748b); margin:0; max-width:60ch; }
+    .chat-frame-wrap { border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#05080a; }
+    .chat-frame { display:block; width:100%; height:78vh; min-height:520px; border:0; }
+</style>
+
+<section class="chat-embed">
+    <div class="chat-embed-head">
+        <h1>💬 Assistant IA</h1>
+        <p class="chat-embed-hint">
+            Chat multi-modèles auto-hébergé. Choisis <strong>« scienceswiki-rag »</strong>
+            pour des réponses <strong>sourcées</strong> sur le corpus (citations [n]) ;
+            les autres modèles répondent en chat libre, sans le corpus.
+        </p>
+    </div>
+    <div class="chat-frame-wrap">
+        <iframe
+            class="chat-frame"
+            src="https://chat.scienceswiki.eu/"
+            title="Assistant IA SciencesWiki"
+            allow="clipboard-write; microphone"
+            referrerpolicy="strict-origin"></iframe>
+    </div>
+</section>
+{% endblock %}

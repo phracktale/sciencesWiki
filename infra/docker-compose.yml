@@ -264,13 +264,14 @@ services:
       OLLAMA_BASE_URL: "http://192.168.1.171:11434"
       # Modèle proposé par défaut à l'ouverture d'un chat.
       DEFAULT_MODELS: "qwen3.6:latest"
-      # Auth activée (des comptes existent déjà). Connexion avec ton compte ; au
-      # go-live, le SSO forward-auth (Heimdall) posera l'identité via trusted-header.
-      # GO-LIVE (exposition Heimdall) : activer le trusted-header
-      # (l'identité vient du forward-auth, cf. chat.scienceswiki.eu.conf) :
-      #   WEBUI_AUTH_TRUSTED_EMAIL_HEADER: "X-SW-Auth-Email"
-      #   WEBUI_AUTH_TRUSTED_NAME_HEADER:  "X-SW-Auth-Name"
-      #   WEBUI_URL: "https://chat.scienceswiki.eu"
+      # SSO : l'identité vient du forward-auth Heimdall (en-têtes de confiance que
+      # le proxy POSE et que le client ne peut pas usurper, cf. chat.scienceswiki.eu.conf).
+      # Open WebUI retrouve/ouvre le compte d'après l'e-mail du header → pas de mot
+      # de passe. ⚠️ Le port LAN :8092 n'a PAS ces en-têtes → accès direct = sans
+      # identité ; à durcir au pare-feu (n'autoriser :8092 que depuis Heimdall).
+      WEBUI_AUTH_TRUSTED_EMAIL_HEADER: "X-SW-Auth-Email"
+      WEBUI_AUTH_TRUSTED_NAME_HEADER: "X-SW-Auth-Name"
+      WEBUI_URL: "https://chat.scienceswiki.eu"
       WEBUI_NAME: "SciencesWiki — Assistant"
     volumes:
       - openwebui_data:/app/backend/data
