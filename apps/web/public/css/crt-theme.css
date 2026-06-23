@@ -82,14 +82,20 @@ body.theme-crt hr { border-color: var(--line); }
 /* --------------------------------- En-tête --------------------------------- */
 body.theme-crt header { border-bottom-color: var(--line); }
 body.theme-crt header .brand { color: var(--accent); }
-body.theme-crt header .brand img { filter: grayscale(1) brightness(0) invert(.92); }
+/* Logo dédié CRT (logo-crt.svg servi par le template) : pas de filtre. */
+body.theme-crt header .brand img { filter: none; }
 body.theme-crt header nav a { color: var(--phos); }
 body.theme-crt header nav a:hover { background: rgba(185,240,201,.12); color: var(--phos-bright); }
 body.theme-crt header nav a.is-active { color: var(--accent); }
 body.theme-crt header nav a.is-active::after { background: var(--accent); }
 body.theme-crt .nav-dd-top { color: var(--phos); background: rgba(185,240,201,.06); border-color: var(--line); }
 body.theme-crt .nav-dd-top:hover, body.theme-crt .nav-dd:focus-within .nav-dd-top { background: rgba(185,240,201,.14); }
-body.theme-crt .nav-dd-menu { background: #0c100e; border-color: var(--line); box-shadow: 0 10px 28px rgba(0,0,0,.5); }
+/* Menu « Mon compte » : fond OPAQUE et AU-DESSUS des surcouches tube (sinon les
+   scanlines/vignette le rendent illisible et il semble se superposer au contenu). */
+body.theme-crt .nav-dd-menu { background: #0c100e; border-color: var(--accent); box-shadow: 0 10px 28px rgba(0,0,0,.7); z-index: 9100; }
+body.theme-crt .nav-dd-menu a { color: var(--phos); }
+body.theme-crt .nav-dd-menu a:hover { background: rgba(185,240,201,.12); color: var(--phos-bright); }
+body.theme-crt .nav-dd-logout { color: #f3b0b0 !important; border-top-color: var(--line); }
 body.theme-crt .nav-email { color: var(--phos-dim); }
 
 /* --------------------------------- Cartes ---------------------------------- */
@@ -267,6 +273,13 @@ body.theme-crt [role=tab][aria-selected=false] .tab-badge { background: var(--ph
 body.theme-crt .cv-summary { color: var(--phos) !important; }
 body.theme-crt .cv-meta, body.theme-crt .cv-claim figcaption, body.theme-crt .cv-claim-meta { color: var(--phos-dim) !important; }
 body.theme-crt .cv-claim blockquote { background: rgba(0,0,0,.3) !important; color: var(--phos) !important; border-left-color: var(--phos-faint) !important; }
+
+/* Revues de littérature : cartes (fond blanc) + boutons d'action (fond blanc). */
+body.theme-crt .rev-item { background: #0e1310 !important; border-color: var(--line) !important; }
+body.theme-crt .rev-actions a, body.theme-crt .rev-actions button { background: transparent !important; color: var(--accent) !important; border-color: var(--accent) !important; }
+body.theme-crt .rev-actions a:hover, body.theme-crt .rev-actions button:hover { background: rgba(185,240,201,.12) !important; color: var(--phos-bright) !important; }
+body.theme-crt .rev-actions .del { border-color: #7f3030 !important; color: #f3b0b0 !important; }
+body.theme-crt .rev-actions .del:hover { background: #2a1414 !important; color: #f3b0b0 !important; }
 
 /* Le bandeau ADMIN garde sa propre charte (déjà sombre, bleu clair lisible). */
 body.theme-crt #admin-bar, body.theme-crt #admin-bar * { color: revert !important; background: revert !important; }

@@ -78,7 +78,7 @@
         .nav-dd-top .nav-email { display:block; font-weight:400; font-size:.76rem; color:var(--muted, #64748b); }
         .nav-dd-menu { position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,.12); min-width:210px; padding:.3rem; display:none; z-index:50; }
         .nav-dd-menu::before { content:''; position:absolute; left:0; right:0; top:-8px; height:8px; }
-        .nav-dd:hover .nav-dd-menu, .nav-dd:focus-within .nav-dd-menu { display:block; }
+        .nav-dd:hover .nav-dd-menu, .nav-dd:focus-within .nav-dd-menu, .nav-dd.open .nav-dd-menu { display:block; }
         .nav-dd-menu a { display:block; }
         .nav-dd-logout { border-top:1px solid var(--line); margin-top:.2rem; color:#b91c1c !important; }
         h1 { margin: .3rem 0; font-size:1.7rem; }
@@ -207,7 +207,7 @@
 <body{{ crt ? ' class="theme-crt"' : '' }}>
     {% if crt %}<div class="crt-overlay" aria-hidden="true"></div><div class="crt-flicker" aria-hidden="true"></div>{% endif %}
     <header>
-        <a class="brand" href="{{ path('home') }}"><img src="/logo.svg" alt="SciencesWiki"></a>
+        <a class="brand" href="{{ path('home') }}"><img src="{{ crt ? '/logo-crt.svg' : '/logo.svg' }}" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
         {% set route = app.request.attributes.get('_route') %}
         <nav>
@@ -309,5 +309,18 @@
         })();
         </script>
     {% endif %}
+
+    {# Menu « Mon compte » : ouverture au CLIC (fiable — ne se referme plus avant
+       de pouvoir cliquer un lien). Le survol reste un raccourci (cf. CSS). #}
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var dd = document.querySelector('.nav-dd');
+        if (!dd) return;
+        var btn = dd.querySelector('.nav-dd-top');
+        btn.addEventListener('click', function (e) { e.stopPropagation(); dd.classList.toggle('open'); });
+        document.addEventListener('click', function (e) { if (!dd.contains(e.target)) dd.classList.remove('open'); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') dd.classList.remove('open'); });
+    })();
+    </script>
 </body>
 </html>
