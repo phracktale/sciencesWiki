@@ -9,7 +9,19 @@
     <form class="ask" method="post" action="{{ path('admin_settings_general') }}" style="max-width:640px">
         <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
 
-        <h2 style="margin-top:0">Notifications des modérateurs</h2>
+        <h2 style="margin-top:0">Thème du site public</h2>
+        <p class="muted" style="font-size:.85rem">Apparence du front public (le back-office n'est jamais affecté). <strong>Legacy</strong> = thème clair d'origine. <strong>CRT</strong> = écran cathodique IBM monochrome (scanlines, phosphore). Bascule réversible à tout moment ; effet quasi immédiat (cache ~1&nbsp;min).</p>
+        {% set theme = settings['site.theme']|default('legacy') %}
+        <label style="display:flex; align-items:center; gap:.5rem; margin:.4rem 0">
+            <input type="radio" name="site_theme" value="legacy" {{ theme != 'crt' ? 'checked' }}>
+            Legacy — thème clair d'origine
+        </label>
+        <label style="display:flex; align-items:center; gap:.5rem; margin:.4rem 0">
+            <input type="radio" name="site_theme" value="crt" {{ theme == 'crt' ? 'checked' }}>
+            CRT — écran IBM monochrome (tube cathodique)
+        </label>
+
+        <h2 style="margin-top:1.4rem">Notifications des modérateurs</h2>
         <p class="muted" style="font-size:.85rem">À chaque nouvelle proposition de correction/contenu, le modérateur de la branche concernée reçoit un e-mail. Décochez pour suspendre ces envois.</p>
         <label style="display:flex; align-items:center; gap:.5rem; margin:.4rem 0">
             <input type="checkbox" name="mod_notify_enabled" value="1" {{ settings['mod.notify_enabled'] == '1' ? 'checked' }}>

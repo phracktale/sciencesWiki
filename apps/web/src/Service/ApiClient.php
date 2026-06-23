@@ -108,6 +108,18 @@ final class ApiClient
         }
     }
 
+    /** Thème public du site ('legacy' | 'crt'), repli 'legacy' si l'API est muette. */
+    public function publicTheme(): string
+    {
+        try {
+            $v = (string) ($this->get('/api/public-settings')['theme'] ?? 'legacy');
+
+            return \in_array($v, ['legacy', 'crt'], true) ? $v : 'legacy';
+        } catch (\Throwable) {
+            return 'legacy';
+        }
+    }
+
     /**
      * Controverses d'un nœud + état d'analyse (cf. spec controverses §8.1).
      * Le déclenchement (POST .../analyze) et le polling sont faits côté navigateur

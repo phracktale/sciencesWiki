@@ -25,6 +25,7 @@ final class AdminController extends AbstractController
         private readonly \App\Service\UserApiClient $user,
         private readonly \App\Service\AdminCsrf $csrf,
         private readonly \Symfony\Contracts\HttpClient\HttpClientInterface $httpClient,
+        private readonly \App\Service\ThemeService $theme,
     ) {
     }
 
@@ -78,6 +79,7 @@ final class AdminController extends AbstractController
     public function settingsGeneral(Request $request): Response
     {
         return $this->saveSettingsPage($request, 'admin_settings_general', 'admin/settings_general.html.twig', static fn (Request $r): array => [
+            'site.theme' => 'crt' === $r->request->get('site_theme') ? 'crt' : 'legacy',
             'mail.reroute_enabled' => $r->request->get('reroute_enabled') ? '1' : '0',
             'mail.reroute_to' => trim((string) $r->request->get('reroute_to')),
             'mod.notify_enabled' => $r->request->get('mod_notify_enabled') ? '1' : '0',
@@ -124,6 +126,8 @@ final class AdminController extends AbstractController
                 return $this->redirectToRoute($route);
             }
             $result = $this->admin->saveSettings($extract($request));
+            // Le thème est lu en cache côté front : on invalide pour un effet immédiat.
+            $this->theme->forget();
             $this->addFlash($result['ok'] ? 'success' : 'error', $result['ok'] ? 'Paramètres enregistrés.' : 'Échec de l\'enregistrement.');
 
             return $this->redirectToRoute($route);

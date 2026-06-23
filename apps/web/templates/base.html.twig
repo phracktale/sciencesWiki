@@ -1,5 +1,9 @@
 <!DOCTYPE html>
-<html lang="fr">
+{# Thème visuel piloté en back-office. Le CRT ne s'applique qu'au front public
+   (jamais au back-office : '_route' ne commence pas par 'admin'). Le legacy reste
+   le défaut et reste réactivable d'un clic dans Paramètres › Général. #}
+{% set crt = site_theme.current() == 'crt' and not ((app.request.attributes.get('_route')|default('')) starts with 'admin') %}
+<html lang="fr"{{ crt ? ' data-theme="crt"' : '' }}>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -162,6 +166,11 @@
         .ai-banner a { color:var(--accent-dark); font-weight:600; }
     </style>
 
+    {# Re-skin CRT « IBM monochrome » appliqué au front public (chargé APRÈS le
+       style legacy pour le surcharger). Le wiki garde le même balisage : seule
+       la peau change. Basculable depuis Paramètres › Général. #}
+    {% if crt %}<link rel="stylesheet" href="/css/crt-theme.css">{% endif %}
+
     {# Mesure d'audience respectueuse de la vie privée (Plausible auto-hébergé : sans cookies, sans données personnelles, RGPD-friendly). #}
     <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
     <script nonce="{{ csp_nonce.value }}">
@@ -195,7 +204,8 @@
         });
     </script>
 </head>
-<body>
+<body{{ crt ? ' class="theme-crt"' : '' }}>
+    {% if crt %}<div class="crt-overlay" aria-hidden="true"></div><div class="crt-flicker" aria-hidden="true"></div>{% endif %}
     <header>
         <a class="brand" href="{{ path('home') }}"><img src="/logo.svg" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>

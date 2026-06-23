@@ -48,6 +48,10 @@ final class SettingsService
     // Notifier les modérateurs par e-mail des nouvelles propositions de correction/contenu.
     public const MOD_NOTIFY_ENABLED = 'mod.notify_enabled';     // '0' | '1'
 
+    // Thème visuel du front public : 'legacy' (clair d'origine) ou 'crt' (tube
+    // cathodique monochrome). Lu publiquement par le front (cf. /api/public-settings).
+    public const SITE_THEME = 'site.theme';                     // 'legacy' | 'crt'
+
     public const DEFAULT_SYSTEM_PROMPT = <<<'TXT'
         Tu es un rédacteur de vulgarisation scientifique pour SciencesWiki, une
         encyclopédie libre d'éducation populaire en français.
@@ -118,6 +122,8 @@ final class SettingsService
         self::MAIL_REROUTE_ENABLED => '0',
         self::MAIL_REROUTE_TO => '',
         self::MOD_NOTIFY_ENABLED => '1',
+        // Thème par défaut : l'ancien (clair). Bascule en 'crt' depuis le back-office.
+        self::SITE_THEME => 'legacy',
     ];
 
     /** @var array<string,string>|null */
@@ -228,6 +234,14 @@ final class SettingsService
         return '1' === trim((string) ($this->get(self::MOD_NOTIFY_ENABLED) ?? '1'));
     }
 
+    /** Thème du front public : 'legacy' ou 'crt' (repli 'legacy' si valeur inconnue). */
+    public function siteTheme(): string
+    {
+        $v = trim((string) ($this->get(self::SITE_THEME) ?? 'legacy'));
+
+        return \in_array($v, ['legacy', 'crt'], true) ? $v : 'legacy';
+    }
+
     public function get(string $name): ?string
     {
         $this->cache ??= $this->repository->allAsMap();
@@ -259,13 +273,14 @@ final class SettingsService
             self::MAIL_REROUTE_ENABLED => $this->mailRerouteEnabled() ? '1' : '0',
             self::MAIL_REROUTE_TO => $this->mailRerouteTo(),
             self::MOD_NOTIFY_ENABLED => $this->moderatorNotifyEnabled() ? '1' : '0',
+            self::SITE_THEME => $this->siteTheme(),
         ];
     }
 
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

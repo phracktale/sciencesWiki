@@ -1,0 +1,180 @@
+/* ============================================================================
+   SciencesWiki — Re-skin CRT « IBM monochrome » du FRONT LEGACY.
+   Ne change PAS le balisage : restyle les composants existants (base.html.twig
+   + pages wiki) en phosphore-sur-tube. Chargé seulement quand le thème 'crt' est
+   actif (Paramètres › Général) et jamais en back-office.
+
+   Autonome (n'importe pas crt.css). Tout est scopé sous body.theme-crt.
+   Les manettes d'effets (--scan-opacity, etc.) sont identiques à crt.css : ajustez
+   ici pour le front legacy, ou via le panneau ⚙ sur les pages de présentation.
+   ========================================================================== */
+
+body.theme-crt {
+    /* Palette phosphore P4 (blanc-gris chaud). */
+    --phos:        #d7d8cf;
+    --phos-dim:    #8f968c;
+    --phos-bright: #f4f5ee;
+    --phos-faint:  #4d544c;
+    --glow:        rgba(215, 216, 207, .45);
+
+    /* On REDÉFINIT les variables legacy : tout composant qui les utilise bascule
+       automatiquement (couleurs d'accent, lignes, encre, fonds). */
+    --accent:      #b9f0c9;   /* ex-teal #019fb9 */
+    --accent-dark: #eafff2;   /* ex-bleu nuit */
+    --aca:         #a9d8c2;   /* bloc académique (était bleu) */
+    --vul:         #f0d8a0;   /* bloc vulgarisation (ambre d'appoint) */
+    --bg:          #0a0d0b;
+    --line:        #3a423c;
+    --ink:         #d7d8cf;
+
+    /* Manettes d'effets (cf. crt.css). 0 = effet désactivé. */
+    --scan-opacity: .22; --scan-gap: 3px; --scan-thickness: 1px; --rgb-opacity: .025;
+    --vignette: .6; --curve: 6%; --flicker: .012; --flicker-speed: .12s;
+    --roll: .035; --roll-speed: 7s; --glow-blur: 6px; --glow-strength: .18;
+
+    background: var(--bg);
+    background-image: radial-gradient(120% 130% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
+    color: var(--phos);
+    text-shadow: 0 0 1px var(--glow), 0 0 var(--glow-blur) rgba(215,216,207,var(--glow-strength));
+    -webkit-font-smoothing: none;
+}
+
+/* ----------------------------- Surcouches tube ----------------------------- */
+body.theme-crt .crt-overlay, body.theme-crt .crt-flicker { position: fixed; inset: 0; pointer-events: none; z-index: 9000; }
+body.theme-crt .crt-overlay {
+    z-index: 9001; mix-blend-mode: multiply;
+    background:
+        repeating-linear-gradient(to bottom,
+            rgba(0,0,0,0) 0,
+            rgba(0,0,0,0) calc(var(--scan-gap) - var(--scan-thickness)),
+            rgba(0,0,0,var(--scan-opacity)) calc(var(--scan-gap) - var(--scan-thickness)),
+            rgba(0,0,0,var(--scan-opacity)) var(--scan-gap)),
+        repeating-linear-gradient(to right,
+            rgba(255,80,80,var(--rgb-opacity)),
+            rgba(80,255,80,var(--rgb-opacity)) 1px,
+            rgba(80,80,255,var(--rgb-opacity)) 2px);
+}
+body.theme-crt .crt-overlay::after {
+    content: ''; position: absolute; inset: 0;
+    background:
+        radial-gradient(140% 140% at 50% -10%, rgba(255,255,255,.05), transparent 40%),
+        radial-gradient(120% 120% at 50% 50%, transparent 60%, rgba(0,0,0,var(--vignette)) 100%);
+    border-radius: 50% / var(--curve);
+    box-shadow: inset 0 0 120px 30px rgba(0,0,0,calc(var(--vignette) * .92));
+}
+body.theme-crt .crt-flicker { z-index: 9002; background: rgba(215,216,207,var(--flicker)); animation: crt-flick var(--flicker-speed) steps(2) infinite; }
+body.theme-crt .crt-flicker::before { content: ''; position: absolute; left: 0; right: 0; height: 28vh; background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,var(--roll)), rgba(255,255,255,0)); animation: crt-roll var(--roll-speed) linear infinite; }
+@keyframes crt-flick { 0% { opacity: .92; } 50% { opacity: 1; } 100% { opacity: .96; } }
+@keyframes crt-roll { 0% { top: -30vh; } 100% { top: 100vh; } }
+
+/* L'enveloppe legacy reste au-dessus des scanlines. */
+body.theme-crt > header, body.theme-crt > main, body.theme-crt > footer { position: relative; z-index: 10; }
+
+/* -------------------------------- Typographie ------------------------------ */
+body.theme-crt h1, body.theme-crt h2, body.theme-crt h3, body.theme-crt h4 { color: var(--phos-bright); letter-spacing: .02em; }
+body.theme-crt a { color: var(--accent); }
+body.theme-crt a:hover, body.theme-crt a:focus { color: var(--phos-bright); }
+body.theme-crt a:focus { font-weight: bold; }
+body.theme-crt .muted, body.theme-crt .qmeta time, body.theme-crt small { color: var(--phos-dim); }
+body.theme-crt strong, body.theme-crt b { color: var(--phos-bright); }
+body.theme-crt hr { border-color: var(--line); }
+
+/* --------------------------------- En-tête --------------------------------- */
+body.theme-crt header { border-bottom-color: var(--line); }
+body.theme-crt header .brand { color: var(--accent); }
+body.theme-crt header .brand img { filter: grayscale(1) brightness(0) invert(.92); }
+body.theme-crt header nav a { color: var(--phos); }
+body.theme-crt header nav a:hover { background: rgba(185,240,201,.12); color: var(--phos-bright); }
+body.theme-crt header nav a.is-active { color: var(--accent); }
+body.theme-crt header nav a.is-active::after { background: var(--accent); }
+body.theme-crt .nav-dd-top { color: var(--phos); background: rgba(185,240,201,.06); border-color: var(--line); }
+body.theme-crt .nav-dd-top:hover, body.theme-crt .nav-dd:focus-within .nav-dd-top { background: rgba(185,240,201,.14); }
+body.theme-crt .nav-dd-menu { background: #0c100e; border-color: var(--line); box-shadow: 0 10px 28px rgba(0,0,0,.5); }
+body.theme-crt .nav-email { color: var(--phos-dim); }
+
+/* --------------------------------- Cartes ---------------------------------- */
+body.theme-crt .card, body.theme-crt .side-block, body.theme-crt .qlist li,
+body.theme-crt .stat-grid .s, body.theme-crt .ask, body.theme-crt .cartouche {
+    background: rgba(215,216,207,.014) !important; border-color: var(--line) !important; color: var(--phos);
+}
+body.theme-crt .card { color: var(--phos); }
+body.theme-crt .card:hover { border-color: var(--accent) !important; box-shadow: inset 0 0 0 1px var(--accent); }
+body.theme-crt .qlist a.q-title { color: var(--phos-bright); }
+body.theme-crt .qlist a.q-title:hover { color: var(--accent); }
+body.theme-crt .stat-grid .s strong { color: var(--phos-bright); }
+
+/* Lanceurs de domaines : forcés en monochrome (on neutralise les fonds colorés inline). */
+body.theme-crt .domain-card { background: #0d110f !important; border-color: var(--phos-faint) !important; box-shadow: none; }
+body.theme-crt .domain-card::after { background: none !important; }
+body.theme-crt .domain-card:hover { border-color: var(--accent) !important; box-shadow: 0 0 18px rgba(185,240,201,.14); transform: scale(1.02); }
+body.theme-crt .domain-card .d-label, body.theme-crt .domain-card .d-sub { color: var(--phos); text-shadow: 0 0 1px var(--glow); }
+
+/* Onglets « Nous rejoindre ». */
+body.theme-crt .join-tabs { border-bottom-color: var(--line); }
+body.theme-crt .join-tabs button { color: var(--phos-dim); background: none; }
+body.theme-crt .join-tabs button[aria-selected="true"] { color: var(--accent); border-bottom-color: var(--accent); }
+
+/* -------------------------- Pastilles, badges, états ----------------------- */
+body.theme-crt .pill { background: rgba(215,216,207,.04); color: var(--phos-dim); border-color: var(--line); }
+body.theme-crt .pill.author { background: rgba(185,240,201,.06); color: #cfeede; border-color: var(--line); }
+body.theme-crt .pill.node { background: rgba(185,240,201,.06); color: var(--accent); border-color: var(--line); }
+body.theme-crt .badge { text-shadow: none; }
+body.theme-crt .badge.ok { background: #14301f; color: #b9f0c9; }
+body.theme-crt .badge.warn { background: #3a2f12; color: #f0d8a0; }
+
+/* Blocs académique / vulgarisation (les bordures viennent de --aca/--vul, déjà redéfinis). */
+body.theme-crt .sources { color: var(--phos-dim); }
+
+/* ------------------------------ Formulaires -------------------------------- */
+body.theme-crt input[type=text], body.theme-crt input[type=email], body.theme-crt input[type=password],
+body.theme-crt input[type=search], body.theme-crt input[type=number], body.theme-crt textarea, body.theme-crt select {
+    background: rgba(0,0,0,.35) !important; color: var(--phos-bright) !important;
+    border: 1px solid var(--line) !important; text-shadow: 0 0 4px var(--glow);
+}
+body.theme-crt input:focus, body.theme-crt textarea:focus, body.theme-crt select:focus {
+    outline: none; border-color: var(--accent) !important; box-shadow: 0 0 0 1px var(--accent), inset 0 0 12px rgba(185,240,201,.06);
+}
+body.theme-crt input::placeholder, body.theme-crt textarea::placeholder { color: var(--phos-faint); }
+
+/* Boutons (accent, vote, soumissions). */
+body.theme-crt button, body.theme-crt .ask button, body.theme-crt .join-pane button[type=submit] {
+    background: transparent !important; color: var(--accent) !important;
+    border: 1px solid var(--accent) !important; text-shadow: none; text-transform: uppercase; letter-spacing: .03em;
+}
+body.theme-crt button:hover, body.theme-crt .ask button:hover { background: var(--accent) !important; color: var(--bg) !important; }
+body.theme-crt button:disabled { opacity: .45; }
+
+/* --------------------------------- Tableaux -------------------------------- */
+body.theme-crt td { border-bottom-color: var(--line); }
+body.theme-crt table th { color: var(--phos-bright); }
+
+/* ----------------------------- Contenu Markdown ---------------------------- */
+body.theme-crt .md { color: var(--phos); }
+body.theme-crt .md h2 { border-bottom-color: var(--line); }
+body.theme-crt .md a { color: var(--accent); text-decoration-color: rgba(185,240,201,.45); }
+body.theme-crt .md a:hover { text-decoration-color: var(--accent); }
+body.theme-crt .md blockquote { border-left-color: var(--line); color: var(--phos-dim); }
+body.theme-crt .md th, body.theme-crt .md td { border-color: var(--line); }
+body.theme-crt .md code { background: rgba(215,216,207,.08); color: var(--phos-bright); }
+body.theme-crt .md pre { background: rgba(0,0,0,.4); border: 1px solid var(--line); }
+
+/* Bannière IA / cartouche / divers. */
+body.theme-crt .ai-banner { background: #2a2410 !important; border-color: #6b5a1f !important; color: #f0d8a0 !important; }
+body.theme-crt .ai-banner a { color: var(--accent) !important; }
+body.theme-crt .cartouche .avatar { background: linear-gradient(135deg, var(--accent), #4d544c); color: var(--bg); }
+body.theme-crt .cartouche .note { color: var(--phos-dim); }
+body.theme-crt .crumbs a { color: var(--phos-dim); }
+body.theme-crt .crumbs a:hover { color: var(--accent); }
+body.theme-crt #stream-out { border-color: var(--line); }
+body.theme-crt #stream-out h4 { color: var(--vul); }
+body.theme-crt .loader { border-color: var(--phos-faint); border-top-color: var(--accent); }
+
+/* --------------------------------- Footer ---------------------------------- */
+body.theme-crt footer { border-top-color: var(--line); color: var(--phos-dim); }
+body.theme-crt footer a { color: var(--phos-dim); }
+body.theme-crt footer a:hover { color: var(--phos-bright); }
+
+/* ------------------------------ Accessibilité ------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+    body.theme-crt .crt-flicker, body.theme-crt .crt-flicker::before { animation: none !important; }
+}
