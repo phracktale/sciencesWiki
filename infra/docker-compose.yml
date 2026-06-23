@@ -216,6 +216,9 @@ services:
       DEFAULT_URI: ${PUBLIC_URL}
       # Appel server-side de l'API via le réseau interne du compose.
       API_BASE_URL: "http://api"
+      # SSO chat : « .scienceswiki.eu » pour partager la session avec chat.scienceswiki.eu
+      # (forward-auth Open WebUI). Vide = host-only (défaut). À régler au go-live.
+      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-}
     # Sessions + médias uploadés persistants (survivent aux rebuilds).
     volumes:
       - web_sessions:/app/var/sessions:rw
@@ -256,6 +259,11 @@ services:
       # Pilote LAN : auth désactivée pour tester le chat tout de suite. NE PAS
       # exposer publiquement ainsi — le SSO forward-auth (Heimdall) la remplacera.
       WEBUI_AUTH: "false"
+      # GO-LIVE (exposition Heimdall) : RETIRER WEBUI_AUTH ci-dessus et activer le
+      # trusted-header (l'identité vient du forward-auth, cf. chat.scienceswiki.eu.conf) :
+      #   WEBUI_AUTH_TRUSTED_EMAIL_HEADER: "X-SW-Auth-Email"
+      #   WEBUI_AUTH_TRUSTED_NAME_HEADER:  "X-SW-Auth-Name"
+      #   WEBUI_URL: "https://chat.scienceswiki.eu"
       WEBUI_NAME: "SciencesWiki — Assistant"
     volumes:
       - openwebui_data:/app/backend/data

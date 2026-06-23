@@ -3,6 +3,10 @@ parameters:
     # Défaut inoffensif si la variable n'est pas fournie (build, dev) ; en prod
     # le compose injecte les plages privées du homelab (proxy nginx Heimdall).
     env(TRUSTED_PROXIES): '127.0.0.1'
+    # Domaine du cookie de session. Vide = host-only (défaut, dev). En prod, mettre
+    # « .scienceswiki.eu » pour partager la session avec le sous-domaine chat.
+    # (SSO Open WebUI forward-auth, cf. docs/spec-openwebui-rag.md).
+    env(SESSION_COOKIE_DOMAIN): ''
 
 framework:
     secret: '%env(APP_SECRET)%'
@@ -27,6 +31,8 @@ framework:
         gc_maxlifetime: 28800
         cookie_secure: auto
         cookie_samesite: lax
+        # Vide par défaut (host-only) ; « .scienceswiki.eu » en prod pour le SSO chat.
+        cookie_domain: '%env(SESSION_COOKIE_DOMAIN)%'
 
     #esi: true
     #fragments: true
