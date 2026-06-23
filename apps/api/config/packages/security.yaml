@@ -37,6 +37,15 @@ security:
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
 
+        # Endpoint RAG chat (Open WebUI, compatible OpenAI) : HORS firewall JWT.
+        # Open WebUI envoie un Bearer (sa clé OpenAI) qui n'est PAS un JWT ; sous le
+        # firewall « api » (jwt), ce Bearer invalide déclencherait un 401 malgré le
+        # PUBLIC_ACCESS. L'accès est géré dans RagChatController (RAG_API_TOKEN optionnel).
+        rag_chat:
+            pattern: ^/api/rag
+            stateless: true
+            security: false
+
         # API : authentification par jeton JWT (anonyme autorisé pour la lecture).
         api:
             pattern: ^/api
