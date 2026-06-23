@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0a0d0b">
     <title>{% block title %}SciencesWiki{% endblock %} :: SciencesWiki</title>
     <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée aux publications de recherche.{% endblock %}">
-    <link rel="stylesheet" href="/css/crt.css">
+    <link rel="stylesheet" href="{{ asset_v('/css/crt.css') }}">
     {# Mesure d'audience sans cookies (Plausible auto-hébergé, RGPD-friendly). #}
     <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
     <script nonce="{{ csp_nonce.value }}">
@@ -88,6 +88,6 @@
         </div>
     </div>
 
-    <script src="/js/crt.js" defer></script>
+    <script src="{{ asset_v('/js/crt.js') }}" defer></script>
 </body>
 </html>

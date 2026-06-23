@@ -13,7 +13,7 @@
     <title>{% block title %}SciencesWiki{% endblock %}</title>
     <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée à des publications de recherche.{% endblock %}">
     {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}
-    <script nonce="{{ csp_nonce.value }}" src="/js/turbo.min.js" defer></script>
+    <script nonce="{{ csp_nonce.value }}" src="{{ asset_v('/js/turbo.min.js') }}" defer></script>
     <style>
         :root {
             --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937;
@@ -169,7 +169,7 @@
     {# Re-skin CRT « IBM monochrome » appliqué au front public (chargé APRÈS le
        style legacy pour le surcharger). Le wiki garde le même balisage : seule
        la peau change. Basculable depuis Paramètres › Général. #}
-    {% if crt %}<link rel="stylesheet" href="/css/crt-theme.css">{% endif %}
+    {% if crt %}<link rel="stylesheet" href="{{ asset_v('/css/crt-theme.css') }}">{% endif %}
 
     {# Mesure d'audience respectueuse de la vie privée (Plausible auto-hébergé : sans cookies, sans données personnelles, RGPD-friendly). #}
     <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
