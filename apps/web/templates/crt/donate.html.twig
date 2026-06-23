@@ -41,16 +41,21 @@
     <h2>Détail de l'infrastructure</h2>
     <p class="dim">Deux scénarios d'hébergement (auto-hébergé ou cloud souverain), sauvegarde redondée 3-2-1. Tout repose sur du matériel et des logiciels libres et souverains — aucune dépendance à un cloud non européen.</p>
     <table class="dos">
-        <thead><tr><th>Poste</th><th>Détail</th><th>Coût</th></tr></thead>
+        <thead><tr><th>Poste</th><th>Détail</th><th>Coût</th><th>Coût / an</th></tr></thead>
         <tbody>
-            <tr><td>Calcul — option cloud</td><td>Scaleway · Instance GPU <strong>L4-4-24G</strong> (NVIDIA L4 24&nbsp;Go)</td><td>2&nbsp;299,50&nbsp;€/mois</td></tr>
-            <tr><td>Calcul — option auto-hébergée</td><td>Minisforum A1&nbsp;Pro&nbsp;370 · 128&nbsp;Go RAM · 6,5&nbsp;To SSD · dock Oculink + <strong>RTX&nbsp;4090 24&nbsp;Go</strong></td><td>matériel amorti + élec.</td></tr>
-            <tr><td>IA</td><td>Debian · Ollama · modèles <strong>Qwen&nbsp;3.6 / Llama / Gemma&nbsp;4</strong> (open source, auto-hébergés)</td><td>0&nbsp;€ de licence</td></tr>
-            <tr><td>Réseau</td><td>Fibre <strong>FTTH / FDN</strong> (FAI associatif)</td><td>~&nbsp;40&nbsp;€/mois</td></tr>
-            <tr><td>Sauvegarde locale</td><td>NAS <strong>QNAP TS-435XeU-4G</strong> · 48&nbsp;To en rack</td><td>matériel amorti</td></tr>
-            <tr><td>Sauvegarde cloud</td><td>Scaleway Object Storage · <strong>Standard Multi-AZ</strong>, chiffré</td><td>0,01606&nbsp;€/Go/mois</td></tr>
+            <tr><td>Calcul — option cloud</td><td>Scaleway · Instance GPU <strong>L4-4-24G</strong> (NVIDIA L4 24&nbsp;Go)</td><td>2&nbsp;299,50&nbsp;€/mois</td><td>27&nbsp;594&nbsp;€/an</td></tr>
+            <tr><td>Calcul — option auto-hébergée</td><td>Minisforum A1&nbsp;Pro&nbsp;370 · 128&nbsp;Go RAM · 6,5&nbsp;To SSD · dock Oculink (109&nbsp;€) + <strong>RTX&nbsp;4090 24&nbsp;Go</strong> (3&nbsp;289&nbsp;€)</td><td>3&nbsp;398&nbsp;€ <span class="dim">(achat)</span></td><td>1&nbsp;133&nbsp;€/an <span class="dim">(amorti 3&nbsp;ans)</span></td></tr>
+            <tr><td>IA</td><td>Debian · Ollama · modèles <strong>Qwen&nbsp;3.6 / Llama / Gemma&nbsp;4</strong> (open source, auto-hébergés)</td><td>0&nbsp;€ de licence</td><td>0&nbsp;€</td></tr>
+            <tr><td>Électricité — auto-hébergé</td><td>Machine + GPU en service</td><td>—</td><td>250&nbsp;€/an</td></tr>
+            <tr><td>Réseau</td><td>Fibre <strong>FTTH / FDN</strong> (FAI associatif)</td><td>~&nbsp;40&nbsp;€/mois</td><td>~&nbsp;480&nbsp;€/an</td></tr>
+            <tr><td>Sauvegarde locale</td><td>NAS <strong>QNAP TS-435XeU-4G</strong> · 48&nbsp;To en rack (3&nbsp;222&nbsp;€)</td><td>3&nbsp;222&nbsp;€ <span class="dim">(achat)</span></td><td>1&nbsp;074&nbsp;€/an <span class="dim">(amorti 3&nbsp;ans)</span></td></tr>
+            <tr><td>Sauvegarde cloud</td><td>Scaleway Object Storage · <strong>Standard Multi-AZ</strong>, chiffré</td><td>0,01606&nbsp;€/Go/mois</td><td>selon volume</td></tr>
         </tbody>
+        <tfoot>
+            <tr><td colspan="3"><strong>Total annuel — scénario auto-hébergé</strong> <span class="dim">(matériel 6&nbsp;620&nbsp;€ annualisé sur 3&nbsp;ans = 2&nbsp;207&nbsp;€ + électricité 250&nbsp;€)</span></td><td><strong>≈&nbsp;2&nbsp;457&nbsp;€/an</strong></td></tr>
+        </tfoot>
     </table>
+    <p class="dim">Soit <strong>≈&nbsp;205&nbsp;€/mois</strong> en auto-hébergé (matériel + électricité), hors réseau (souvent déjà en place) et sauvegarde cloud (selon le volume). À comparer aux <strong>27&nbsp;594&nbsp;€/an</strong> de l'option GPU cloud : le matériel s'amortit en quelques mois.</p>
 
     <h2 id="don">Faire un don</h2>
     {% if donate_url %}
