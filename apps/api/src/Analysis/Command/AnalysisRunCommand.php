@@ -65,11 +65,12 @@ final class AnalysisRunCommand extends Command
         ));
 
         $io->success(\sprintf(
-            'Analyse de « %s » terminée : %d publication(s), %d claim(s), %d controverse(s).',
+            'Analyse de « %s » terminée : %d publication(s), %d claim(s), %d controverse(s), %d piste(s).',
             $slug,
             $result->publications,
             $result->claims,
             $result->controversies,
+            $result->gaps,
         ));
 
         return Command::SUCCESS;

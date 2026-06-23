@@ -13,6 +13,7 @@
     {% set rootSlug = (crumbs|first).slug ?? node.slug %}
     {% set qcount = answers|default([])|length %}
     {% set cvcount = controversies|default([])|length %}
+    {% set gapcount = gaps|default([])|length %}
 
     <style>
         .qtabs { display:flex; gap:.3rem; border-bottom:2px solid var(--line); margin:1.2rem 0 1.4rem; }
@@ -84,6 +85,7 @@
         <button type="button" role="tab" id="tab-article" aria-controls="panel-article" aria-selected="true" tabindex="0">Article</button>
         <button type="button" role="tab" id="tab-qa" aria-controls="panel-qa" aria-selected="false" tabindex="-1">Questions &amp; réponses{% if qcount > 0 %} <span class="tab-badge" aria-label="{{ qcount }} question(s)">{{ qcount }}</span>{% endif %}</button>
         <button type="button" role="tab" id="tab-controv" aria-controls="panel-controv" aria-selected="false" tabindex="-1">Controverses{% if cvcount > 0 %} <span class="tab-badge" aria-label="{{ cvcount }} controverse(s)">{{ cvcount }}</span>{% endif %}</button>
+        <button type="button" role="tab" id="tab-gaps" aria-controls="panel-gaps" aria-selected="false" tabindex="-1">Pistes{% if gapcount > 0 %} <span class="tab-badge" aria-label="{{ gapcount }} piste(s)">{{ gapcount }}</span>{% endif %}</button>
     </div>
 
     {# ===================== Onglet Article ===================== #}
@@ -228,6 +230,11 @@
     {# ===================== Onglet Controverses ===================== #}
     <section role="tabpanel" id="panel-controv" aria-labelledby="tab-controv" hidden>
         {% include 'wiki/_controversies.html.twig' %}
+    </section>
+
+    {# ===================== Onglet Pistes inexplorées ===================== #}
+    <section role="tabpanel" id="panel-gaps" aria-labelledby="tab-gaps" hidden>
+        {% include 'wiki/_gaps.html.twig' %}
     </section>
 
     <script nonce="{{ csp_nonce.value }}">

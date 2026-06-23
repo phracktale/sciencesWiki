@@ -356,6 +356,7 @@ final class WikiController extends AbstractController
             'childrenStats' => $this->api->nodeChildrenStats($slug),
             'analysis' => $controversies['node'],
             'controversies' => $controversies['controversies'],
+            'gaps' => $controversies['gaps'],
         ]);
     }
 }

@@ -1,0 +1,51 @@
+{# Panneau « Pistes inexplorées » d'un nœud (cf. docs/spec-controverses-lacunes.md §8.2).
+   Trois voies : chaînon manquant (Swanson), case creuse, lacune auto-déclarée.
+   Badge de vérification croisée (§6.5) renseigné en Phase B2. #}
+<style>
+    .gap-card { border:1px solid var(--line); border-radius:12px; padding:.9rem 1.1rem; margin:.8rem 0; background:#fff; }
+    .gap-type { display:inline-block; font-size:.76rem; font-weight:700; padding:.12rem .55rem; border-radius:999px; background:#eef2ff; color:#3730a3; }
+    .gap-type.ml { background:#eef2ff; color:#3730a3; }
+    .gap-type.sc { background:#fef9c3; color:#854d0e; }
+    .gap-type.sd { background:#dcfce7; color:#166534; }
+    .gap-desc { margin:.5rem 0 .3rem; color:#1e293b; }
+    .gap-meta { font-size:.8rem; color:#64748b; }
+    .gap-verif { font-size:.78rem; font-weight:700; padding:.1rem .5rem; border-radius:999px; background:#f1f5f9; color:#475569; }
+</style>
+
+{% set typeMeta = {
+    'missing_link': {'label': 'Chaînon manquant', 'cls': 'ml', 'icon': '🔗'},
+    'sparse_cell':  {'label': 'Case creuse',      'cls': 'sc', 'icon': '▦'},
+    'self_declared':{'label': 'Réclamée par les auteurs', 'cls': 'sd', 'icon': '✍️'}
+} %}
+{% set verifMeta = {
+    'unverified':   {'label': '· non vérifiée ailleurs', 'icon': '•'},
+    'unexplored':   {'label': 'inexplorée confirmée', 'icon': '✅'},
+    'corroborated': {'label': 'intuition renforcée', 'icon': '⬆️'},
+    'contested':    {'label': 'contestée', 'icon': '⚠️'}
+} %}
+
+{% if gaps is defined and gaps is not empty %}
+    <p class="muted" style="font-size:.9rem">{{ gaps|length }} piste(s) détectée(s) automatiquement à partir des assertions extraites. Non garanties par le comité ; à confirmer par un chercheur.</p>
+    {% for g in gaps %}
+        {% set tm = typeMeta[g.type] ?? {'label': g.type, 'cls': '', 'icon': '•'} %}
+        {% set vm = verifMeta[g.verification] ?? verifMeta['unverified'] %}
+        <article class="gap-card">
+            <span class="gap-type {{ tm.cls }}">{{ tm.icon }} {{ tm.label }}</span>
+            <span class="gap-verif">{{ vm.icon }} {{ vm.label }}</span>
+            <p class="gap-desc">{{ g.description }}</p>
+            <div class="gap-meta">
+                maturité {{ (g.maturityScore * 100)|round }}%{% if g.evidenceCount %} · {{ g.evidenceCount }} signal/aux{% endif %}
+                {% if g.conceptA %} · <strong>{{ g.conceptA }}</strong>{% if g.conceptB %} → {{ g.conceptB }}{% endif %}{% if g.conceptC %} → {{ g.conceptC }}{% endif %}{% endif %}
+            </div>
+        </article>
+    {% endfor %}
+{% else %}
+    {% set st = analysis.analysisStatus|default('not_analyzed') %}
+    {% if st == 'ready' %}
+        <p class="muted">Aucune piste détectée pour ce sujet (corpus trop homogène, ou pas assez d'assertions structurées).</p>
+    {% elseif st == 'analyzing' %}
+        <p class="muted">Analyse en cours — les pistes apparaîtront une fois l'analyse terminée.</p>
+    {% else %}
+        <p class="muted">Lancez l'analyse du sujet (onglet « Controverses ») pour faire apparaître les pistes inexplorées.</p>
+    {% endif %}
+{% endif %}

@@ -6,9 +6,11 @@ namespace App\Controller;
 
 use App\Analysis\Message\AnalyzeNodeMessage;
 use App\Entity\Controversy;
+use App\Entity\ResearchGap;
 use App\Enum\AnalysisStatus;
 use App\Repository\ControversyRepository;
 use App\Repository\PublicationRepository;
+use App\Repository\ResearchGapRepository;
 use App\Repository\TreeNodeRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -30,6 +32,7 @@ final class ControversyController
 
     public function __construct(
         private readonly ControversyRepository $controversies,
+        private readonly ResearchGapRepository $gaps,
         private readonly TreeNodeRepository $nodes,
         private readonly PublicationRepository $publications,
         private readonly MessageBusInterface $bus,
@@ -62,7 +65,31 @@ final class ControversyController
                 fn (Controversy $c): array => $this->serialize($c),
                 $this->controversies->findByNode($node),
             ),
+            'gaps' => array_map(
+                fn (ResearchGap $g): array => $this->serializeGap($g),
+                $this->gaps->findByNode($node),
+            ),
         ]);
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function serializeGap(ResearchGap $g): array
+    {
+        return [
+            'id' => $g->getId(),
+            'type' => $g->getType()->value,
+            'conceptA' => $g->getConceptA(),
+            'conceptB' => $g->getConceptB(),
+            'conceptC' => $g->getConceptC(),
+            'description' => $g->getDescription(),
+            'maturityScore' => $g->getMaturityScore(),
+            'rarityScore' => $g->getRarityScore(),
+            'evidenceCount' => $g->getEvidenceCount(),
+            'verification' => $g->getVerification()->value,
+            'status' => $g->getStatus()->value,
+        ];
     }
 
     #[Route('/api/tree_nodes/{slug}/analyze', name: 'api_node_analyze', methods: ['POST'])]

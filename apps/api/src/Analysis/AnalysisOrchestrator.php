@@ -6,6 +6,7 @@ namespace App\Analysis;
 
 use App\Analysis\Claim\ClaimExtractor;
 use App\Analysis\Controversy\ControversyDetector;
+use App\Analysis\Gap\GapDetector;
 use App\Entity\TreeNode;
 use App\Enum\AnalysisStatus;
 use Doctrine\ORM\EntityManagerInterface;
@@ -30,6 +31,7 @@ final class AnalysisOrchestrator
     public function __construct(
         private readonly ClaimExtractor $extractor,
         private readonly ControversyDetector $controversyDetector,
+        private readonly GapDetector $gapDetector,
         private readonly EntityManagerInterface $em,
         private readonly ManagerRegistry $registry,
         ?LoggerInterface $logger = null,
@@ -59,7 +61,10 @@ final class AnalysisOrchestrator
             $controversies = $this->controversyDetector->detect($node, $options->theta);
             $this->logger->info('Controverses détectées', ['count' => \count($controversies)]);
 
-            // --- POINT D'EXTENSION Phase B : GapDetector::detect($node) → GapVerifier::verify($node, $options) ---
+            // Phase B — pistes inexplorées (chaînons manquants, cases creuses, lacunes
+            // auto-déclarées). La vérification croisée (§6.5, GapVerifier) viendra ici.
+            $gaps = $this->gapDetector->detect($node);
+            $this->logger->info('Pistes détectées', ['count' => \count($gaps)]);
 
             $node->markAnalyzed();
             $this->em->flush();
@@ -68,6 +73,7 @@ final class AnalysisOrchestrator
                 publications: $extraction['publications'],
                 claims: $extraction['claims'],
                 controversies: \count($controversies),
+                gaps: \count($gaps),
             );
         } catch (\Throwable $e) {
             // On journalise l'ERREUR RÉELLE (avec sa trace) AVANT toute autre

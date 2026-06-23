@@ -125,16 +125,16 @@ final class ApiClient
      * Le déclenchement (POST .../analyze) et le polling sont faits côté navigateur
      * (même origine /api), comme « poser une question ».
      *
-     * @return array{node:array<string,mixed>,controversies:list<array<string,mixed>>}
+     * @return array{node:array<string,mixed>,controversies:list<array<string,mixed>>,gaps:list<array<string,mixed>>}
      */
     public function controversies(string $slug): array
     {
         try {
             $data = $this->get('/api/tree_nodes/'.rawurlencode($slug).'/controversies');
 
-            return ['node' => $data['node'] ?? [], 'controversies' => $data['controversies'] ?? []];
+            return ['node' => $data['node'] ?? [], 'controversies' => $data['controversies'] ?? [], 'gaps' => $data['gaps'] ?? []];
         } catch (\Throwable) {
-            return ['node' => [], 'controversies' => []];
+            return ['node' => [], 'controversies' => [], 'gaps' => []];
         }
     }
 
