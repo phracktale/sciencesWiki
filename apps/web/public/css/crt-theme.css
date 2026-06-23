@@ -251,6 +251,23 @@ body.theme-crt .cv-stance.nul { background: #14181500 !important; }
 body.theme-crt .vote-yes.on { background: #11301e !important; border-color: #2f6b46 !important; color: #bdf3cf !important; }
 body.theme-crt .vote-no.on { background: #2a1414 !important; border-color: #7f3030 !important; color: #f3b0b0 !important; }
 
+/* --- Couleurs définies en CLASSES dans les <style> de page (n'ont pas de
+       style="" en ligne → échappent aux sélecteurs [style*] ci-dessus). --- */
+
+/* Sidebar nœud : bouton « Explorer » = ancre à fond accent → texte blanc illisible. */
+body.theme-crt .aside-explore { background: var(--accent) !important; color: var(--bg) !important; }
+body.theme-crt .aside-explore:hover { background: var(--phos-bright) !important; color: var(--bg) !important; }
+
+/* Onglets : pastille de compteur (fond accent/gris clair, texte blanc). */
+body.theme-crt .tab-badge { background: var(--accent) !important; color: var(--bg) !important; }
+body.theme-crt [role=tab][aria-selected=false] .tab-badge { background: var(--phos-faint) !important; color: var(--phos) !important; }
+
+/* Controverses : textes des cartes (résumé, méta, citation verbatim) en couleurs
+   sombres codées en dur → invisibles sur le tube. On les ramène en phosphore. */
+body.theme-crt .cv-summary { color: var(--phos) !important; }
+body.theme-crt .cv-meta, body.theme-crt .cv-claim figcaption, body.theme-crt .cv-claim-meta { color: var(--phos-dim) !important; }
+body.theme-crt .cv-claim blockquote { background: rgba(0,0,0,.3) !important; color: var(--phos) !important; border-left-color: var(--phos-faint) !important; }
+
 /* Le bandeau ADMIN garde sa propre charte (déjà sombre, bleu clair lisible). */
 body.theme-crt #admin-bar, body.theme-crt #admin-bar * { color: revert !important; background: revert !important; }
 body.theme-crt #admin-bar { background: #0f172a !important; }
