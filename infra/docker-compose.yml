@@ -264,11 +264,10 @@ services:
       OLLAMA_BASE_URL: "http://192.168.1.171:11434"
       # Modèle proposé par défaut à l'ouverture d'un chat.
       DEFAULT_MODELS: "qwen3.6:latest"
-      # Pilote LAN : auth désactivée pour tester le chat tout de suite. NE PAS
-      # exposer publiquement ainsi — le SSO forward-auth (Heimdall) la remplacera.
-      WEBUI_AUTH: "false"
-      # GO-LIVE (exposition Heimdall) : RETIRER WEBUI_AUTH ci-dessus et activer le
-      # trusted-header (l'identité vient du forward-auth, cf. chat.scienceswiki.eu.conf) :
+      # Auth activée (des comptes existent déjà). Connexion avec ton compte ; au
+      # go-live, le SSO forward-auth (Heimdall) posera l'identité via trusted-header.
+      # GO-LIVE (exposition Heimdall) : activer le trusted-header
+      # (l'identité vient du forward-auth, cf. chat.scienceswiki.eu.conf) :
       #   WEBUI_AUTH_TRUSTED_EMAIL_HEADER: "X-SW-Auth-Email"
       #   WEBUI_AUTH_TRUSTED_NAME_HEADER:  "X-SW-Auth-Name"
       #   WEBUI_URL: "https://chat.scienceswiki.eu"
