@@ -230,6 +230,27 @@ body.theme-crt [style*="color:#92400e"], body.theme-crt [style*="color:#78350f"]
 body.theme-crt [style*="color:#b45309"] { color: #f2dca6 !important; }
 body.theme-crt [style*="color:#3730a3"], body.theme-crt [style*="color:#1e40af"] { color: #b9c8ee !important; }
 
+/* --- Classes définies dans les <style> par page (recherche, nœud, réponse,
+       revue de littérature, controverses, vote…) : surchargées par spécificité. --- */
+body.theme-crt .lr-aside, body.theme-crt .node-aside, body.theme-crt .rs-card,
+body.theme-crt .cv-state, body.theme-crt .cv-card, body.theme-crt .qa-item {
+    background: #0e1310 !important; border-color: var(--line) !important; color: var(--phos) !important;
+}
+body.theme-crt .art-edit-btn, body.theme-crt .vote-btn {
+    background: transparent !important; color: var(--accent) !important; border-color: var(--accent) !important;
+}
+body.theme-crt .vote-btn:hover, body.theme-crt .rev-actions a:hover, body.theme-crt .rev-actions button:hover {
+    background: rgba(185,240,201,.12) !important; color: var(--phos-bright) !important;
+}
+body.theme-crt .qa-warn { background: #2a2410 !important; color: #f2dca6 !important; border-color: #6b5a1f !important; }
+body.theme-crt .rs-soon { background: rgba(215,216,207,.08) !important; color: var(--phos-dim) !important; }
+body.theme-crt .cv-axis { background: rgba(185,200,238,.12) !important; color: #b9c8ee !important; }
+body.theme-crt .cv-stance.pos { background: #11301e !important; border-color: #2f6b46 !important; color: #bdf3cf !important; }
+body.theme-crt .cv-stance.neg { background: #2a1414 !important; border-color: #7f3030 !important; color: #f3b0b0 !important; }
+body.theme-crt .cv-stance.nul { background: #14181500 !important; }
+body.theme-crt .vote-yes.on { background: #11301e !important; border-color: #2f6b46 !important; color: #bdf3cf !important; }
+body.theme-crt .vote-no.on { background: #2a1414 !important; border-color: #7f3030 !important; color: #f3b0b0 !important; }
+
 /* Le bandeau ADMIN garde sa propre charte (déjà sombre, bleu clair lisible). */
 body.theme-crt #admin-bar, body.theme-crt #admin-bar * { color: revert !important; background: revert !important; }
 body.theme-crt #admin-bar { background: #0f172a !important; }
