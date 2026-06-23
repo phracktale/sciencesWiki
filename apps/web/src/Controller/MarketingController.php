@@ -47,6 +47,12 @@ final class MarketingController extends AbstractController
         return $this->render('crt/public.html.twig');
     }
 
+    #[Route('/{_locale}/manifeste', name: 'crt_manifesto', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function manifesto(): Response
+    {
+        return $this->render('crt/manifesto.html.twig');
+    }
+
     #[Route('/{_locale}/tarifs', name: 'crt_pricing', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function pricing(): Response
     {

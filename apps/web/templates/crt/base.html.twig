@@ -16,6 +16,7 @@
         {# Index des pages pour le prompt interactif (commande `ls` / `cd`). #}
         window.CRT_ROUTES = {
             "accueil": "{{ path('crt_discover') }}",
+            "manifeste": "{{ path('crt_manifesto') }}",
             "chercheurs": "{{ path('crt_researchers') }}",
             "journalistes": "{{ path('crt_journalists') }}",
             "enseignants": "{{ path('crt_teachers') }}",
@@ -45,6 +46,7 @@
 
             <nav class="shell-nav" aria-label="Navigation principale">
                 <a href="{{ path('crt_discover') }}"{{ route == 'crt_discover' ? ' aria-current="page"' : '' }}>accueil</a>
+                <a href="{{ path('crt_manifesto') }}"{{ route == 'crt_manifesto' ? ' aria-current="page"' : '' }}>manifeste</a>
                 <a href="{{ path('crt_researchers') }}"{{ route == 'crt_researchers' ? ' aria-current="page"' : '' }}>chercheurs</a>
                 <a href="{{ path('crt_journalists') }}"{{ route == 'crt_journalists' ? ' aria-current="page"' : '' }}>journalistes</a>
                 <a href="{{ path('crt_teachers') }}"{{ route == 'crt_teachers' ? ' aria-current="page"' : '' }}>enseignants</a>

@@ -1,0 +1,92 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Manifeste{% endblock %}
+{% block cwd %}manifeste{% endblock %}
+{% block command %}cat manifeste.txt{% endblock %}
+{% block description %}Le manifeste de SciencesWiki : information scientifique libre et gratuite, IA souveraine open source, sans tracker ni pub ni abonnement, vulgarisation et éducation pour toutes et tous.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Manifeste — pour une science libre." data-tw-speed="22" data-tw-cursor></h1>
+
+    <p class="lead">SciencesWiki n'est pas une entreprise. C'est un commun. Voici ce en quoi nous
+    croyons, et ce que nous refusons. <strong>Quelques principes, non négociables.</strong></p>
+
+    <div class="box dbl">
+        <span class="box-ttl">préambule</span>
+        La recherche est largement financée par l'argent public. Le savoir qui en découle devrait
+        appartenir à tout le monde — pas à des éditeurs qui le revendent, ni à des plateformes qui
+        le pistent. Nous bâtissons l'inverse : un accès libre, gratuit, sourcé, et respectueux.
+    </div>
+
+    <h2>Les principes</h2>
+    <ol class="dosnum">
+        <li><strong>Le savoir doit circuler.</strong> L'information scientifique est mise en libre
+            circulation, gratuitement, pour qu'elle profite à toute la communauté scientifique —
+            et, par la vulgarisation, à la société entière.</li>
+
+        <li><strong>Une IA souveraine, pas un aspirateur de données.</strong> Notre IA repose sur
+            des <strong>modèles open source auto-hébergés</strong>. Aucune donnée n'est mise en
+            circulation, pour quelque raison que ce soit — seul le <strong>corpus, librement
+            consultable</strong>, l'est. Pas de dépendance à une API propriétaire.</li>
+
+        <li><strong>Aucun tracker, aucune publicité, aucun abonnement.</strong> Vos lectures et vos
+            questions ne sont pas un produit. Pas de mouchard, pas de bannière, pas de paywall —
+            jamais.</li>
+
+        <li><strong>Libérer les publications.</strong> Quand un article paraît dans une revue
+            payante, nous <strong>incitons les auteurs à déposer leur version</strong> (postprint
+            légal) afin que la connaissance circule librement plutôt que de rester enfermée.</li>
+
+        <li><strong>Vulgariser.</strong> Nous mettons la science <strong>à la portée du grand
+            public</strong> : un langage clair, des analogies, mais toujours adossé aux sources.</li>
+
+        <li><strong>Éduquer les enfants.</strong> Nous proposons des <strong>activités calibrées
+            selon leur programme</strong> scolaire — et au-delà&nbsp;! — pour donner le goût des
+            sciences, du primaire au lycée.</li>
+
+        <li><strong>Croiser les études.</strong> Nous utilisons l'IA pour <strong>confronter les
+            travaux entre eux</strong> : repérer les incohérences, les contradictions, les
+            réplications manquantes et les <strong>angles morts inexploités</strong> de la
+            littérature.</li>
+
+        <li><strong>Rien sans source.</strong> Pas de réponse « hors-sol ». Faute de publication
+            pertinente, nous le disons. Nous distinguons toujours <strong>consensus, controverse
+            et lacune</strong>, et signalons les études rétractées.</li>
+
+        <li><strong>Libre et copyleft.</strong> Le contenu est sous licence <strong>CC BY-SA
+            4.0</strong>, le code est ouvert et reproductible. Ce que nous recevons du commun
+            retourne au commun.</li>
+
+        <li><strong>Accessible à tous les niveaux.</strong> Un même savoir décliné du chercheur à
+            l'enfant de 8 ans (4 niveaux de lecture), pensé aussi pour la lecture facile et
+            l'accessibilité.</li>
+
+        <li><strong>Indépendant et non lucratif.</strong> Aucun actionnaire, aucune marge. Nous
+            vivons d'une <strong>cagnotte, comme Wikipédia</strong> — uniquement pour payer les
+            machines et les sauvegardes.</li>
+
+        <li><strong>Un bouclier contre la désinformation.</strong> Nous confrontons les affirmations
+            virales (santé, climat, nutrition) au consensus scientifique, en cartes claires
+            « ce qu'on sait / ce qu'on ne sait pas ».</li>
+    </ol>
+
+    <h2>Ce que nous refusons</h2>
+    <ul class="doslist">
+        <li>Revendre, louer ou céder la moindre donnée personnelle.</li>
+        <li>Enfermer le savoir derrière un péage.</li>
+        <li>Présenter une opinion ou une hypothèse comme un fait établi.</li>
+        <li>Dépendre d'une IA fermée dont on ne maîtrise ni les données ni les biais.</li>
+    </ul>
+
+    <div class="box ok" style="text-align:center; margin-top:2.4rem;">
+        <span class="box-ttl">signature</span>
+        <p class="bright" data-typewriter data-text="En fait, c'est nous les gentils !" data-tw-speed="34" style="font-size:1.25rem; margin:.6rem 0;"></p>
+        <p class="dim" style="margin:0; letter-spacing:.18em;">🄯 copyleft D. R.</p>
+    </div>
+
+    <div class="btn-row" style="justify-content:center;">
+        <a class="btn primary" href="{{ path('crt_donate') }}">★ Soutenir le commun</a>
+        <a class="btn" href="{{ path('crt_discover') }}">Découvrir les usages</a>
+        <a class="btn" href="{{ path('home') }}">Ouvrir le wiki</a>
+    </div>
+{% endblock %}

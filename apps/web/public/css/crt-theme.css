@@ -174,6 +174,66 @@ body.theme-crt footer { border-top-color: var(--line); color: var(--phos-dim); }
 body.theme-crt footer a { color: var(--phos-dim); }
 body.theme-crt footer a:hover { color: var(--phos-bright); }
 
+/* ======================= CORRECTION DE CONTRASTE ========================== */
+/* Les pages legacy posent beaucoup de couleurs EN LIGNE (style="...") : fonds
+   clairs (texte phosphore illisible) et textes sombres (invisibles sur le tube).
+   On les neutralise par sélecteurs d'attribut + !important, regroupés par famille
+   sémantique. Les règles spécifiques (succès/alerte/erreur) viennent APRÈS les
+   neutres pour gagner en cas de collision de sous-chaîne (#fff ⊂ #fffbeb). */
+
+/* --- Fonds clairs neutres → sombre + texte phosphore --- */
+body.theme-crt [style*="background:#fff"], body.theme-crt [style*="background: #fff"],
+body.theme-crt [style*="background:#fafafa"], body.theme-crt [style*="background:#fafcff"],
+body.theme-crt [style*="background:#f8fafc"], body.theme-crt [style*="background:#f1f5f9"],
+body.theme-crt [style*="background:#f9fafb"], body.theme-crt [style*="background:#e2e8f0"],
+body.theme-crt [style*="background:#eef2ff"], body.theme-crt [style*="background:#f3f4f6"],
+body.theme-crt [style*="rgba(255,255,255"], body.theme-crt [style*="rgba(255, 255, 255"] {
+    background: #0e1310 !important; color: var(--phos) !important; border-color: var(--line) !important;
+}
+
+/* --- Fonds « succès » verts → vert phosphore sombre --- */
+body.theme-crt [style*="background:#f0fdf4"], body.theme-crt [style*="background:#ecfdf5"],
+body.theme-crt [style*="background:#dcfce7"], body.theme-crt [style*="background:#d1fae5"] {
+    background: #11301e !important; color: #bdf3cf !important; border-color: #2f6b46 !important;
+}
+
+/* --- Fonds « alerte » ambre → ambre sombre --- */
+body.theme-crt [style*="background:#fffbeb"], body.theme-crt [style*="background:#fef3c7"],
+body.theme-crt [style*="background:#fefce8"], body.theme-crt [style*="background:#fff7ed"] {
+    background: #2a2410 !important; color: #f2dca6 !important; border-color: #6b5a1f !important;
+}
+
+/* --- Fonds « erreur » rouges → rouge sombre --- */
+body.theme-crt [style*="background:#fef2f2"], body.theme-crt [style*="background:#fee2e2"],
+body.theme-crt [style*="background:#fecaca"] {
+    background: #2a1414 !important; color: #f3b0b0 !important; border-color: #7f3030 !important;
+}
+
+/* --- Textes sombres en ligne → phosphore lisible (gris/quasi-noir) --- */
+body.theme-crt [style*="color:#111827"], body.theme-crt [style*="color:#1f2937"],
+body.theme-crt [style*="color:#374151"], body.theme-crt [style*="color:#1e293b"],
+body.theme-crt [style*="color:#0f172a"], body.theme-crt [style*="color:#334155"],
+body.theme-crt [style*="color:#475569"] {
+    color: var(--phos) !important;
+}
+body.theme-crt [style*="color:#6b7280"], body.theme-crt [style*="color:#64748b"],
+body.theme-crt [style*="color:#9ca3af"], body.theme-crt [style*="color:#94a3b8"] {
+    color: var(--phos-dim) !important;
+}
+
+/* --- Textes sémantiques sombres → accents lisibles (rouge/vert/ambre/bleu) --- */
+body.theme-crt [style*="color:#991b1b"], body.theme-crt [style*="color:#b91c1c"],
+body.theme-crt [style*="color:#dc2626"], body.theme-crt [style*="color:#792424"] { color: #f3b0b0 !important; }
+body.theme-crt [style*="color:#166534"], body.theme-crt [style*="color:#065f46"],
+body.theme-crt [style*="color:#16a34a"], body.theme-crt [style*="color:#15803d"] { color: #bdf3cf !important; }
+body.theme-crt [style*="color:#92400e"], body.theme-crt [style*="color:#78350f"],
+body.theme-crt [style*="color:#b45309"] { color: #f2dca6 !important; }
+body.theme-crt [style*="color:#3730a3"], body.theme-crt [style*="color:#1e40af"] { color: #b9c8ee !important; }
+
+/* Le bandeau ADMIN garde sa propre charte (déjà sombre, bleu clair lisible). */
+body.theme-crt #admin-bar, body.theme-crt #admin-bar * { color: revert !important; background: revert !important; }
+body.theme-crt #admin-bar { background: #0f172a !important; }
+
 /* ------------------------------ Accessibilité ------------------------------ */
 @media (prefers-reduced-motion: reduce) {
     body.theme-crt .crt-flicker, body.theme-crt .crt-flicker::before { animation: none !important; }

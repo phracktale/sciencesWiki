@@ -3,7 +3,7 @@
 {% block title %}Soutenir{% endblock %}
 {% block cwd %}soutenir{% endblock %}
 {% block command %}./donate.sh --comme-wikipedia{% endblock %}
-{% block description %}Soutenez SciencesWiki : une cagnotte, comme Wikipédia, pour couvrir l'hébergement et les sauvegardes du corpus. Le projet est libre, gratuit et sans publicité.{% endblock %}
+{% block description %}Soutenez SciencesWiki : une cagnotte, pour couvrir l'hébergement et les sauvegardes du corpus. Le projet est libre, gratuit et sans publicité.{% endblock %}
 
 {% block body %}
     <h1 data-typewriter data-text="Soutenir SciencesWiki — comme Wikipédia." data-tw-speed="20" data-tw-cursor></h1>
@@ -12,17 +12,45 @@
     et sauvegardé.</p>
 
     <div class="box dbl">
-        <span class="box-ttl">À quoi sert votre don</span>
-        <pre class="out">$ df -h /corpus
-RUBRIQUE                  USAGE   COÛT/MOIS (estimé)
-serveurs (CPU/GPU LLM)    ████░░  hébergement & inférence
-stockage embeddings       ███░░░  base vectorielle pgvector
-sauvegardes chiffrées     ███░░░  redondance hors-site (3-2-1)
-bande passante & domaine  █░░░░░  diffusion publique
-─────────────────────────────────────────────
-TOTAL                     financé à 100% par les dons</pre>
-        <p class="dim" style="margin-bottom:0;">Pas de salaire, pas de marge : chaque euro va à la machine et aux sauvegardes.</p>
+        <span class="box-ttl">À quoi sert votre don — répartition des coûts</span>
+        <div style="display:flex; flex-wrap:wrap; gap:1.6rem; align-items:center; justify-content:center;">
+            {# Camembert (donut) monochrome phosphore. Estimation mensuelle, hébergement cloud souverain. #}
+            <svg viewBox="0 0 180 180" width="190" height="190" role="img" aria-label="Répartition des coûts mensuels : calcul GPU 82 %, sauvegarde cloud chiffrée 14 %, NAS de sauvegarde 3 %, réseau et domaine 2 %." style="flex:0 0 auto;">
+                <circle cx="90" cy="90" r="70" fill="none" stroke="#2a302b" stroke-width="26"/>
+                <g transform="rotate(-90 90 90)" fill="none" stroke-width="26">
+                    <circle cx="90" cy="90" r="70" stroke="#b9f0c9" stroke-dasharray="359.8 80.0" stroke-dashoffset="0"/>
+                    <circle cx="90" cy="90" r="70" stroke="#8f968c" stroke-dasharray="60.3 379.5" stroke-dashoffset="-359.8"/>
+                    <circle cx="90" cy="90" r="70" stroke="#5c635b" stroke-dasharray="12.3 427.5" stroke-dashoffset="-420.0"/>
+                    <circle cx="90" cy="90" r="70" stroke="#f0d8a0" stroke-dasharray="7.0 432.8" stroke-dashoffset="-432.3"/>
+                </g>
+                <text x="90" y="84" text-anchor="middle" fill="#f4f5ee" font-family="'Roboto Mono',monospace" font-size="15" font-weight="700">≈ 2810 €</text>
+                <text x="90" y="102" text-anchor="middle" fill="#8f968c" font-family="'Roboto Mono',monospace" font-size="9.5">/ mois (est.)</text>
+            </svg>
+            <table class="dos" style="flex:1 1 280px; margin:0;">
+                <tbody>
+                    <tr><td><span style="display:inline-block;width:.8rem;height:.8rem;background:#b9f0c9;vertical-align:-1px;margin-right:.5rem;"></span>Calcul IA — GPU (inférence LLM)</td><td style="text-align:right;color:#f4f5ee;">82&nbsp;%</td></tr>
+                    <tr><td><span style="display:inline-block;width:.8rem;height:.8rem;background:#8f968c;vertical-align:-1px;margin-right:.5rem;"></span>Sauvegarde cloud chiffrée (Multi-AZ)</td><td style="text-align:right;color:#f4f5ee;">14&nbsp;%</td></tr>
+                    <tr><td><span style="display:inline-block;width:.8rem;height:.8rem;background:#5c635b;vertical-align:-1px;margin-right:.5rem;"></span>NAS de sauvegarde (amorti)</td><td style="text-align:right;color:#f4f5ee;">3&nbsp;%</td></tr>
+                    <tr><td><span style="display:inline-block;width:.8rem;height:.8rem;background:#f0d8a0;vertical-align:-1px;margin-right:.5rem;"></span>Réseau (FTTH/FDN) + domaine</td><td style="text-align:right;color:#f4f5ee;">2&nbsp;%</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p class="dim" style="margin:.8rem 0 0;">Estimation pour l'hébergement cloud souverain. Pas de salaire, pas de marge : <strong>chaque euro va à la machine et aux sauvegardes.</strong> Le calcul (GPU qui fait tourner l'IA open source) est de loin le premier poste.</p>
     </div>
+
+    <h2>Détail de l'infrastructure</h2>
+    <p class="dim">Deux scénarios d'hébergement (auto-hébergé ou cloud souverain), sauvegarde redondée 3-2-1. Tout repose sur du matériel et des logiciels libres et souverains — aucune dépendance à un cloud non européen.</p>
+    <table class="dos">
+        <thead><tr><th>Poste</th><th>Détail</th><th>Coût</th></tr></thead>
+        <tbody>
+            <tr><td>Calcul — option cloud</td><td>Scaleway · Instance GPU <strong>L4-4-24G</strong> (NVIDIA L4 24&nbsp;Go)</td><td>2&nbsp;299,50&nbsp;€/mois</td></tr>
+            <tr><td>Calcul — option auto-hébergée</td><td>Minisforum A1&nbsp;Pro&nbsp;370 · 128&nbsp;Go RAM · 6,5&nbsp;To SSD · dock Oculink + <strong>RTX&nbsp;4090 24&nbsp;Go</strong></td><td>matériel amorti + élec.</td></tr>
+            <tr><td>IA</td><td>Debian · Ollama · modèles <strong>Qwen&nbsp;3.6 / Llama / Gemma&nbsp;4</strong> (open source, auto-hébergés)</td><td>0&nbsp;€ de licence</td></tr>
+            <tr><td>Réseau</td><td>Fibre <strong>FTTH / FDN</strong> (FAI associatif)</td><td>~&nbsp;40&nbsp;€/mois</td></tr>
+            <tr><td>Sauvegarde locale</td><td>NAS <strong>QNAP TS-435XeU-4G</strong> · 48&nbsp;To en rack</td><td>matériel amorti</td></tr>
+            <tr><td>Sauvegarde cloud</td><td>Scaleway Object Storage · <strong>Standard Multi-AZ</strong>, chiffré</td><td>0,01606&nbsp;€/Go/mois</td></tr>
+        </tbody>
+    </table>
 
     <h2 id="don">Faire un don</h2>
     {% if donate_url %}
