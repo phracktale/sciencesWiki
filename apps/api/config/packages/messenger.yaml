@@ -18,6 +18,15 @@ framework:
                     max_retries: 2
                     delay: 5000
                     multiplier: 3
+            # File dédiée à l'analyse « controverses & pistes » d'un nœud. SÉPARÉE de
+            # la moisson (sinon le job d'analyse est affamé derrière des milliers de
+            # messages de moisson). redeliver_timeout très long : un run peut durer
+            # >1 h sur un gros nœud, on ne veut pas qu'il soit re-livré en double.
+            analysis:
+                dsn: 'doctrine://default?queue_name=analysis&redeliver_timeout=14400'
+                retry_strategy:
+                    max_retries: 1
+                    delay: 10000
             failed: 'doctrine://default?queue_name=failed'
             sync: 'sync://'
 
@@ -27,7 +36,8 @@ framework:
             App\Harvester\Message\HarvestRubric: harvester
             App\Harvester\Message\IngestFulltext: fulltext
             # Analyse « controverses & pistes » d'un nœud (cf. spec controverses §7bis).
-            App\Analysis\Message\AnalyzeNodeMessage: harvester
+            # File DÉDIÉE (pas harvester) pour ne pas être affamée par la moisson.
+            App\Analysis\Message\AnalyzeNodeMessage: analysis
 
 # when@test:
 #    framework:
