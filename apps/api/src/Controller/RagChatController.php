@@ -85,6 +85,12 @@ final class RagChatController
             return new JsonResponse(['error' => ['message' => 'Non autorisé.']], 401);
         }
 
+        // La génération LLM dépasse souvent les 30 s de max_execution_time PHP
+        // (vrai aussi pour le chemin non-stream, ex. génération de titre par Open
+        // WebUI). On lève la limite, comme StreamAnswerController.
+        @set_time_limit(0);
+        ignore_user_abort(true);
+
         /** @var array<string,mixed> $body */
         $body = json_decode($request->getContent() ?: '[]', true) ?? [];
         /** @var list<array{role?:string,content?:mixed}> $incoming */
