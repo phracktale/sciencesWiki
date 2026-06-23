@@ -251,6 +251,9 @@ services:
       api:
         condition: service_started
     environment:
+      # Config pilotée par ces variables (pas d'override persistant en base qui
+      # garderait une vieille URL Ollama, ex. host.docker.internal). Source unique = compose.
+      ENABLE_PERSISTENT_CONFIG: "false"
       # Notre endpoint RAG (compatible OpenAI) : Open WebUI y ajoute /chat/completions et /models.
       OPENAI_API_BASE_URL: "http://api/api/rag"
       OPENAI_API_KEY: "sk-scienceswiki-rag"
