@@ -59,6 +59,20 @@ final class MarketingController extends AbstractController
         return $this->render('crt/pricing.html.twig');
     }
 
+    /** Journal des versions (changelog éditorial, maintenu à la main). */
+    #[Route('/{_locale}/changelog', name: 'crt_changelog', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function changelog(): Response
+    {
+        return $this->render('crt/changelog.html.twig');
+    }
+
+    /** Roadmap publique + formulaire de proposition (POST navigateur → /api/roadmap/proposals). */
+    #[Route('/{_locale}/roadmap', name: 'crt_roadmap', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function roadmap(): Response
+    {
+        return $this->render('crt/roadmap.html.twig');
+    }
+
     #[Route('/{_locale}/soutenir', name: 'crt_donate', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function donate(): Response
     {

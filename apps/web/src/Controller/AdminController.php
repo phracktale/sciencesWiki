@@ -321,6 +321,39 @@ final class AdminController extends AbstractController
         return $this->redirectToRoute('admin_join');
     }
 
+    /** Propositions de roadmap (vue back-office). */
+    #[Route('/admin/roadmap', name: 'admin_roadmap', methods: ['GET'])]
+    public function roadmapProposals(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        $status = trim((string) $request->query->get('status', ''));
+
+        return $this->render('admin/roadmap.html.twig', [
+            'data' => $this->admin->roadmapProposals($status),
+            'status' => $status,
+        ]);
+    }
+
+    /** Changer le statut d'une proposition de roadmap. */
+    #[Route('/admin/roadmap/{id}/status', name: 'admin_roadmap_status', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function roadmapStatus(int $id, Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_roadmap');
+        }
+        $res = $this->admin->setRoadmapStatus($id, trim((string) $request->request->get('status')));
+        $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Statut mis à jour.' : 'Échec : '.($res['data']['error'] ?? 'erreur'));
+
+        return $this->redirectToRoute('admin_roadmap');
+    }
+
     /** Proxy du PDF en accès libre (même origine → visualiseur natif + impression). Anti-SSRF. */
     #[Route('/admin/articles/{id}/pdf', name: 'admin_article_pdf', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function articlePdf(int $id, Request $request): Response

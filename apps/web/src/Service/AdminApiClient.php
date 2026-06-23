@@ -210,6 +210,20 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/join-requests/'.$id.'/reject', []);
     }
 
+    /** Propositions de roadmap (vue back-office). @return array<string,mixed> */
+    public function roadmapProposals(string $status = ''): array
+    {
+        $res = $this->send('GET', '/api/admin/roadmap-proposals?'.http_build_query(array_filter(['status' => $status])), null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'statuses' => []];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function setRoadmapStatus(int $id, string $status): array
+    {
+        return $this->send('POST', '/api/admin/roadmap-proposals/'.$id.'/status', ['status' => $status]);
+    }
+
     /** @return array<string,mixed> liste des utilisateurs + rôles disponibles */
     public function users(): array
     {

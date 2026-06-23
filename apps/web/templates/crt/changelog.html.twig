@@ -1,0 +1,45 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Journal des versions{% endblock %}
+{% block cwd %}changelog{% endblock %}
+{% block command %}git log --oneline --decorate{% endblock %}
+{% block description %}Journal des versions de SciencesWiki : ce qui a été livré à chaque version (synthèse éditoriale).{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Journal des versions — ce qu'on a livré." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">Synthèse des évolutions, version par version. Pour les développements à venir, voir la
+    <a href="{{ path('crt_roadmap') }}">roadmap</a>.</p>
+
+    <div class="box dbl">
+        <span class="box-ttl">v0.59 — 23 juin 2026</span>
+        <ul class="doslist">
+            <li><strong>Cartographe de controverses &amp; pistes</strong> — par sujet, détection des résultats contradictoires : chaque assertion citée <em>verbatim</em> et sourcée (DOI), avec l'axe du désaccord (population, méthode, dose, époque).</li>
+            <li><strong>Moteur d'analyse</strong> — extraction d'assertions structurées par IA, modèle léger configurable en back-office, file de traitement dédiée, chrono &amp; durée estimée pendant l'analyse.</li>
+            <li><strong>Thème CRT</strong> — lisibilité corrigée (citations, encadrés, menu « Mon compte », logo dédié) ; sous-rubriques remontées au-dessus des onglets.</li>
+            <li><strong>Page Soutenir</strong> — détail d'infrastructure avec coûts à l'achat, coût annuel et total.</li>
+        </ul>
+    </div>
+
+    <div class="box">
+        <span class="box-ttl">v0.58 — 22 juin 2026</span>
+        <ul class="doslist">
+            <li><strong>Thème CRT « IBM monochrome »</strong> activable en back-office pour le front public.</li>
+            <li><strong>Tableau de bord</strong> enrichi : types de publication, éditeurs, moisson &amp; domaines (articles réellement moissonnés par jour).</li>
+            <li>Pied de page : tag de version court.</li>
+        </ul>
+    </div>
+
+    <div class="box">
+        <span class="box-ttl">v0.57 — juin 2026</span>
+        <ul class="doslist">
+            <li><strong>Revue de littérature en PDF</strong> via gabarit (en-tête, date et numéro de page au pied).</li>
+        </ul>
+    </div>
+
+    <div class="box">
+        <span class="box-ttl">Avant v0.57 — fondations</span>
+        <pre class="out">moissonneuse OpenAlex (incrémentale) · arbre des connaissances (DAG)
+recherche sémantique (embeddings pgvector) · Q/R sourcées (RAG)
+revues de littérature · accès libre (Unpaywall) · texte intégral (GROBID)</pre>
+    </div>
+{% endblock %}

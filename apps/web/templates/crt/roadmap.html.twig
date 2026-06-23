@@ -1,0 +1,110 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Roadmap{% endblock %}
+{% block cwd %}roadmap{% endblock %}
+{% block command %}cat ROADMAP.md{% endblock %}
+{% block description %}Roadmap de SciencesWiki : ce qui est disponible, en cours et prévu. Proposez vos idées.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Roadmap — où on va." data-tw-speed="20" data-tw-cursor></h1>
+    <p class="lead">Ce qui est en ligne, en chantier, et prévu. Le passé est dans le
+    <a href="{{ path('crt_changelog') }}">journal des versions</a>. Une idée&nbsp;? Proposez-la plus bas.</p>
+
+    <div class="box">
+        <span class="box-ttl">✅ Disponible</span>
+        <ul class="doslist">
+            <li>Recherche sémantique trans-domaine &amp; Q/R sourcées (RAG)</li>
+            <li>Revue de littérature assistée (export Markdown / PDF)</li>
+            <li>Controverses &amp; pistes : résultats contradictoires sourcés, par sujet</li>
+        </ul>
+    </div>
+
+    <div class="box">
+        <span class="box-ttl">🚧 En cours</span>
+        <ul class="doslist">
+            <li>Pistes inexplorées : chaînons manquants (Swanson), cases creuses, lacunes auto-déclarées</li>
+            <li>Localisation précise des assertions dans les études (page / paragraphe)</li>
+        </ul>
+    </div>
+
+    <div class="box">
+        <span class="box-ttl">🛣️ Prévu</span>
+        <ul class="doslist">
+            <li>Open WebUI pour profils connectés : modèle d'IA au choix (auto-hébergé) + accès au RAG SciencesWiki</li>
+            <li>Veille &amp; alertes personnalisées (sous-domaine, auteur, revue suivie)</li>
+            <li>Détecteur de rétractations · cartographie auteurs / revues / éditeurs</li>
+            <li>Application mobile</li>
+        </ul>
+    </div>
+
+    <h2 id="proposer">Proposer une piste</h2>
+    <p class="lead">Un manque, une priorité, une idée d'outil&nbsp;? Dites-le — chaque proposition est lue.</p>
+
+    <form class="dosform" id="roadmap-form" novalidate>
+        <span class="form-ttl">┌─ NOUVELLE PROPOSITION ────────────────────┐</span>
+
+        <div class="field">
+            <label for="r-name">Nom</label>
+            <input id="r-name" name="name" type="text" maxlength="120" autocomplete="name" placeholder="votre nom (optionnel)">
+        </div>
+        <div class="field">
+            <label for="r-email">E-mail</label>
+            <input id="r-email" name="email" type="email" maxlength="180" autocomplete="email" placeholder="vous@exemple.fr (optionnel, pour un retour)">
+        </div>
+        <div class="field">
+            <label for="r-message">Votre proposition</label>
+            <textarea id="r-message" name="message" maxlength="5000" required placeholder="Ce que vous aimeriez voir arriver…"></textarea>
+        </div>
+
+        {# Pot de miel anti-spam : invisible pour l'humain, rempli par les bots. #}
+        <div class="hp" aria-hidden="true">
+            <label for="r-website">Ne pas remplir</label>
+            <input id="r-website" class="hp" name="website" type="text" tabindex="-1" autocomplete="off">
+        </div>
+
+        <p class="hint">Votre proposition est transmise à l'équipe et conservée pour étude. Voir <a href="{{ path('crt_legal') }}">mentions légales</a>.</p>
+
+        <div class="btn-row" style="margin-bottom:.4rem;">
+            <button class="btn primary" type="submit">Transmettre</button>
+        </div>
+        <div id="roadmap-status" role="status" aria-live="polite"></div>
+
+        <span class="form-ttl" style="margin:.6rem 0 0;">└────────────────────────────────────────────┘</span>
+    </form>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var form = document.getElementById('roadmap-form');
+        if (!form) return;
+        var status = document.getElementById('roadmap-status');
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var honey = form.querySelector('input.hp');
+            if (honey && honey.value) return;
+            var btn = form.querySelector('button[type=submit]');
+            var data = {};
+            form.querySelectorAll('input, textarea').forEach(function (el) {
+                if (el.name && !el.classList.contains('hp')) data[el.name] = el.value;
+            });
+            if (!data.message || data.message.trim().length < 8) {
+                status.className = 'err'; status.textContent = '! ERREUR : décrivez votre proposition.'; return;
+            }
+            btn.disabled = true; status.className = ''; status.textContent = '> TRANSMISSION…';
+            fetch('/api/roadmap/proposals', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    btn.disabled = false;
+                    if (res.ok) {
+                        status.className = 'ok';
+                        status.textContent = '> PROPOSITION REÇUE — merci !\n> [ CONNEXION FERMÉE ]';
+                        form.reset();
+                    } else {
+                        status.className = 'err';
+                        status.textContent = '! ÉCHEC : ' + (res.d.error || 'erreur serveur') + '. Réessayez.';
+                    }
+                })
+                .catch(function () { btn.disabled = false; status.className = 'err'; status.textContent = '! ERREUR RÉSEAU — réessayez.'; });
+        });
+    })();
+    </script>
+{% endblock %}
