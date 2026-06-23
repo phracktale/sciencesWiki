@@ -61,6 +61,25 @@
     <h1>{{ node.label }}</h1>
     {% if node.description %}<p class="muted">{{ node.description }}</p>{% endif %}
 
+    {# Sous-rubriques : navigation des sous-thèmes, AU-DESSUS des onglets. #}
+    {% if node.children is not empty %}
+        <section aria-label="Sous-rubriques" style="margin:1rem 0 1.4rem">
+            <h2 style="margin-top:0">Sous-rubriques</h2>
+            <div class="grid">
+                {% for child in node.children %}
+                    {% set cs = (childrenStats[child.slug] ?? {}) %}
+                    <a class="domain-card" href="/{{ app.request.locale }}/{{ path }}/{{ child.slug }}" style="background:{{ colors.card_bg(rootSlug, child.level) }}; min-height:96px">
+                        <span class="d-label">{{ child.label }}</span>
+                        <span style="display:block; margin-top:.45rem">
+                            <span class="pill" style="background:rgba(255,255,255,.85)" title="Publications">📚 {{ (cs.publications ?? 0)|number_format(0, ',', ' ') }}</span>
+                            <span class="pill" style="background:rgba(255,255,255,.85)" title="Questions">❓ {{ (cs.questions ?? 0)|number_format(0, ',', ' ') }}</span>
+                        </span>
+                    </a>
+                {% endfor %}
+            </div>
+        </section>
+    {% endif %}
+
     <div class="qtabs" role="tablist" aria-label="Contenu de la rubrique {{ node.label }}">
         <button type="button" role="tab" id="tab-article" aria-controls="panel-article" aria-selected="true" tabindex="0">Article</button>
         <button type="button" role="tab" id="tab-qa" aria-controls="panel-qa" aria-selected="false" tabindex="-1">Questions &amp; réponses{% if qcount > 0 %} <span class="tab-badge" aria-label="{{ qcount }} question(s)">{{ qcount }}</span>{% endif %}</button>
@@ -210,25 +229,6 @@
     <section role="tabpanel" id="panel-controv" aria-labelledby="tab-controv" hidden>
         {% include 'wiki/_controversies.html.twig' %}
     </section>
-
-    {# Sous-rubriques : hors des onglets, toujours affichées. #}
-    {% if node.children is not empty %}
-        <section aria-label="Sous-rubriques" style="margin-top:2rem">
-            <h2>Sous-rubriques</h2>
-            <div class="grid">
-                {% for child in node.children %}
-                    {% set cs = (childrenStats[child.slug] ?? {}) %}
-                    <a class="domain-card" href="/{{ app.request.locale }}/{{ path }}/{{ child.slug }}" style="background:{{ colors.card_bg(rootSlug, child.level) }}; min-height:96px">
-                        <span class="d-label">{{ child.label }}</span>
-                        <span style="display:block; margin-top:.45rem">
-                            <span class="pill" style="background:rgba(255,255,255,.85)" title="Publications">📚 {{ (cs.publications ?? 0)|number_format(0, ',', ' ') }}</span>
-                            <span class="pill" style="background:rgba(255,255,255,.85)" title="Questions">❓ {{ (cs.questions ?? 0)|number_format(0, ',', ' ') }}</span>
-                        </span>
-                    </a>
-                {% endfor %}
-            </div>
-        </section>
-    {% endif %}
 
     <script nonce="{{ csp_nonce.value }}">
     (function () {
