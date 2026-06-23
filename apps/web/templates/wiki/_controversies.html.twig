@@ -11,6 +11,9 @@
     .cv-state { border:1px solid var(--line); border-radius:12px; padding:1.4rem 1.3rem; background:#fafcff; margin:1rem 0; }
     .cv-cta { display:inline-block; background:var(--accent); color:#fff; border:0; border-radius:9px; padding:.7rem 1.3rem; font:inherit; font-weight:600; cursor:pointer; }
     .cv-cta[disabled] { opacity:.55; cursor:not-allowed; }
+    .cv-reanalyze { display:flex; gap:.7rem; align-items:center; flex-wrap:wrap; margin:1.2rem 0 .4rem; padding-top:1rem; border-top:1px dashed var(--line); }
+    .cv-reanalyze-btn { background:transparent; color:var(--accent); border:1px solid var(--accent); border-radius:9px; padding:.45rem 1rem; font:inherit; font-weight:600; cursor:pointer; }
+    .cv-reanalyze-btn[disabled] { opacity:.55; cursor:not-allowed; }
     .cv-card { border:1px solid var(--line); border-radius:12px; padding:1rem 1.2rem; margin:1rem 0; background:#fff; }
     .cv-card h3 { margin:.1rem 0 .6rem; font-size:1.08rem; color:var(--ink); }
     .cv-gauge { height:.7rem; border-radius:999px; background:linear-gradient(90deg,#dc2626,#f59e0b,#16a34a); position:relative; margin:.4rem 0 .2rem; }
@@ -75,6 +78,13 @@
             </article>
         {% endfor %}
     {% endif %}
+
+    {# Ré-analyse à la demande : le corpus évolue, on doit pouvoir rafraîchir. #}
+    <div class="cv-reanalyze">
+        <button type="button" class="cv-reanalyze-btn cv-analyze" data-slug="{{ node.slug }}">🔄 Ré-analyser ce sujet</button>
+        <span class="cv-meta">{% if analysis.analyzedAt %}Dernière analyse : {{ analysis.analyzedAt|slice(0,10) }} · {% endif %}relancez pour intégrer les nouvelles études moissonnées.</span>
+        <span class="cv-msg muted" role="status" aria-live="polite"></span>
+    </div>
 {% elseif status == 'analyzing' %}
     <div class="cv-state" id="cv-progress" data-slug="{{ node.slug }}"
          data-started="{{ analysis.analysisStartedAt|default('') }}"
@@ -86,13 +96,13 @@
     </div>
 {% else %}
     {# not_analyzed ou stale #}
-    <div class="cv-state" data-slug="{{ node.slug }}" id="cv-cta-box">
+    <div class="cv-state">
         {% if status == 'stale' %}
             <p><strong>De nouvelles études ont été moissonnées</strong> depuis la dernière analyse.</p>
-            <button type="button" class="cv-cta" id="cv-analyze-btn"{% if not isAnalysable %} disabled{% endif %}>🔄 Ré-analyser ce sujet</button>
+            <button type="button" class="cv-cta cv-analyze" data-slug="{{ node.slug }}"{% if not isAnalysable %} disabled{% endif %}>🔄 Ré-analyser ce sujet</button>
         {% else %}
             <p><strong>Ce sujet n'a pas encore été analysé.</strong> Lancez la cartographie des résultats contradictoires.</p>
-            <button type="button" class="cv-cta" id="cv-analyze-btn"{% if not isAnalysable %} disabled{% endif %}>🔬 Analyser ce sujet</button>
+            <button type="button" class="cv-cta cv-analyze" data-slug="{{ node.slug }}"{% if not isAnalysable %} disabled{% endif %}>🔬 Analyser ce sujet</button>
         {% endif %}
         <p class="cv-meta" style="margin-top:.7rem">
             {% if isAnalysable %}
@@ -101,30 +111,67 @@
                 Trop peu de publications validées ({{ analysable }}/{{ threshold }}) pour une analyse significative. Essayez une rubrique parente.
             {% endif %}
         </p>
-        <span id="cv-msg" class="muted" role="status" aria-live="polite"></span>
+        <span class="cv-msg muted" role="status" aria-live="polite"></span>
     </div>
 {% endif %}
 
 <script nonce="{{ csp_nonce.value }}">
 (function () {
-    var box = document.getElementById('cv-cta-box');
     var progress = document.getElementById('cv-progress');
-    var slug = (box && box.dataset.slug) || (progress && progress.dataset.slug);
-    if (!slug) { return; }
+    var cvUrl = function (slug) { return '/api/tree_nodes/' + encodeURIComponent(slug) + '/controversies'; };
 
-    // Polling : tant que le nœud est « analyzing », on interroge l'API puis on
-    // recharge la page dès que l'analyse est prête (les fiches sont alors servies).
-    function poll() {
-        fetch('/api/tree_nodes/' + encodeURIComponent(slug) + '/controversies', { headers: { 'Accept': 'application/json' } })
+    // Mise à jour du contenu SANS rechargement complet : on re-rend la page via
+    // Turbo (déjà chargé). Repli sur reload si Turbo est absent.
+    function refresh() {
+        if (window.Turbo && typeof Turbo.visit === 'function') { Turbo.visit(window.location.href, { action: 'replace' }); }
+        else { window.location.reload(); }
+    }
+
+    // Pendant « analyzing » : on interroge l'API et on rafraîchit dès que l'état change.
+    if (progress) {
+        var pslug = progress.dataset.slug;
+        (function poll() {
+            fetch(cvUrl(pslug), { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    var st = d.node && d.node.analysisStatus;
+                    if (st === 'ready' || st === 'stale' || st === 'not_analyzed') { refresh(); }
+                    else { setTimeout(poll, 4000); }
+                })
+                .catch(function () { setTimeout(poll, 8000); });
+        })();
+    }
+
+    // Déclenchement (Analyser / Ré-analyser) : POST puis on attend que le worker
+    // bascule le nœud en « analyzing » (ou termine), et on rafraîchit via Turbo —
+    // jamais de navigation ni de reload prématuré.
+    function box(btn) { return btn.closest('.cv-state, .cv-reanalyze'); }
+    function waitForChange(slug, from, tries) {
+        fetch(cvUrl(slug), { headers: { 'Accept': 'application/json' } })
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 var st = d.node && d.node.analysisStatus;
-                if (st === 'ready' || st === 'stale') { window.location.reload(); }
-                else { setTimeout(poll, 4000); }
+                if (st && st !== from) { refresh(); return; }
+                if (tries > 25) { refresh(); return; }
+                setTimeout(function () { waitForChange(slug, from, tries + 1); }, 3000);
             })
-            .catch(function () { setTimeout(poll, 8000); });
+            .catch(function () { setTimeout(function () { waitForChange(slug, from, tries + 1); }, 5000); });
     }
-    if (progress) { setTimeout(poll, 4000); }
+    document.querySelectorAll('.cv-analyze').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.preventDefault();
+            var slug = btn.dataset.slug;
+            var b = box(btn);
+            var msg = b ? b.querySelector('.cv-msg') : null;
+            var from = '{{ status }}';
+            btn.disabled = true;
+            if (msg) { msg.innerHTML = '<span class="loader"></span> Analyse lancée… (vous pouvez patienter ici)'; }
+            fetch('/api/tree_nodes/' + encodeURIComponent(slug) + '/analyze', { method: 'POST', headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function () { waitForChange(slug, from, 0); })
+                .catch(function () { btn.disabled = false; if (msg) { msg.textContent = 'Échec du lancement, réessayez.'; } });
+        });
+    });
 
     // Chrono live + durée estimée pendant l'analyse (rafraîchi chaque seconde).
     if (progress) {
@@ -150,19 +197,6 @@
         }
         tick();
         setInterval(tick, 1000);
-    }
-
-    var btn = document.getElementById('cv-analyze-btn');
-    if (btn) {
-        btn.addEventListener('click', function () {
-            var msg = document.getElementById('cv-msg');
-            btn.disabled = true;
-            if (msg) { msg.innerHTML = '<span class="loader"></span> Lancement…'; }
-            fetch('/api/tree_nodes/' + encodeURIComponent(slug) + '/analyze', { method: 'POST', headers: { 'Accept': 'application/json' } })
-                .then(function (r) { return r.json(); })
-                .then(function () { window.location.reload(); })
-                .catch(function () { btn.disabled = false; if (msg) { msg.textContent = 'Échec du lancement, réessayez.'; } });
-        });
     }
 })();
 </script>

@@ -100,17 +100,19 @@ final class ControversyController
             return new JsonResponse(['error' => 'Nœud introuvable.'], 404);
         }
 
-        $status = $node->getAnalysisStatus();
-        $reextract = AnalysisStatus::Stale === $status; // ré-analyse incrémentale
-        if (!\in_array($status, [AnalysisStatus::NotAnalyzed, AnalysisStatus::Stale], true)) {
+        // Seul un job déjà en cours bloque ; sinon on (re)lance — y compris depuis
+        // « ready » : le corpus évolue, le chercheur doit pouvoir rafraîchir.
+        if (AnalysisStatus::Analyzing === $node->getAnalysisStatus()) {
             return new JsonResponse([
-                'analysisStatus' => $status->value,
+                'analysisStatus' => AnalysisStatus::Analyzing->value,
                 'queued' => false,
-                'message' => AnalysisStatus::Analyzing === $status ? 'Analyse déjà en cours.' : 'Analyse déjà disponible.',
+                'message' => 'Analyse déjà en cours.',
             ]);
         }
 
-        $this->bus->dispatch(new AnalyzeNodeMessage((int) $node->getId(), reextract: $reextract));
+        // Incrémental : seules les publications sans claims sont ré-extraites
+        // (les nouvelles), puis controverses et pistes sont recalculées.
+        $this->bus->dispatch(new AnalyzeNodeMessage((int) $node->getId(), reextract: false));
 
         return new JsonResponse(['analysisStatus' => AnalysisStatus::Analyzing->value, 'queued' => true]);
     }
