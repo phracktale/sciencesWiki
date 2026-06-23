@@ -33,6 +33,16 @@ final class RagChatController
     /** Distance cosinus max pour qu'une publication soit jugée pertinente (garde-fou RAG). */
     private const MAX_SOURCE_DISTANCE = 0.62;
 
+    /**
+     * Nombre de voisins récupérés. Le chat fait une recherche GLOBALE (tout le
+     * corpus multi-domaines), contrairement aux Q/R du site qui sont limitées à un
+     * nœud. Un K plus élevé qu'en Q/R améliore le rappel : sur une formulation où
+     * un terme générique domine l'embedding (ex. « marqueurs biologiques »), les
+     * publications réellement pertinentes peuvent être reléguées au-delà du top-6.
+     * Le seuil de distance filtre ensuite le bruit, et le LLM ne cite que l'utile.
+     */
+    private const CHAT_NEIGHBORS = 24;
+
     /** Identifiant du « modèle » virtuel annoncé à Open WebUI. */
     private const MODEL_ID = 'scienceswiki-rag';
 
@@ -190,7 +200,7 @@ final class RagChatController
         }
 
         $sources = [];
-        foreach ($this->publications->nearestTo($embedding, $this->settings->neighbors()) as $hit) {
+        foreach ($this->publications->nearestTo($embedding, self::CHAT_NEIGHBORS) as $hit) {
             if ($hit['distance'] <= self::MAX_SOURCE_DISTANCE) {
                 $sources[] = $hit['publication'];
             }
