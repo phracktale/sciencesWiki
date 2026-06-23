@@ -43,4 +43,10 @@
         <a class="btn primary" href="{{ path('wiki_search') }}">Poser une question</a>
         <a class="btn" href="{{ path('crt_donate') }}">★ Soutenir le projet</a>
     </div>
+
+    {% include 'crt/_newsletter_form.html.twig' with {
+        news_audience: 'public',
+        news_heading: 'Tenez-moi au courant',
+        news_intro: "Laissez votre e-mail : on vous prévient des nouveautés (nouveaux sujets, outils grand public). Pas de spam."
+    } %}
 {% endblock %}

@@ -41,4 +41,10 @@
         <a class="btn primary" href="{{ path('wiki_search') }}">Vérifier une affirmation</a>
         <a class="btn" href="{{ path('crt_contact') }}">Demander un accès presse</a>
     </div>
+
+    {% include 'crt/_newsletter_form.html.twig' with {
+        news_audience: 'journalists',
+        news_heading: 'Rester informé (presse)',
+        news_intro: "Recevez les nouveautés utiles à la couverture scientifique (outils, jeux de données, expertises). Pas de spam."
+    } %}
 {% endblock %}

@@ -1,0 +1,60 @@
+{# Formulaire « Rejoindre » réutilisable (chercheurs / enseignants). Poste vers
+   /api/join-requests (système Demandes, géré en back-office). Paramètres :
+   join_type (committee|author|editor), join_profile (chercheur|vulgarisateur),
+   join_heading, join_profession_label, join_profession_ph. #}
+<h2 id="rejoindre">{{ join_heading|default('Rejoindre SciencesWiki') }}</h2>
+<p class="lead">{{ join_intro|default("Demande d'accès gratuite. Nous revenons vers vous par e-mail.") }}</p>
+
+<form class="dosform" id="join-form" data-type="{{ join_type|default('author') }}" data-profile="{{ join_profile|default('') }}" novalidate>
+    <span class="form-ttl">┌─ DEMANDE D'ACCÈS ─────────────────────────┐</span>
+    <div class="field">
+        <label for="j-first">Prénom</label>
+        <input id="j-first" name="firstName" type="text" maxlength="120" required placeholder="Prénom">
+    </div>
+    <div class="field">
+        <label for="j-last">Nom</label>
+        <input id="j-last" name="lastName" type="text" maxlength="120" required placeholder="Nom">
+    </div>
+    <div class="field">
+        <label for="j-email">E-mail</label>
+        <input id="j-email" name="email" type="email" maxlength="180" placeholder="vous@exemple.fr">
+    </div>
+    <div class="field">
+        <label for="j-prof">{{ join_profession_label|default('Fonction / institution') }}</label>
+        <input id="j-prof" name="profession" type="text" maxlength="180" placeholder="{{ join_profession_ph|default('') }}">
+    </div>
+    <div class="field">
+        <label for="j-msg">Message (optionnel)</label>
+        <textarea id="j-msg" name="message" maxlength="2000" placeholder="Quelques mots sur votre demande…"></textarea>
+    </div>
+    <div class="hp" aria-hidden="true"><label for="j-website">Ne pas remplir</label><input id="j-website" class="hp" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+    <div class="btn-row" style="margin-bottom:.4rem;"><button class="btn primary" type="submit">Envoyer ma demande</button></div>
+    <div id="join-status" role="status" aria-live="polite"></div>
+    <span class="form-ttl" style="margin:.6rem 0 0;">└────────────────────────────────────────────┘</span>
+</form>
+
+<script nonce="{{ csp_nonce.value }}">
+(function () {
+    var form = document.getElementById('join-form');
+    if (!form) return;
+    var status = document.getElementById('join-status');
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (form.querySelector('input.hp').value) return;
+        var btn = form.querySelector('button[type=submit]');
+        var data = { type: form.dataset.type };
+        if (form.dataset.profile) { data.profile = form.dataset.profile; }
+        form.querySelectorAll('input, textarea').forEach(function (el) { if (el.name && !el.classList.contains('hp')) data[el.name] = el.value; });
+        if (!data.firstName || !data.lastName) { status.className = 'err'; status.textContent = '! Prénom et nom sont requis.'; return; }
+        btn.disabled = true; status.className = ''; status.textContent = '> ENVOI…';
+        fetch('/api/join-requests', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+                btn.disabled = false;
+                if (res.ok) { status.className = 'ok'; status.textContent = '> ' + (res.d.message || 'Demande reçue, merci !'); form.reset(); }
+                else { status.className = 'err'; status.textContent = '! ' + (res.d.error || 'Erreur, réessayez.'); }
+            })
+            .catch(function () { btn.disabled = false; status.className = 'err'; status.textContent = '! Erreur réseau, réessayez.'; });
+    });
+})();
+</script>

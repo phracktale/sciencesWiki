@@ -1,0 +1,46 @@
+{# Formulaire « tenez-moi au courant » réutilisable (journalistes / grand public).
+   Poste vers /api/newsletter (stocké, géré en back-office). Paramètres :
+   news_audience (journalists|public|…), news_heading, news_intro. #}
+<h2 id="inscription">{{ news_heading|default('Tenez-moi au courant') }}</h2>
+<p class="lead">{{ news_intro|default("Laissez votre e-mail : on vous prévient des nouveautés. Pas de spam, désinscription en un clic.") }}</p>
+
+<form class="dosform" id="news-form" data-audience="{{ news_audience|default('other') }}" novalidate>
+    <span class="form-ttl">┌─ INSCRIPTION ─────────────────────────────┐</span>
+    <div class="field">
+        <label for="n-name">Nom</label>
+        <input id="n-name" name="name" type="text" maxlength="120" placeholder="(optionnel)">
+    </div>
+    <div class="field">
+        <label for="n-email">E-mail</label>
+        <input id="n-email" name="email" type="email" maxlength="180" required placeholder="vous@exemple.fr">
+    </div>
+    <div class="hp" aria-hidden="true"><label for="n-website">Ne pas remplir</label><input id="n-website" class="hp" name="website" type="text" tabindex="-1" autocomplete="off"></div>
+    <div class="btn-row" style="margin-bottom:.4rem;"><button class="btn primary" type="submit">M'inscrire</button></div>
+    <div id="news-status" role="status" aria-live="polite"></div>
+    <span class="form-ttl" style="margin:.6rem 0 0;">└────────────────────────────────────────────┘</span>
+</form>
+
+<script nonce="{{ csp_nonce.value }}">
+(function () {
+    var form = document.getElementById('news-form');
+    if (!form) return;
+    var status = document.getElementById('news-status');
+    form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        if (form.querySelector('input.hp').value) return;
+        var btn = form.querySelector('button[type=submit]');
+        var data = { audience: form.dataset.audience };
+        form.querySelectorAll('input').forEach(function (el) { if (el.name && !el.classList.contains('hp')) data[el.name] = el.value; });
+        if (!data.email) { status.className = 'err'; status.textContent = '! Un e-mail valide est requis.'; return; }
+        btn.disabled = true; status.className = ''; status.textContent = '> INSCRIPTION…';
+        fetch('/api/newsletter', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) })
+            .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+            .then(function (res) {
+                btn.disabled = false;
+                if (res.ok) { status.className = 'ok'; status.textContent = '> ' + (res.d.message || 'Inscription enregistrée. Merci !'); form.reset(); }
+                else { status.className = 'err'; status.textContent = '! ' + (res.d.error || 'Erreur, réessayez.'); }
+            })
+            .catch(function () { btn.disabled = false; status.className = 'err'; status.textContent = '! Erreur réseau, réessayez.'; });
+    });
+})();
+</script>

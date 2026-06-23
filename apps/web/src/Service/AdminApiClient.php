@@ -224,6 +224,14 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/roadmap-proposals/'.$id.'/status', ['status' => $status]);
     }
 
+    /** Inscriptions newsletter par cible (vue back-office). @return array<string,mixed> */
+    public function newsletterSignups(string $audience = ''): array
+    {
+        $res = $this->send('GET', '/api/admin/newsletter-signups?'.http_build_query(array_filter(['audience' => $audience])), null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'total' => 0];
+    }
+
     /** @return array<string,mixed> liste des utilisateurs + rôles disponibles */
     public function users(): array
     {

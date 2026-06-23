@@ -354,6 +354,20 @@ final class AdminController extends AbstractController
         return $this->redirectToRoute('admin_roadmap');
     }
 
+    /** Inscriptions newsletter par cible (vue back-office). */
+    #[Route('/admin/newsletter', name: 'admin_newsletter', methods: ['GET'])]
+    public function newsletterSignups(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/newsletter.html.twig', [
+            'data' => $this->admin->newsletterSignups(trim((string) $request->query->get('audience', ''))),
+            'audience' => trim((string) $request->query->get('audience', '')),
+        ]);
+    }
+
     /** Proxy du PDF en accès libre (même origine → visualiseur natif + impression). Anti-SSRF. */
     #[Route('/admin/articles/{id}/pdf', name: 'admin_article_pdf', requirements: ['id' => '\d+'], methods: ['GET'])]
     public function articlePdf(int $id, Request $request): Response

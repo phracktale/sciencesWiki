@@ -40,4 +40,11 @@
         <a class="btn primary" href="{{ path('wiki_search') }}">Explorer un thème</a>
         <a class="btn" href="{{ path('crt_contact') }}">Suggérer un usage en classe</a>
     </div>
+
+    {% include 'crt/_join_form.html.twig' with {
+        join_type: 'editor', join_profile: 'vulgarisateur',
+        join_heading: 'Contribuer comme enseignant·e',
+        join_intro: "Vous enseignez et souhaitez contribuer (vulgarisation, relecture, usages en classe) ? Laissez vos coordonnées.",
+        join_profession_label: 'Établissement / niveau', join_profession_ph: 'ex. collège, lycée, université…'
+    } %}
 {% endblock %}

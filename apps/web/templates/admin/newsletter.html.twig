@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Inscriptions newsletter{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+
+    <h1>Inscriptions newsletter <span class="muted">({{ data.total }})</span></h1>
+
+    {% set audLabels = { 'journalists': 'Journalistes', 'public': 'Grand public', 'researchers': 'Chercheurs', 'teachers': 'Enseignants', 'other': 'Autre' } %}
+
+    <p style="margin:.6rem 0">
+        <a href="{{ path('admin_newsletter') }}" class="pill {{ audience == '' ? 'author' }}">Toutes</a>
+        {% for key, label in audLabels %}
+            <a href="{{ path('admin_newsletter', { audience: key }) }}" class="pill {{ audience == key ? 'author' }}">{{ label }}</a>
+        {% endfor %}
+    </p>
+
+    {% if data.items is empty %}
+        <p class="muted">Aucune inscription.</p>
+    {% else %}
+        <p class="muted" style="font-size:.85rem">Adresses (séparées par des virgules, pour copier) :
+            <br><code style="user-select:all">{{ data.items|map(i => i.email)|join(', ') }}</code>
+        </p>
+        <table class="dos" style="width:100%; border-collapse:collapse; margin-top:1rem">
+            <thead><tr><th style="text-align:left">E-mail</th><th style="text-align:left">Nom</th><th style="text-align:left">Cible</th><th style="text-align:left">Date</th></tr></thead>
+            <tbody>
+                {% for s in data.items %}
+                    <tr>
+                        <td><a href="mailto:{{ s.email }}">{{ s.email }}</a></td>
+                        <td>{{ s.name ?: '—' }}</td>
+                        <td><span class="pill">{{ audLabels[s.audience] ?? s.audience }}</span></td>
+                        <td class="muted">{{ s.createdAt|slice(0,10) }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}

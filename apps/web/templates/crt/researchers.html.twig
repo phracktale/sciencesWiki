@@ -44,4 +44,11 @@
         <a class="btn primary" href="{{ path('wiki_search') }}">Tester la recherche sémantique</a>
         <a class="btn" href="{{ path('crt_contact') }}">Nous écrire</a>
     </div>
+
+    {% include 'crt/_join_form.html.twig' with {
+        join_type: 'author', join_profile: 'chercheur',
+        join_heading: 'Demander un accès chercheur',
+        join_intro: "Chercheur·e ou auteur·e d'une publication ? L'accès aux outils chercheur est gratuit — laissez vos coordonnées.",
+        join_profession_label: 'Laboratoire / institution', join_profession_ph: 'ex. CNRS, INSERM, université…'
+    } %}
 {% endblock %}
