@@ -275,6 +275,8 @@ services:
       WEBUI_NAME: "SciencesWiki — Assistant"
     volumes:
       - openwebui_data:/app/backend/data
+      # Thème CRT SciencesWiki : Open WebUI charge nativement /static/custom.css.
+      - ./openwebui/custom.css:/app/backend/open_webui/static/custom.css:ro
     ports:
       - "${OPENWEBUI_PORT:-8092}:8080"
     restart: unless-stopped

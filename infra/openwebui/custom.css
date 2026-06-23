@@ -1,0 +1,109 @@
+/* =============================================================================
+ * SciencesWiki — thème CRT pour Open WebUI (injecté via /static/custom.css)
+ *
+ * Bind-monté dans le conteneur (cf. docker-compose.yml). Open WebUI charge ce
+ * fichier nativement (référencé dans son index.html) — pas besoin de sub_filter.
+ *
+ * Open WebUI est une SPA Tailwind : peu de classes sémantiques stables. On pose
+ * donc une BASE robuste (police monospace + palette phosphore + scanlines) par
+ * sélecteurs larges, puis on affine les détails (logo, bulles) au vu du DOM réel.
+ * Palette alignée sur public/css/crt-theme.css du site.
+ * ========================================================================== */
+
+:root {
+    --sw-bg:      #05080a;   /* fond « terminal » */
+    --sw-panel:   #0a1410;   /* panneaux / barres */
+    --sw-fg:      #9dffc4;   /* phosphore vert clair */
+    --sw-bright:  #33ff99;   /* vert vif (accents, liens) */
+    --sw-dim:     #2f6f4a;   /* vert atténué */
+    --sw-border:  #1c3a28;   /* bordures */
+    --sw-mono:    ui-monospace, "IBM Plex Mono", "JetBrains Mono", "Courier New", monospace;
+}
+
+/* ── Police monospace partout (le « feel » terminal) ─────────────────────── */
+html, body, button, input, textarea, select, .prose, [class*="font-"] {
+    font-family: var(--sw-mono) !important;
+}
+
+/* ── Fond sombre + texte phosphore ───────────────────────────────────────── */
+html, body {
+    background-color: var(--sw-bg) !important;
+    color: var(--sw-fg) !important;
+}
+/* Surfaces sombres d'Open WebUI (mode sombre) re-teintées vers le vert-noir. */
+.dark body,
+[class*="bg-gray-8"], [class*="bg-gray-9"],
+[class*="bg-black"], [class*="dark:bg-gray-8"], [class*="dark:bg-gray-9"] {
+    background-color: var(--sw-bg) !important;
+}
+[class*="bg-gray-7"], [class*="dark:bg-gray-7"] {
+    background-color: var(--sw-panel) !important;
+}
+[class*="text-white"], [class*="text-gray-1"], [class*="text-gray-2"],
+[class*="text-gray-3"], .prose, .prose * {
+    color: var(--sw-fg) !important;
+}
+
+/* Liens & accents en vert vif. */
+a, .text-blue-500, [class*="text-blue"] { color: var(--sw-bright) !important; }
+
+/* Champs de saisie : ardoise sombre, texte vert, bord phosphore. */
+textarea, input, [contenteditable="true"] {
+    background-color: var(--sw-panel) !important;
+    color: var(--sw-fg) !important;
+    border-color: var(--sw-border) !important;
+}
+textarea::placeholder, input::placeholder { color: var(--sw-dim) !important; }
+
+/* Boutons primaires en vert. */
+button[class*="bg-black"], button[class*="bg-white"], button[type="submit"] {
+    background-color: var(--sw-dim) !important;
+    color: #03110a !important;
+}
+
+/* Barre de défilement « terminal ». */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--sw-bg); }
+::-webkit-scrollbar-thumb { background: var(--sw-dim); border-radius: 0; }
+
+/* ── Bulles de message en « fenêtres de terminal » ───────────────────────── */
+/* Best-effort : conteneurs de message d'Open WebUI. À affiner selon le DOM. */
+[id^="message-"], .chat-message, [class*="message"] > .rounded-3xl,
+[class*="message"] > .rounded-xl {
+    border: 1px solid var(--sw-border) !important;
+    border-radius: 4px !important;
+    background-color: rgba(10, 20, 16, 0.6) !important;
+    box-shadow: 0 0 8px rgba(51, 255, 153, 0.06) inset;
+}
+
+/* ── Logo SciencesWiki ajouté (le logo Open WebUI reste) ──────────────────── */
+/* Badge fixe en haut à gauche pour l'instant ; placement exact à côté du logo
+ * Open WebUI une fois le sélecteur du conteneur identifié sur le DOM réel. */
+body::before {
+    content: "";
+    position: fixed;
+    top: 8px;
+    left: 56px;            /* à droite de la zone logo/menu d'Open WebUI */
+    width: 120px;
+    height: 34px;
+    background: url("https://scienceswiki.eu/logo-crt.svg") left center / contain no-repeat;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0.92;
+}
+
+/* ── Effet scanlines CRT (overlay, n'intercepte pas les clics) ────────────── */
+body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9998;
+    background: repeating-linear-gradient(
+        to bottom,
+        rgba(0, 0, 0, 0) 0px,
+        rgba(0, 0, 0, 0) 2px,
+        rgba(0, 0, 0, 0.18) 3px
+    );
+    mix-blend-mode: multiply;
+}
