@@ -318,9 +318,24 @@
         });
     }
 
+    /* Titre PRINCIPAL des pages non-marketing (accueil, admin, espaces perso, wiki…) :
+       on convertit le 1er <h1> du contenu en machine à écrire — s'il n'en est pas déjà
+       une (les pages marketing ont déjà leur <h1 data-typewriter>) et s'il a du texte —
+       pour une animation uniforme partout. */
+    function autoTitle() {
+        var h = document.querySelector('main h1') || document.querySelector('h1');
+        if (!h || h.hasAttribute('data-typewriter')) return;
+        var txt = (h.textContent || '').trim();
+        if (!txt) return;
+        h.setAttribute('data-text', txt);
+        h.setAttribute('data-tw-cursor', '');
+        h.setAttribute('data-typewriter', '');
+        h.textContent = '';
+    }
+
     /* --------------------------------- Init ------------------------------ */
     function init() {
-        loadCfg(); powerOn(); tickClock(); typewriters(); steppedAnchors(); shell(); contactForm(); buildPanel();
+        loadCfg(); powerOn(); tickClock(); autoTitle(); typewriters(); steppedAnchors(); shell(); contactForm(); buildPanel();
     }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
     else init();
