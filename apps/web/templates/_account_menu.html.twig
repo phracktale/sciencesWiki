@@ -1,0 +1,16 @@
+{# Bloc « compte » (Connexion / Mon compte) — réutilisé dans la barre terminal
+   (crt-termbar, ancré à droite, mode fenêtré) ou dans la nav (sinon). Style « lien
+   simple », sans bordure. Le contexte parent (current_user, route, app) est hérité. #}
+{% if current_user.isLogged %}
+    <div class="nav-dd">
+        <button type="button" class="nav-dd-top" aria-haspopup="true">{{ current_user.displayName }}</button>
+        <div class="nav-dd-menu">
+            <a href="{{ path('chat') }}"{{ route == 'chat' ? ' class="is-active"' : '' }}>💬 Assistant IA</a>
+            {% if current_user.canResearch %}<a href="{{ path('researcher_dashboard') }}"{{ route == 'researcher_dashboard' ? ' class="is-active"' : '' }}>🔬 Espace chercheur</a>{% endif %}
+            {% if current_user.hasRole('ROLE_ADMIN') %}<a href="{{ path('admin_dashboard') }}">⚙️ Tableau de bord</a>{% endif %}
+            <a href="{{ path('logout') }}" class="nav-dd-logout">⏻ Déconnexion</a>
+        </div>
+    </div>
+{% else %}
+    <a href="{{ path('login') }}"{{ route == 'login' ? ' class="is-active"' : '' }}>Connexion</a>
+{% endif %}

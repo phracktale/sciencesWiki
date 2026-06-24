@@ -100,8 +100,8 @@ body.theme-crt header nav a { color: var(--phos); }
 body.theme-crt header nav a:hover { background: rgba(185,240,201,.12); color: var(--phos-bright); }
 body.theme-crt header nav a.is-active { color: var(--accent); }
 body.theme-crt header nav a.is-active::after { background: var(--accent); }
-body.theme-crt .nav-dd-top { color: var(--phos); background: rgba(185,240,201,.06); border-color: var(--line); }
-body.theme-crt .nav-dd-top:hover, body.theme-crt .nav-dd:focus-within .nav-dd-top { background: rgba(185,240,201,.14); }
+body.theme-crt .nav-dd-top { color: var(--phos); background: none; border: none; }
+body.theme-crt .nav-dd-top:hover, body.theme-crt .nav-dd:focus-within .nav-dd-top { background: rgba(185,240,201,.14); color: var(--phos-bright); }
 /* Menu « Mon compte » : fond OPAQUE et AU-DESSUS des surcouches tube (sinon les
    scanlines/vignette le rendent illisible et il semble se superposer au contenu). */
 body.theme-crt .nav-dd-menu { background: #0c100e; border-color: var(--accent); box-shadow: 0 10px 28px rgba(0,0,0,.7); z-index: 9100; }

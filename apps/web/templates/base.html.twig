@@ -225,43 +225,23 @@
     </script>
 </head>
 <body{{ crt ? (crt_framed ? ' class="theme-crt crt-framed"' : ' class="theme-crt"') : '' }}>
+    {% set route = app.request.attributes.get('_route') %}
     {% if crt_framed %}<div class="crt-overlay" aria-hidden="true"></div><div class="crt-flicker" aria-hidden="true"></div>
-    {# Cadre « terminal » unifié (même habillage que les pages de présentation). #}
-    <div class="crt-shell"><div class="crt-termbar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">SciencesWiki — IBM-MONOCHROME · TTY1</span></div><div class="crt-term">{% endif %}{# /crt_framed #}
+    {# Cadre « terminal » unifié ; le bloc compte est ancré à droite dans la barre. #}
+    <div class="crt-shell"><div class="crt-termbar"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><span class="ttl">SciencesWiki — IBM-MONOCHROME · TTY1</span><span class="term-account">{% include '_account_menu.html.twig' %}</span></div><div class="crt-term">{% endif %}{# /crt_framed #}
     <header>
         <a class="brand" href="{{ path('home') }}"><img src="{{ crt ? '/logo-crt.svg' : '/logo.svg' }}" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
-        {% set route = app.request.attributes.get('_route') %}
         <nav>
             <a href="{{ path('home') }}"{{ route in ['home','node'] ? ' class="is-active"' : '' }}>Accueil</a>
-            <div class="nav-dd dd-left">
-                <button type="button" class="nav-dd-top" aria-haspopup="true">SciencesWiki</button>
-                <div class="nav-dd-menu">
-                    <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
-                    <a href="{{ path('crt_discover') }}"{{ route == 'crt_discover' ? ' class="is-active"' : '' }}>Découvrir</a>
-                    <a href="{{ path('crt_researchers') }}" class="sub{{ route == 'crt_researchers' ? ' is-active' : '' }}">Chercheurs</a>
-                    <a href="{{ path('crt_journalists') }}" class="sub{{ route == 'crt_journalists' ? ' is-active' : '' }}">Journalistes</a>
-                    <a href="{{ path('crt_teachers') }}" class="sub{{ route == 'crt_teachers' ? ' is-active' : '' }}">Enseignants &amp; élèves</a>
-                    <a href="{{ path('crt_public') }}" class="sub{{ route == 'crt_public' ? ' is-active' : '' }}">Grand public</a>
-                    <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
-                    <a href="{{ path('crt_manifesto') }}"{{ route == 'crt_manifesto' ? ' class="is-active"' : '' }}>Manifeste</a>
-                </div>
-            </div>
+            <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
+            <a href="{{ path('crt_discover') }}"{{ route == 'crt_discover' ? ' class="is-active"' : '' }}>Découvrir</a>
+            <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
+            <a href="{{ path('crt_manifesto') }}"{{ route == 'crt_manifesto' ? ' class="is-active"' : '' }}>Manifeste</a>
             <a href="{{ path('crt_donate') }}" style="color:var(--vul); font-weight:700">★ Soutenir</a>
             <a href="{{ path('crt_contact') }}"{{ route == 'crt_contact' ? ' class="is-active"' : '' }}>Contact</a>
-            {% if current_user.isLogged %}
-                <div class="nav-dd">
-                    <button type="button" class="nav-dd-top" aria-haspopup="true">Mon compte<span class="nav-email">{{ current_user.displayName }}</span></button>
-                    <div class="nav-dd-menu">
-                        <a href="{{ path('chat') }}"{{ route == 'chat' ? ' class="is-active"' : '' }}>💬 Assistant IA</a>
-                        {% if current_user.canResearch %}<a href="{{ path('researcher_dashboard') }}"{{ route == 'researcher_dashboard' ? ' class="is-active"' : '' }}>🔬 Espace chercheur</a>{% endif %}
-                        {% if current_user.hasRole('ROLE_ADMIN') %}<a href="{{ path('admin_dashboard') }}">⚙️ Tableau de bord</a>{% endif %}
-                        <a href="{{ path('logout') }}" class="nav-dd-logout">⏻ Déconnexion</a>
-                    </div>
-                </div>
-            {% else %}
-                <a href="{{ path('login') }}"{{ route == 'login' ? ' class="is-active"' : '' }}>Connexion</a>
-            {% endif %}
+            {# Compte : dans la barre terminal si mode fenêtré, sinon ici (à droite). #}
+            {% if not crt_framed %}<span class="nav-account">{% include '_account_menu.html.twig' %}</span>{% endif %}
         </nav>
     </header>
     <main>

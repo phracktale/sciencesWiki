@@ -53,8 +53,12 @@ header nav a.is-active { color:var(--accent-dark); }
 header nav a.is-active::after { content:''; position:absolute; left:.9rem; right:.9rem; bottom:.28rem; height:2px; background:var(--accent); border-radius:2px; }
 /* Menu déroulant « Mon compte » (front). */
 .nav-dd { position:relative; }
-.nav-dd-top { font:inherit; font-weight:600; color:var(--ink); background:rgba(1,159,185,.08); border:1px solid var(--line); border-radius:9px; padding:.35rem .9rem; cursor:pointer; text-align:left; line-height:1.15; }
-.nav-dd-top:hover, .nav-dd:focus-within .nav-dd-top { background:rgba(1,159,185,.16); }
+/* Déclencheur compte : lien simple, sans bordure ni fond (comme les autres liens). */
+.nav-dd-top { font:inherit; font-weight:600; color:var(--ink); background:none; border:none; border-radius:9px; padding:.5rem .9rem; cursor:pointer; text-align:left; line-height:1.15; }
+.nav-dd-top:hover, .nav-dd:focus-within .nav-dd-top { background:rgba(1,159,185,.12); color:var(--accent-dark); }
+/* Compte ancré à droite dans la barre terminal (mode fenêtré). */
+.crt-termbar .term-account { margin-left:auto; }
+.crt-termbar .nav-dd-top, .crt-termbar .term-account a { text-transform:none; color:inherit; padding:.05rem .4rem; }
 .nav-dd-top .nav-email { display:block; font-weight:400; font-size:.76rem; color:var(--muted, #64748b); }
 .nav-dd-menu { position:absolute; top:calc(100% + 6px); right:0; background:#fff; border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 28px rgba(0,0,0,.12); min-width:210px; padding:.3rem; display:none; z-index:50; }
 .nav-dd-menu::before { content:''; position:absolute; left:0; right:0; top:-8px; height:8px; }
