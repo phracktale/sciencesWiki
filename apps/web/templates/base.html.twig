@@ -16,8 +16,9 @@
     <meta name="description" content="{% block description %}SciencesWiki — l'encyclopédie scientifique libre, gratuite et vulgarisée, adossée à des publications de recherche.{% endblock %}">
     {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}
     <script nonce="{{ csp_nonce.value }}" src="{{ asset_v('/js/turbo.min.js') }}" defer></script>
-    <style>
-
+    {# Styles de base déplacés dans /css/base.css (data-turbo-track : reload propre). #}
+    <link rel="stylesheet" href="{{ asset_v('/css/base.css') }}" data-turbo-track="reload">
+    {% if false %}{# ——— ancien <style> inline, désormais dans base.css ———
         * { box-sizing: border-box; }
         /* Classes utilitaires explicites (cf. usage dans les templates). */
         .font-roboto { font-family: var(--font-base); }
@@ -176,9 +177,7 @@
         .article-paternity { display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; margin:.3rem 0 1.2rem; }
         .ai-banner { margin:2rem 0 .5rem; padding:.9rem 1.1rem; border:1px solid #fcd34d; background:#fffbeb; border-radius:10px; font-size:.92rem; line-height:1.6; color:#78350f; }
         .ai-banner a { color:var(--accent-dark); font-weight:600; }
-
-        
-    </style>
+    ———fin——— #}{% endif %}
 
     {# Re-skin CRT « IBM monochrome » appliqué au front public (chargé APRÈS le
        style legacy pour le surcharger). Le wiki garde le même balisage : seule
