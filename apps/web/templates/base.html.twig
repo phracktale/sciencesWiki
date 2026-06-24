@@ -352,5 +352,11 @@
         });
     })();
     </script>
+
+    {# Effets terminal : machine à écrire des titres ([data-typewriter] → texte
+       révélé lettre par lettre + curseur), horloge, easter-egg shell. Entièrement
+       gardé (no-op si les éléments sont absents). En fin de body pour que Turbo le
+       ré-exécute à chaque navigation (sinon les titres ne se ré-animent pas). #}
+    {% if crt %}<script src="{{ asset_v('/js/crt.js') }}" defer></script>{% endif %}
 </body>
 </html>
