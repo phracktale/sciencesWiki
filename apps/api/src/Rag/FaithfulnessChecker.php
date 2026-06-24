@@ -46,6 +46,11 @@ final class FaithfulnessChecker
         - Ne reformule RIEN, ne supprime RIEN, n'ajoute AUCUN autre commentaire ni balise.
         - Une affirmation correctement appuyée par une source : n'y touche pas.
         - Les titres de section et le texte déjà cité [n] correctement : ne marque pas.
+
+        FORMAT DE SORTIE (impératif absolu) :
+        - Réponds UNIQUEMENT par le TEXTE, éventuellement enrichi des marqueurs.
+        - AUCUN préambule, AUCUNE explication, AUCUN commentaire, AUCUNE répétition,
+          ne réécris JAMAIS l'énoncé « TEXTE : » ni la liste des sources.
         TXT;
 
     public function __construct(
@@ -82,8 +87,10 @@ final class FaithfulnessChecker
             LlmMessage::system(self::SYSTEM),
             LlmMessage::user($sourcesBlock."\n\nTEXTE :\n".$text),
         ];
-        // Vérificateur ≠ rédacteur : modèle léger, température nulle (déterministe).
-        $opts = ['temperature' => 0.0, 'max_tokens' => 2000, 'model' => $this->settings->lightModel(), 'timeout' => 300];
+        // Modèle CAPABLE (défaut LLM_MODEL = gemma4), distinct du rédacteur d'articles
+        // (qwen). Un modèle trop faible bavarde/duplique au lieu d'annoter verbatim.
+        // Température nulle = déterministe.
+        $opts = ['temperature' => 0.0, 'max_tokens' => 2000, 'timeout' => 300];
 
         try {
             $annotated = trim($this->llm->complete($messages, $opts)->content);
@@ -91,10 +98,20 @@ final class FaithfulnessChecker
             return $text; // best-effort : ne pas dégrader le contenu
         }
 
-        // Garde-fou anti-réécriture : si le vérificateur a perdu du contenu (sortie
-        // tronquée ou reformulée), on conserve l'original plutôt que de risquer une perte.
+        // Garde-fous anti-pollution : on rejette toute sortie qui n'est pas le texte
+        // verbatim + marqueurs (le vérificateur conserve alors l'ORIGINAL, jamais de
+        // contenu corrompu) :
+        //  - vide ;
+        //  - longueur (hors marqueurs) hors de [0,8 ; 1,2]× l'original → perte ou bavardage ;
+        //  - présence de méta-commentaire typique d'un modèle qui « explique ».
         $stripped = trim(str_replace(self::MARKER, '', $annotated));
-        if ('' === $annotated || mb_strlen($stripped) < (int) (mb_strlen($text) * 0.7)) {
+        $len = mb_strlen($text);
+        $sLen = mb_strlen($stripped);
+        $meta = (bool) preg_match(
+            '/(TEXTE\s*:|aucune information pertinente|je vais (simplement )?ajouter le marqueur|après avoir examiné les sources|puisque vous avez demandé)/ui',
+            $annotated,
+        );
+        if ('' === $annotated || $meta || $sLen < (int) ($len * 0.8) || $sLen > (int) ($len * 1.2)) {
             return $text;
         }
 
