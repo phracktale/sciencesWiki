@@ -42,6 +42,8 @@ body.theme-crt {
     --cursor-speed: 0.8s;
     --tw-speed: 37;
 
+    min-width: fit-content;
+    
     background: var(--bg);
     background-image: radial-gradient(120% 130% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%);
     color: var(--phos);
