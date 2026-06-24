@@ -46,6 +46,8 @@ final class CspSubscriber implements EventSubscriberInterface
             ."img-src 'self' data: https:; "
             ."font-src 'self' data:; "
             ."connect-src 'self' https://analytics.phracktale.com; "
+            // Iframe de l'assistant IA (Open WebUI) sur le sous-domaine chat.
+            ."frame-src 'self' https://chat.scienceswiki.eu; "
             ."frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'",
             $nonce,
         );
