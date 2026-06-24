@@ -41,8 +41,21 @@ final class RagChatController
      */
     private const CHAT_NEIGHBORS = 12;
 
-    /** Identifiant du « modèle » virtuel annoncé à Open WebUI. */
+    /** Modèle RAG par défaut (LLM = réglage rag.model / LLM_MODEL courant). */
     private const MODEL_ID = 'scienceswiki-rag';
+
+    /**
+     * « Modèles » RAG exposés à Open WebUI : MÊME pipeline (récupération hybride +
+     * garde-fous sourcés), mais LLM différent dessous → comparaison côte à côte via
+     * le « + » d'Open WebUI, sur les MÊMES sources. La valeur = le tag Ollama à
+     * utiliser ; null = LLM courant. Ajuste/complète selon les modèles tirés sur Marvin.
+     */
+    private const RAG_MODELS = [
+        self::MODEL_ID => null,
+        'scienceswiki-rag-mistral' => 'mistral-medium-3.5:latest',
+        'scienceswiki-rag-qwen' => 'qwen3.6:latest',
+        'scienceswiki-rag-gemma' => 'gemma4:latest',
+    ];
 
     private const CHAT_SYSTEM = <<<'TXT'
         Tu es l'assistant de recherche de SciencesWiki. Tu réponds en FRANÇAIS,
@@ -75,15 +88,13 @@ final class RagChatController
             return new JsonResponse(['error' => ['message' => 'Non autorisé.']], 401);
         }
 
-        return new JsonResponse([
-            'object' => 'list',
-            'data' => [[
-                'id' => self::MODEL_ID,
-                'object' => 'model',
-                'created' => time(),
-                'owned_by' => 'scienceswiki',
-            ]],
-        ]);
+        $now = time();
+        $data = [];
+        foreach (array_keys(self::RAG_MODELS) as $id) {
+            $data[] = ['id' => $id, 'object' => 'model', 'created' => $now, 'owned_by' => 'scienceswiki'];
+        }
+
+        return new JsonResponse(['object' => 'list', 'data' => $data]);
     }
 
     #[Route('/api/rag/chat/completions', name: 'api_rag_chat', methods: ['POST'])]
@@ -105,6 +116,11 @@ final class RagChatController
         $incoming = \is_array($body['messages'] ?? null) ? $body['messages'] : [];
         $stream = (bool) ($body['stream'] ?? false);
 
+        // « Modèle » RAG demandé : même pipeline, LLM dessous éventuellement différent
+        // (comparaison côte à côte). On ignore tout id inconnu (→ défaut).
+        $modelId = (string) ($body['model'] ?? '');
+        $modelId = \array_key_exists($modelId, self::RAG_MODELS) ? $modelId : self::MODEL_ID;
+
         $query = $this->lastUserText($incoming);
         if ('' === $query) {
             return new JsonResponse(['error' => ['message' => 'Aucun message utilisateur.']], 422);
@@ -115,12 +131,15 @@ final class RagChatController
 
         // Pas de source pertinente : on renvoie un message honnête (garde-fou), sans LLM.
         if (null !== $noSourceNotice) {
-            return $stream ? $this->streamText($noSourceNotice) : $this->jsonText($noSourceNotice);
+            return $stream ? $this->streamText($noSourceNotice, $modelId) : $this->jsonText($noSourceNotice, $modelId);
         }
 
         $messages = $this->buildMessages($incoming, $query, $sources);
         $opts = ['temperature' => $this->settings->temperature(), 'max_tokens' => $this->settings->maxTokens(), 'timeout' => 300];
-        if (null !== ($m = $this->settings->model())) {
+        // LLM dessous : override du « modèle » RAG choisi, sinon réglage courant.
+        if (null !== (self::RAG_MODELS[$modelId] ?? null)) {
+            $opts['model'] = self::RAG_MODELS[$modelId];
+        } elseif (null !== ($m = $this->settings->model())) {
             $opts['model'] = $m;
         }
 
@@ -129,20 +148,20 @@ final class RagChatController
         if (!$stream) {
             $content = $llm->complete($messages, $opts)->content;
 
-            return $this->jsonText($content);
+            return $this->jsonText($content, $modelId);
         }
 
-        $response = new StreamedResponse(function () use ($llm, $messages, $opts): void {
+        $response = new StreamedResponse(function () use ($llm, $messages, $opts, $modelId): void {
             @set_time_limit(0);
             ignore_user_abort(true);
             $id = 'chatcmpl-'.bin2hex(random_bytes(8));
             $created = time();
-            $emit = function (array $delta, ?string $finish = null) use ($id, $created): void {
+            $emit = function (array $delta, ?string $finish = null) use ($id, $created, $modelId): void {
                 echo 'data: '.json_encode([
                     'id' => $id,
                     'object' => 'chat.completion.chunk',
                     'created' => $created,
-                    'model' => self::MODEL_ID,
+                    'model' => $modelId,
                     'choices' => [['index' => 0, 'delta' => $delta, 'finish_reason' => $finish]],
                 ], \JSON_UNESCAPED_UNICODE)."\n\n";
                 @ob_flush();
@@ -284,12 +303,12 @@ final class RagChatController
         return hash_equals('Bearer '.$this->apiToken, $auth);
     }
 
-    private function streamText(string $text): StreamedResponse
+    private function streamText(string $text, string $modelId = self::MODEL_ID): StreamedResponse
     {
-        $response = new StreamedResponse(function () use ($text): void {
+        $response = new StreamedResponse(function () use ($text, $modelId): void {
             $id = 'chatcmpl-'.bin2hex(random_bytes(8));
             $created = time();
-            $base = ['id' => $id, 'object' => 'chat.completion.chunk', 'created' => $created, 'model' => self::MODEL_ID];
+            $base = ['id' => $id, 'object' => 'chat.completion.chunk', 'created' => $created, 'model' => $modelId];
             echo 'data: '.json_encode($base + ['choices' => [['index' => 0, 'delta' => ['role' => 'assistant', 'content' => $text], 'finish_reason' => null]]], \JSON_UNESCAPED_UNICODE)."\n\n";
             echo 'data: '.json_encode($base + ['choices' => [['index' => 0, 'delta' => [], 'finish_reason' => 'stop']]], \JSON_UNESCAPED_UNICODE)."\n\n";
             echo "data: [DONE]\n\n";
@@ -303,13 +322,13 @@ final class RagChatController
         return $response;
     }
 
-    private function jsonText(string $text): JsonResponse
+    private function jsonText(string $text, string $modelId = self::MODEL_ID): JsonResponse
     {
         return new JsonResponse([
             'id' => 'chatcmpl-'.bin2hex(random_bytes(8)),
             'object' => 'chat.completion',
             'created' => time(),
-            'model' => self::MODEL_ID,
+            'model' => $modelId,
             'choices' => [['index' => 0, 'message' => ['role' => 'assistant', 'content' => $text], 'finish_reason' => 'stop']],
         ]);
     }
