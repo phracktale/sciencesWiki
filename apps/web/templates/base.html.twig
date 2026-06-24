@@ -17,17 +17,7 @@
     {# Hotwire Turbo (auto-hébergé) : navigation instantanée (front + back-office). #}
     <script nonce="{{ csp_nonce.value }}" src="{{ asset_v('/js/turbo.min.js') }}" defer></script>
     <style>
-        :root {
-            --accent:#019fb9; --accent-dark:#02356c; --aca:#2563eb; --vul:#b45309; --bg:#fff; --line:#e5e7eb; --ink:#1f2937;
-            /* Roboto Mono = base + structure (titres, menus, boutons, en-têtes de tables). */
-            --font-base: 'Roboto Mono', ui-monospace, 'Cascadia Code', 'Consolas', monospace;
-            /* Monofur = contenu des listes/articles + texte secondaire des cartes + badges. */
-            --font-content: 'Monofur', ui-monospace, monospace;
-        }
-        @font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
-        @font-face { font-family:'Roboto Mono'; src:url('/fonts/roboto-mono/RobotoMono-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
-        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/MonofurNerdFont-Regular.ttf') format('truetype'); font-weight:400; font-display:swap; }
-        @font-face { font-family:'Monofur'; src:url('/fonts/monofur/MonofurNerdFont-Bold.ttf') format('truetype'); font-weight:700; font-display:swap; }
+
         * { box-sizing: border-box; }
         /* Classes utilitaires explicites (cf. usage dans les templates). */
         .font-roboto { font-family: var(--font-base); }
@@ -170,19 +160,7 @@
         .ai-banner { margin:2rem 0 .5rem; padding:.9rem 1.1rem; border:1px solid #fcd34d; background:#fffbeb; border-radius:10px; font-size:.92rem; line-height:1.6; color:#78350f; }
         .ai-banner a { color:var(--accent-dark); font-weight:600; }
 
-        /* ===== Cadre « terminal » unifié sous CRT (cohérence avec les pages de
-           présentation : barre TTY + bordure + largeur 1000px centrée). Scopé
-           .theme-crt ; les variables --phos-* viennent de crt-theme.css. ===== */
-        /* Largeur pleine seulement quand le cadre terminal est présent (front).
-           L'admin en CRT garde le centrage/padding sobres du body. */
-        body.theme-crt.crt-framed { max-width:none; margin:0; padding:0; }
-        body.theme-crt .crt-shell { max-width:1000px; margin:0 auto; padding:1.2rem 1.4rem 4rem; position:relative; z-index:10; }
-        body.theme-crt .crt-termbar { display:flex; align-items:center; gap:.6rem; border:1px solid var(--phos-faint,#4d544c); border-bottom:none; padding:.35rem .7rem; background:#0c0f0d; font-size:.82rem; color:var(--phos-dim,#8f968c); letter-spacing:.08em; text-transform:uppercase; }
-        body.theme-crt .crt-termbar .dots { display:flex; gap:.35rem; }
-        body.theme-crt .crt-termbar .dots i { width:.62rem; height:.62rem; border:1px solid var(--phos-faint,#4d544c); border-radius:50%; display:inline-block; }
-        body.theme-crt .crt-term { border:1px solid var(--phos-faint,#4d544c); padding:1.4rem 1.6rem 1.8rem; box-shadow:inset 0 0 60px rgba(0,0,0,.5); min-height:60vh; }
-        /* En-tête sans bordure redondante dans le cadre. */
-        body.theme-crt .crt-term > header { border-top:none; }
+        
     </style>
 
     {# Re-skin CRT « IBM monochrome » appliqué au front public (chargé APRÈS le
