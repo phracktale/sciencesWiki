@@ -26,6 +26,7 @@ final class PublicArticlesController
         private readonly PublicationRepository $publications,
         private readonly EntityManagerInterface $em,
         private readonly \App\Ai\Llm\LlmClient $llm,
+        private readonly \App\Harvester\Ai\EmbeddingClientFactory $embeddings,
     ) {
     }
 
@@ -71,6 +72,7 @@ final class PublicArticlesController
         $q = trim((string) $request->query->get('q', ''));
         $page = max(1, (int) $request->query->get('page', '1'));
         $stemming = '0' !== (string) $request->query->get('stemming', '1');
+        $semantic = '1' === (string) $request->query->get('semantic', '0');
         $sort = (string) $request->query->get('sort', '');
         $dir = (string) $request->query->get('dir', 'asc');
         $types = array_values(array_filter(array_map(
@@ -78,7 +80,22 @@ final class PublicArticlesController
             $request->query->all('types'),
         )));
 
-        $res = $this->publications->searchInSubtree($slug, $q, $stemming, $page, self::PER_PAGE, $sort, $dir, $types);
+        // Recherche en langage naturel : récupération hybride (sémantique + lexicale)
+        // classée par pertinence. Repli silencieux sur le plein-texte si l'embedding
+        // échoue, ou si la requête est vide (rien à vectoriser), ou si un tri colonne
+        // est demandé (incompatible avec un classement par pertinence).
+        if ($semantic && '' !== $q && '' === $sort) {
+            try {
+                $embedding = $this->embeddings->create()->embed($q);
+                $res = $this->publications->searchInSubtreeHybrid($slug, $embedding, $q, $page, self::PER_PAGE, $types);
+            } catch (\Throwable) {
+                $semantic = false;
+                $res = $this->publications->searchInSubtree($slug, $q, $stemming, $page, self::PER_PAGE, $sort, $dir, $types);
+            }
+        } else {
+            $semantic = false;
+            $res = $this->publications->searchInSubtree($slug, $q, $stemming, $page, self::PER_PAGE, $sort, $dir, $types);
+        }
         $appliedTypes = \App\Catalog\PublicationType::searchTypes($types);
 
         $items = array_map(function (array $r): array {
@@ -103,6 +120,7 @@ final class PublicArticlesController
             'pages' => (int) ceil($res['total'] / self::PER_PAGE),
             'query' => $q,
             'stemming' => $stemming,
+            'semantic' => $semantic,
             'sort' => $sort,
             'dir' => $dir,
             // Filtre de type (front) : familles proposables + types réellement appliqués.

@@ -36,6 +36,9 @@
         <label class="xp-toggle" title="Rapproche les mots de la même famille (run, running, runs…)">
             <input type="checkbox" id="xp-stem" checked> Racinisation (stemming)
         </label>
+        <label class="xp-toggle" title="Recherche par le SENS (sémantique + mots-clés) : trouve les articles pertinents même sans les mots exacts. Classe par pertinence.">
+            <input type="checkbox" id="xp-sem"> Langage naturel
+        </label>
         <div style="position:relative">
             <button type="button" id="xp-types-btn" style="background:#fff; border:1px solid #d1d5db; border-radius:9px; padding:.6rem .9rem; cursor:pointer; font:inherit">Types ▾</button>
             <div id="xp-types-panel" hidden style="position:absolute; z-index:20; top:calc(100% + 4px); left:0; background:#fff; border:1px solid #d1d5db; border-radius:9px; box-shadow:0 8px 24px rgba(0,0,0,.12); padding:.6rem .8rem; min-width:260px; max-height:340px; overflow:auto"></div>
@@ -69,7 +72,7 @@
     <script nonce="{{ csp_nonce.value }}">
     (function () {
         var SLUG = {{ slug|json_encode|raw }};
-        var state = { q: '', stemming: true, sort: '', dir: 'asc', page: 1, selected: null, types: [] };
+        var state = { q: '', stemming: true, semantic: false, sort: '', dir: 'asc', page: 1, selected: null, types: [] };
         var rows = document.getElementById('xp-rows');
         var pager = document.getElementById('xp-pager');
         var countEl = document.getElementById('xp-count');
@@ -93,6 +96,7 @@
                 + 'q=' + encodeURIComponent(state.q)
                 + '&page=' + state.page
                 + '&stemming=' + (state.stemming ? '1' : '0')
+                + '&semantic=' + (state.semantic ? '1' : '0')
                 + '&sort=' + encodeURIComponent(state.sort)
                 + '&dir=' + state.dir
                 + state.types.map(function (t) { return '&types[]=' + encodeURIComponent(t); }).join('');
@@ -249,12 +253,17 @@
                 var s = th.dataset.sort;
                 if (state.sort === s) { state.dir = (state.dir === 'asc') ? 'desc' : 'asc'; }
                 else { state.sort = s; state.dir = 'asc'; }
+                // Un tri colonne reprend la main sur le classement sémantique.
+                if (state.semantic) { state.semantic = false; document.getElementById('xp-sem').checked = false; }
                 state.page = 1; load();
             });
         });
         document.getElementById('xp-go').addEventListener('click', function () {
             state.q = document.getElementById('xp-q').value.trim();
             state.stemming = document.getElementById('xp-stem').checked;
+            state.semantic = document.getElementById('xp-sem').checked;
+            // Le classement par pertinence sémantique est incompatible avec un tri colonne.
+            if (state.semantic) { state.sort = ''; state.dir = 'asc'; }
             state.page = 1; load();
         });
         document.getElementById('xp-q').addEventListener('keydown', function (e) { if (e.key === 'Enter') document.getElementById('xp-go').click(); });

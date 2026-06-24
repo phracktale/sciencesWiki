@@ -498,6 +498,116 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Recherche en LANGAGE NATUREL scopée à un sous-arbre : kNN vectoriel (filtré au
+     * sous-arbre) + plein-texte OR, fusionnés par RRF, classés par pertinence
+     * sémantique. Même forme de lignes riches que searchInSubtree (pagination incluse).
+     *
+     * @param list<float> $embedding
+     *
+     * @return array{items: list<array<string,mixed>>, total: int}
+     */
+    public function searchInSubtreeHybrid(string $slug, array $embedding, string $query, int $page, int $perPage, array $types = []): array
+    {
+        $conn = $this->getEntityManager()->getConnection();
+        $searchTypes = \App\Catalog\PublicationType::searchTypes($types);
+
+        $nodeIds = array_map('intval', $conn->executeQuery(
+            'WITH RECURSIVE sub AS (
+                SELECT id FROM tree_node WHERE slug = :slug
+                UNION SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
+             ) SELECT id FROM sub',
+            ['slug' => $slug],
+        )->fetchFirstColumn());
+        if ([] === $nodeIds) {
+            return ['items' => [], 'total' => 0];
+        }
+
+        $cand = 200; // pool de candidats par côté avant fusion
+        $params = ['nodes' => $nodeIds, 'ptypes' => $searchTypes];
+        $paramTypes = [
+            'nodes' => \Doctrine\DBAL\ArrayParameterType::INTEGER,
+            'ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING,
+        ];
+        // Périmètre commun : non rétracté, types demandés, placé dans le sous-arbre.
+        $subtree = "p.retraction_status = 'none' AND p.type IN (:ptypes)
+            AND EXISTS (SELECT 1 FROM placement_suggestion ps
+                        WHERE ps.publication_id = p.id AND ps.tree_node_id IN (:nodes))";
+
+        // Côté vectoriel (kNN filtré au sous-arbre).
+        $conn->executeStatement('SET hnsw.ef_search = '.max(40, $cand));
+        $vecIds = $conn->executeQuery(
+            \sprintf(
+                "SELECT p.id FROM publication p
+                 WHERE %s AND p.embedding IS NOT NULL
+                 ORDER BY p.embedding <=> CAST(:vec AS vector)
+                 LIMIT %d",
+                $subtree,
+                $cand,
+            ),
+            $params + ['vec' => (string) new Vector($embedding)],
+            $paramTypes,
+        )->fetchFirstColumn();
+
+        // Côté lexical (plein-texte OR, sous-arbre).
+        $lexIds = [];
+        $tsq = $this->ftsOrQuery($query);
+        if ('' !== $tsq) {
+            $tsv = "to_tsvector('simple', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
+            $lexIds = $conn->executeQuery(
+                \sprintf(
+                    "SELECT p.id FROM publication p
+                     WHERE %s AND %s @@ to_tsquery('simple', :tsq)
+                     ORDER BY ts_rank(%s, to_tsquery('simple', :tsq)) DESC
+                     LIMIT %d",
+                    $subtree,
+                    $tsv,
+                    $tsv,
+                    $cand,
+                ),
+                $params + ['tsq' => $tsq],
+                $paramTypes,
+            )->fetchFirstColumn();
+        }
+
+        // Fusion RRF.
+        $K = 60;
+        $scores = [];
+        foreach (array_values($vecIds) as $pos => $id) {
+            $scores[(int) $id] = ($scores[(int) $id] ?? 0.0) + 1.0 / ($K + $pos + 1);
+        }
+        foreach (array_values($lexIds) as $pos => $id) {
+            $scores[(int) $id] = ($scores[(int) $id] ?? 0.0) + 1.0 / ($K + $pos + 1);
+        }
+        arsort($scores);
+        $rankedIds = array_keys($scores);
+
+        $total = \count($rankedIds);
+        $pageIds = \array_slice($rankedIds, max(0, ($page - 1) * $perPage), $perPage);
+        if ([] === $pageIds) {
+            return ['items' => [], 'total' => $total];
+        }
+
+        // Hydratation des lignes riches, en CONSERVANT l'ordre de pertinence.
+        $rows = $conn->executeQuery(
+            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
+                    j.name AS journal_name,
+                    to_char(p.publication_date, 'YYYY') AS year,
+                    (SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) AS chunks,
+                    (SELECT string_agg(a.name, ', ' ORDER BY au.position)
+                       FROM authorship au JOIN author a ON a.id = au.author_id
+                      WHERE au.publication_id = p.id) AS authors
+             FROM publication p
+             LEFT JOIN journal j ON j.id = p.journal_id
+             WHERE p.id IN (:ids)
+             ORDER BY array_position(CAST(:order AS int[]), p.id)",
+            ['ids' => $pageIds, 'order' => '{'.implode(',', $pageIds).'}'],
+            ['ids' => \Doctrine\DBAL\ArrayParameterType::INTEGER],
+        )->fetchAllAssociative();
+
+        return ['items' => $rows, 'total' => $total];
+    }
+
+    /**
      * Recherche par identifiant externe (ex. openalex/arxiv) stocké dans le JSON
      * `external_ids`. Utilise l'opérateur JSON de PostgreSQL.
      */
