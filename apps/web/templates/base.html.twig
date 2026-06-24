@@ -189,8 +189,9 @@
     {# Feuilles additionnelles par layout (ex. composants marketing crt.css quand
        les pages projet/marketing étendent ce base). Les EFFETS restent pilotés par
        crt-theme.css. #}
-    {% block head_extra %}{% endblock %}
-
+    {% block head_extra %}
+        <link rel="stylesheet" href="{{ asset_v('/css/crt.css') }}" data-turbo-track="reload">
+    {% endblock %}
     {# Mesure d'audience respectueuse de la vie privée (Plausible auto-hébergé : sans cookies, sans données personnelles, RGPD-friendly). #}
     <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
     <script nonce="{{ csp_nonce.value }}">
