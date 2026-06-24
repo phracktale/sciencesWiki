@@ -183,7 +183,10 @@
     {# Re-skin CRT « IBM monochrome » appliqué au front public (chargé APRÈS le
        style legacy pour le surcharger). Le wiki garde le même balisage : seule
        la peau change. Basculable depuis Paramètres › Général. #}
-    {% if crt %}<link rel="stylesheet" href="{{ asset_v('/css/crt-theme.css') }}">{% endif %}
+    {# data-turbo-track=reload : si l'on navigue vers une page à AUTRE feuille (layout
+       marketing crt.css), Turbo force un rechargement complet → évite le mélange de
+       <head> qui laissait traîner le style legacy (bug de reflow largeur). #}
+    {% if crt %}<link rel="stylesheet" href="{{ asset_v('/css/crt-theme.css') }}" data-turbo-track="reload">{% endif %}
 
     {# Mesure d'audience respectueuse de la vie privée (Plausible auto-hébergé : sans cookies, sans données personnelles, RGPD-friendly). #}
     <script nonce="{{ csp_nonce.value }}" async src="https://analytics.phracktale.com/js/pa-DkrJNGX36qKPTtMpcLs1z.js"></script>
