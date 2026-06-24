@@ -58,6 +58,7 @@ final class SettingsService
     // Thème visuel du front public : 'legacy' (clair d'origine) ou 'crt' (tube
     // cathodique monochrome). Lu publiquement par le front (cf. /api/public-settings).
     public const SITE_THEME = 'site.theme';                     // 'legacy' | 'crt'
+    public const SITE_FRAMED = 'site.framed';                   // '1' = mode fenêtré (cadre terminal partout)
 
     public const DEFAULT_SYSTEM_PROMPT = <<<'TXT'
         Tu es un rédacteur de vulgarisation scientifique pour SciencesWiki, une
@@ -132,6 +133,7 @@ final class SettingsService
         self::MOD_NOTIFY_ENABLED => '1',
         // Thème par défaut : l'ancien (clair). Bascule en 'crt' depuis le back-office.
         self::SITE_THEME => 'legacy',
+        self::SITE_FRAMED => '1',
     ];
 
     /** @var array<string,string>|null */
@@ -256,6 +258,12 @@ final class SettingsService
         return \in_array($v, ['legacy', 'crt'], true) ? $v : 'legacy';
     }
 
+    /** Mode fenêtré (cadre « terminal ») du thème CRT, appliqué partout (front + admin). */
+    public function siteFramed(): bool
+    {
+        return '0' !== trim((string) ($this->get(self::SITE_FRAMED) ?? '1'));
+    }
+
     public function get(string $name): ?string
     {
         $this->cache ??= $this->repository->allAsMap();
@@ -288,13 +296,15 @@ final class SettingsService
             self::MAIL_REROUTE_TO => $this->mailRerouteTo(),
             self::MOD_NOTIFY_ENABLED => $this->moderatorNotifyEnabled() ? '1' : '0',
             self::SITE_THEME => $this->siteTheme(),
+            self::SITE_FRAMED => $this->siteFramed() ? '1' : '0',
+            self::RAG_VERIFY => $this->verifyFaithfulness() ? '1' : '0',
         ];
     }
 
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

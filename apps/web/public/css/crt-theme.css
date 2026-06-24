@@ -302,7 +302,7 @@ body.theme-crt #admin-bar { background: #0f172a !important; }
 /* Largeur pleine seulement quand le cadre terminal est présent (front).
     L'admin en CRT garde le centrage/padding sobres du body. */
 body.theme-crt.crt-framed { max-width:none; margin:0; padding:0; }
-body.theme-crt .crt-shell { max-width:1000px; margin:0 auto; padding:1.2rem 1.4rem 4rem; position:relative; z-index:10; }
+body.theme-crt .crt-shell { max-width:75%; margin:0 auto; padding:1.2rem 1.4rem 4rem; position:relative; z-index:10; }
 body.theme-crt .crt-termbar { display:flex; align-items:center; gap:.6rem; border:1px solid var(--phos-faint,#4d544c); border-bottom:none; padding:.35rem .7rem; background:#0c0f0d; font-size:.82rem; color:var(--phos-dim,#8f968c); letter-spacing:.08em; text-transform:uppercase; }
 body.theme-crt .crt-termbar .dots { display:flex; gap:.35rem; }
 body.theme-crt .crt-termbar .dots i { width:.62rem; height:.62rem; border:1px solid var(--phos-faint,#4d544c); border-radius:50%; display:inline-block; }

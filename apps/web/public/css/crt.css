@@ -136,12 +136,19 @@ body.crt-boot { animation: crt-power var(--boot-duration) ease-out 1; }
 /* ============================ MISE EN PAGE SHELL ========================== */
 
 .scr {
-    max-width: 1000px;
+    max-width: 75%;
     margin: 0 auto;
     padding: 1.2rem 1.4rem 5rem;
     position: relative;
     z-index: 10;
 }
+
+/* Mode NON fenêtré (réglage back-office « mode fenêtré » désactivé) : on retire le
+   cadre « terminal » et les effets (scanlines/scintillement), en gardant la palette CRT. */
+body.unframed .crt-overlay,
+body.unframed .crt-flicker,
+body.unframed .term-bar { display: none; }
+body.unframed .term { border: none; box-shadow: none; min-height: 0; padding: 0; }
 
 /* Barre de titre du « terminal » (façon xterm / DOS). */
 .term-bar {

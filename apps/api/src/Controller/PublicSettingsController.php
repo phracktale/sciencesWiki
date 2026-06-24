@@ -24,6 +24,7 @@ final class PublicSettingsController
     {
         return new JsonResponse([
             'theme' => $this->settings->siteTheme(),
+            'framed' => $this->settings->siteFramed(),
         ]);
     }
 }

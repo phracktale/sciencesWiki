@@ -120,6 +120,16 @@ final class ApiClient
         }
     }
 
+    /** Mode fenêtré (cadre terminal) du thème CRT ; repli activé si l'API est muette. */
+    public function publicFramed(): bool
+    {
+        try {
+            return (bool) ($this->get('/api/public-settings')['framed'] ?? true);
+        } catch (\Throwable) {
+            return true;
+        }
+    }
+
     /**
      * Controverses d'un nœud + état d'analyse (cf. spec controverses §8.1).
      * Le déclenchement (POST .../analyze) et le polling sont faits côté navigateur

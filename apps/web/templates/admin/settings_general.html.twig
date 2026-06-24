@@ -20,6 +20,11 @@
             <input type="radio" name="site_theme" value="crt" {{ theme == 'crt' ? 'checked' }}>
             CRT — écran IBM monochrome (tube cathodique)
         </label>
+        <label style="display:flex; align-items:center; gap:.5rem; margin:.7rem 0 .2rem">
+            <input type="checkbox" name="site_framed" value="1" {{ settings['site.framed']|default('1') != '0' ? 'checked' }}>
+            Mode fenêtré — cadre « terminal » + scanlines, appliqué partout (front ET back-office)
+        </label>
+        <p class="muted" style="font-size:.8rem; margin:.1rem 0 0">Décoché : thème CRT « à plat » (palette/typo conservées, sans cadre ni effets) — utile pour un back-office plus sobre. Sans effet si le thème est Legacy.</p>
 
         <h2 style="margin-top:1.4rem">Notifications des modérateurs</h2>
         <p class="muted" style="font-size:.85rem">À chaque nouvelle proposition de correction/contenu, le modérateur de la branche concernée reçoit un e-mail. Décochez pour suspendre ces envois.</p>

@@ -80,6 +80,7 @@ final class AdminController extends AbstractController
     {
         return $this->saveSettingsPage($request, 'admin_settings_general', 'admin/settings_general.html.twig', static fn (Request $r): array => [
             'site.theme' => 'crt' === $r->request->get('site_theme') ? 'crt' : 'legacy',
+            'site.framed' => $r->request->get('site_framed') ? '1' : '0',
             'mail.reroute_enabled' => $r->request->get('reroute_enabled') ? '1' : '0',
             'mail.reroute_to' => trim((string) $r->request->get('reroute_to')),
             'mod.notify_enabled' => $r->request->get('mod_notify_enabled') ? '1' : '0',

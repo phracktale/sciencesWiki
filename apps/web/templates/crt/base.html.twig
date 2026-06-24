@@ -30,8 +30,8 @@
         };
     </script>
 </head>
-<body>
-    {# Surcouches CRT (scanlines, vignette, scintillement). #}
+<body{{ site_theme.framed() ? '' : ' class="unframed"' }}>
+    {# Surcouches CRT (scanlines, vignette, scintillement) — masquées en mode non fenêtré. #}
     <div class="crt-overlay" aria-hidden="true"></div>
     <div class="crt-flicker" aria-hidden="true"></div>
 

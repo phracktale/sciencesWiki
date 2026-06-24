@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 {# Thème visuel piloté en back-office. « crt » = palette/typo CRT (front ET
    back-office, pour la cohérence) ; « crt_framed » = en plus le cadre « terminal »
-   + scanlines/flicker, RÉSERVÉ au front public (l'admin reste sobre et lisible,
-   sans effets gênants pour le travail). Legacy = défaut, réactivable en 1 clic. #}
+   + scanlines/flicker, appliqué PARTOUT (front ET admin) et piloté par le réglage
+   « mode fenêtré » (site.framed). Legacy = défaut, réactivable en 1 clic. #}
 {% set crt = site_theme.current() == 'crt' %}
-{% set crt_framed = crt and not ((app.request.attributes.get('_route')|default('')) starts with 'admin') %}
+{% set crt_framed = crt and site_theme.framed() %}
 <html lang="fr"{{ crt ? ' data-theme="crt"' : '' }}>
 <head>
     <meta charset="UTF-8">
