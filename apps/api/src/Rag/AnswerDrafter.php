@@ -30,6 +30,7 @@ final class AnswerDrafter
         private readonly EntityManagerInterface $em,
         private readonly \App\Service\SettingsService $settings,
         private readonly FaithfulnessChecker $faithfulness,
+        private readonly WikipediaLinker $wikipedia,
     ) {
     }
 
@@ -83,10 +84,11 @@ final class AnswerDrafter
     {
         $parsed = $this->analyze($content, $sources);
 
-        // Vérification de fidélité : marque « [réf. nécessaire] » les affirmations
-        // non soutenues par les sources (anti-hallucination). Le relecteur tranche.
-        $parsed['vulgarization'] = $this->faithfulness->annotate($parsed['vulgarization'], $sources);
-        $parsed['academic'] = $this->faithfulness->annotate($parsed['academic'], $sources);
+        // Vérification de fidélité : marque les affirmations non soutenues, puis
+        // promeut les marqueurs en liens Wikipédia réels quand un article existe
+        // (anti-hallucination ; le relecteur tranche le reste).
+        $parsed['vulgarization'] = $this->wikipedia->resolve($this->faithfulness->annotate($parsed['vulgarization'], $sources));
+        $parsed['academic'] = $this->wikipedia->resolve($this->faithfulness->annotate($parsed['academic'], $sources));
 
         if (null === $question->getTitle() && '' !== $parsed['title']) {
             $question->setTitle($parsed['title']);

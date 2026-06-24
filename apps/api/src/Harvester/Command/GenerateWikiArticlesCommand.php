@@ -40,6 +40,7 @@ final class GenerateWikiArticlesCommand extends Command
         private readonly EntityManagerInterface $em,
         private readonly \App\Service\SettingsService $settings,
         private readonly \App\Rag\FaithfulnessChecker $faithfulness,
+        private readonly \App\Rag\WikipediaLinker $wikipedia,
     ) {
         parent::__construct();
     }
@@ -110,9 +111,10 @@ final class GenerateWikiArticlesCommand extends Command
                 // Liens internes garantis (le modèle local les omet souvent) : on lie
                 // la 1re occurrence de chaque domaine voisin dans le corps de l'article.
                 $md = $this->autolink($md, $related, $node->getSlug());
-                // Vérification de fidélité : marque « [réf. nécessaire] » ce que les
-                // sources ne soutiennent pas (anti-hallucination ; le relecteur tranche).
-                $md = $this->faithfulness->annotate($md, $pubs);
+                // Vérification de fidélité : marque ce que les sources ne soutiennent
+                // pas, puis promeut les marqueurs en liens Wikipédia réels si possible
+                // (anti-hallucination ; le relecteur tranche le reste).
+                $md = $this->wikipedia->resolve($this->faithfulness->annotate($md, $pubs));
                 if (mb_strlen($md) < 800) {
                     $io->warning(\sprintf('  réponse trop courte (%d car.), ignorée.', mb_strlen($md)));
                     continue;

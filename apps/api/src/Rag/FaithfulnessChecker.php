@@ -40,8 +40,10 @@ final class FaithfulnessChecker
 
         Règles IMPÉRATIVES :
         - Renvoie le TEXTE EXACTEMENT à l'identique (mêmes mots, même ordre, même
-          markdown), en insérant le marqueur « [réf. nécessaire] » IMMÉDIATEMENT après
-          chaque phrase ou affirmation non soutenue.
+          markdown), en insérant IMMÉDIATEMENT après chaque affirmation non soutenue
+          le marqueur « [réf. nécessaire: MOTS-CLÉS] », où MOTS-CLÉS = 2 à 4 mots
+          décrivant le SUJET de l'affirmation (pour une recherche encyclopédique).
+          Exemple : « …compilation juste-à-temps [réf. nécessaire: compilation à la volée] ».
         - Au moindre doute → marque (mieux vaut un marqueur de trop qu'un fait non vérifié).
         - Ne reformule RIEN, ne supprime RIEN, n'ajoute AUCUN autre commentaire ni balise.
         - Une affirmation correctement appuyée par une source : n'y touche pas.
@@ -104,7 +106,7 @@ final class FaithfulnessChecker
         //  - vide ;
         //  - longueur (hors marqueurs) hors de [0,8 ; 1,2]× l'original → perte ou bavardage ;
         //  - présence de méta-commentaire typique d'un modèle qui « explique ».
-        $stripped = trim(str_replace(self::MARKER, '', $annotated));
+        $stripped = trim((string) preg_replace('/\[réf\.\s*nécessaire[^\]]*\]/u', '', $annotated));
         $len = mb_strlen($text);
         $sLen = mb_strlen($stripped);
         $meta = (bool) preg_match(
