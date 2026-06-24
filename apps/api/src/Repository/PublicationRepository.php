@@ -147,8 +147,90 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
      */
     public function nearestTo(array $embedding, int $k, array $types = []): array
     {
-        $literal = (string) new Vector($embedding);
+        $result = [];
+        foreach ($this->vectorCandidates($embedding, max(1, $k), $types) as $row) {
+            $publication = $this->find($row['id']);
+            if (null !== $publication) {
+                $result[] = ['publication' => $publication, 'distance' => $row['distance']];
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Récupération HYBRIDE : kNN vectoriel (sémantique) + plein-texte (lexical),
+     * fusionnés par Reciprocal Rank Fusion. Corrige le défaut de rappel du vecteur
+     * seul : quand un terme générique domine l'embedding (« marqueurs biologiques »),
+     * le signal lexical (« covid ») fait remonter les publications réellement
+     * pertinentes même si leur distance vectorielle est élevée. L'unité = la publication.
+     *
+     * @param list<float> $embedding
+     *
+     * @return list<array{publication: Publication, distance: ?float, score: float, lexical: bool}>
+     */
+    public function nearestHybrid(array $embedding, string $query, int $k, float $maxDistance): array
+    {
         $k = max(1, $k);
+        $cand = min($k * 4, 80);
+
+        // 1) Vectoriel : on ne retient que les voisins sémantiquement proches (≤ seuil).
+        $vector = [];
+        foreach ($this->vectorCandidates($embedding, $cand) as $row) {
+            if ($row['distance'] <= $maxDistance) {
+                $vector[$row['id']] = $row['distance'];
+            }
+        }
+
+        // 2) Lexical : plein-texte OR — un seul terme discriminant (« covid »)
+        //    suffit à faire remonter une publication.
+        $lexical = $this->lexicalCandidates($query, $cand); // id => position (0-based)
+
+        // 3) Fusion RRF : score = Σ 1/(K + rang) sur chaque classement.
+        $K = 60;
+        $scores = [];
+        $vPos = 0;
+        foreach (array_keys($vector) as $id) { // déjà trié par distance asc
+            $scores[$id] = ($scores[$id] ?? 0.0) + 1.0 / ($K + $vPos + 1);
+            ++$vPos;
+        }
+        foreach ($lexical as $id => $pos) {
+            $scores[$id] = ($scores[$id] ?? 0.0) + 1.0 / ($K + $pos + 1);
+        }
+        arsort($scores);
+
+        $out = [];
+        foreach (\array_slice(array_keys($scores), 0, $k) as $id) {
+            $publication = $this->find($id);
+            if (null === $publication) {
+                continue;
+            }
+            $out[] = [
+                'publication' => $publication,
+                'distance' => $vector[$id] ?? null,
+                'score' => $scores[$id],
+                'lexical' => isset($lexical[$id]),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * kNN vectoriel combiné (résumé + fragments de texte intégral), trié par
+     * distance croissante. Chaque sous-requête « ORDER BY embedding <=> const
+     * LIMIT n » exploite l'index HNSW ; on fusionne en retenant la meilleure
+     * distance par publication (un corps précis l'emporte sur un résumé moins
+     * proche), filtre rétractations/satellites, puis limite.
+     *
+     * @param list<float> $embedding
+     *
+     * @return list<array{id: int, distance: float}>
+     */
+    private function vectorCandidates(array $embedding, int $limit, array $types = []): array
+    {
+        $literal = (string) new Vector($embedding);
+        $limit = max(1, $limit);
         $typeClause = [] !== $types ? ' AND p.type IN (:ptypes)' : '';
         $params = ['vec' => $literal];
         $paramTypes = [];
@@ -156,21 +238,14 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             $params['ptypes'] = array_values($types);
             $paramTypes['ptypes'] = \Doctrine\DBAL\ArrayParameterType::STRING;
         }
-        // Sur-échantillonnage par côté : marge pour la déduplication (un article
-        // peut sortir des deux côtés) et le filtre rétraction appliqué ensuite.
-        $perSide = min($k * 4, 120);
+        // Sur-échantillonnage : marge pour la déduplication (un article peut sortir
+        // des deux côtés) et le filtre rétraction appliqué ensuite.
+        $perSide = min($limit * 4, 120);
 
         $conn = $this->getEntityManager()->getConnection();
         // ef_search ≥ taille demandée : qualité du kNN approximatif HNSW.
         $conn->executeStatement('SET hnsw.ef_search = '.max(40, $perSide));
 
-        // Recherche kNN combinée : embedding du résumé (publication) ET fragments
-        // de texte intégral (publication_chunk). Chaque sous-requête
-        // « ORDER BY embedding <=> const LIMIT n » exploite l'index HNSW (≈ ms
-        // au lieu d'un scan séquentiel). On fusionne en retenant la meilleure
-        // distance par publication, afin qu'un article dont le corps répond
-        // précisément ressorte même si son résumé est moins proche, puis on
-        // filtre les rétractations et on limite. L'unité reste la publication.
         $rows = $conn->executeQuery(
             \sprintf(
                 "WITH abs AS (
@@ -195,21 +270,77 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                  ORDER BY m.distance ASC
                  LIMIT %2\$d",
                 $perSide,
-                $k,
+                $limit,
             ),
             $params,
             $paramTypes,
         )->fetchAllAssociative();
 
-        $result = [];
-        foreach ($rows as $row) {
-            $publication = $this->find((int) $row['id']);
-            if (null !== $publication) {
-                $result[] = ['publication' => $publication, 'distance' => (float) $row['distance']];
+        return array_map(
+            static fn (array $r): array => ['id' => (int) $r['id'], 'distance' => (float) $r['distance']],
+            $rows,
+        );
+    }
+
+    /**
+     * Candidats lexicaux (plein-texte OR sur titre + résumé), classés par ts_rank.
+     * Réutilise EXACTEMENT l'expression to_tsvector('simple', …) indexée (GIN) afin
+     * d'exploiter l'index. La requête est transformée en tsquery OR sécurisé.
+     *
+     * @return array<int, int> id de publication => position (0-based)
+     */
+    private function lexicalCandidates(string $query, int $limit): array
+    {
+        $tsq = $this->ftsOrQuery($query);
+        if ('' === $tsq) {
+            return [];
+        }
+        $tsv = "to_tsvector('simple', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                "SELECT p.id
+                 FROM publication p
+                 WHERE p.retraction_status = 'none' AND p.%s
+                   AND %s @@ to_tsquery('simple', :tsq)
+                 ORDER BY ts_rank(%s, to_tsquery('simple', :tsq)) DESC, p.cited_by_count DESC
+                 LIMIT %d",
+                \App\Catalog\PublicationType::notSatelliteSql(),
+                $tsv,
+                $tsv,
+                max(1, $limit),
+            ),
+            ['tsq' => $tsq],
+        )->fetchFirstColumn();
+
+        $out = [];
+        foreach (array_values($ids) as $pos => $id) {
+            $out[(int) $id] = $pos;
+        }
+
+        return $out;
+    }
+
+    /**
+     * Construit un tsquery OR sécurisé à partir d'une requête libre : on ne garde
+     * que des lexèmes alphanumériques (≥ 3 car., hors mots vides), joints par « | ».
+     * Sécurisé par construction (aucun opérateur tsquery ne survit au découpage).
+     */
+    private function ftsOrQuery(string $query): string
+    {
+        static $stop = [
+            'les', 'des', 'une', 'un', 'le', 'la', 'de', 'du', 'et', 'ou', 'pour', 'par',
+            'sur', 'dans', 'aux', 'est', 'sont', 'que', 'qui', 'quel', 'quels', 'quelle',
+            'quelles', 'avec', 'the', 'and', 'for', 'what', 'are', 'was', 'were', 'with',
+        ];
+        $words = preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($query), -1, \PREG_SPLIT_NO_EMPTY) ?: [];
+        $terms = [];
+        foreach ($words as $w) {
+            if (mb_strlen($w) >= 3 && !\in_array($w, $stop, true)) {
+                $terms[$w] = true;
             }
         }
 
-        return $result;
+        return implode(' | ', array_keys($terms));
     }
 
     /**

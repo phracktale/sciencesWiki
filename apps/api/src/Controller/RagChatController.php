@@ -34,14 +34,12 @@ final class RagChatController
     private const MAX_SOURCE_DISTANCE = 0.62;
 
     /**
-     * Nombre de voisins récupérés. Le chat fait une recherche GLOBALE (tout le
-     * corpus multi-domaines), contrairement aux Q/R du site qui sont limitées à un
-     * nœud. Un K plus élevé qu'en Q/R améliore le rappel : sur une formulation où
-     * un terme générique domine l'embedding (ex. « marqueurs biologiques »), les
-     * publications réellement pertinentes peuvent être reléguées au-delà du top-6.
-     * Le seuil de distance filtre ensuite le bruit, et le LLM ne cite que l'utile.
+     * Nombre de sources retenues (après fusion hybride vecteur + lexical). Le chat
+     * fait une recherche GLOBALE (tout le corpus multi-domaines) ; la fusion RRF
+     * (cf. PublicationRepository::nearestHybrid) remonte le pertinent même quand un
+     * terme générique domine l'embedding, donc un K modéré suffit (contexte LLM léger).
      */
-    private const CHAT_NEIGHBORS = 24;
+    private const CHAT_NEIGHBORS = 12;
 
     /** Identifiant du « modèle » virtuel annoncé à Open WebUI. */
     private const MODEL_ID = 'scienceswiki-rag';
@@ -200,10 +198,8 @@ final class RagChatController
         }
 
         $sources = [];
-        foreach ($this->publications->nearestTo($embedding, self::CHAT_NEIGHBORS) as $hit) {
-            if ($hit['distance'] <= self::MAX_SOURCE_DISTANCE) {
-                $sources[] = $hit['publication'];
-            }
+        foreach ($this->publications->nearestHybrid($embedding, $query, self::CHAT_NEIGHBORS, self::MAX_SOURCE_DISTANCE) as $hit) {
+            $sources[] = $hit['publication'];
         }
 
         if ([] === $sources) {
