@@ -1,0 +1,45 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}{{ title }} — Développeur{% endblock %}
+{% block cwd %}developpeur{% endblock %}
+{% block command %}cat {{ current ? current ~ '.md' : 'README.md' }}{% endblock %}
+{% block description %}Documentation technique de SciencesWiki : architecture, choix techniques, conventions de code et de contribution. Projet libre et open source.{% endblock %}
+
+{% block body %}
+    <style>
+        .dev-wrap { display:grid; grid-template-columns: 13rem 1fr; gap:1.6rem; align-items:start; }
+        @media (max-width: 720px) { .dev-wrap { grid-template-columns: 1fr; } }
+        .dev-nav { position:sticky; top:1rem; font-size:.86rem; line-height:1.9; }
+        .dev-nav .ttl { text-transform:uppercase; letter-spacing:.08em; font-size:.72rem; opacity:.6; }
+        .dev-nav a { display:block; padding:.05rem 0; }
+        .dev-nav a.on { font-weight:700; text-decoration:underline; }
+        .dev-doc { min-width:0; overflow-wrap:anywhere; }
+        .dev-doc h1 { margin-top:0; }
+        .dev-doc h2 { margin-top:2rem; border-top:1px solid var(--line, #2a2a2a); padding-top:1rem; }
+        .dev-doc pre { overflow:auto; padding:.8rem 1rem; border:1px solid var(--line, #2a2a2a); border-radius:6px; font-size:.82rem; line-height:1.45; }
+        .dev-doc code { font-size:.86em; }
+        .dev-doc table { width:100%; border-collapse:collapse; font-size:.88rem; margin:1rem 0; }
+        .dev-doc th, .dev-doc td { border:1px solid var(--line, #2a2a2a); padding:.4rem .6rem; text-align:left; vertical-align:top; }
+        .dev-doc blockquote { border-left:3px solid var(--line, #2a2a2a); margin:1rem 0; padding:.2rem 1rem; opacity:.85; }
+    </style>
+
+    <div class="dev-wrap">
+        <nav class="dev-nav" aria-label="Sommaire développeur">
+            <span class="ttl">~/developpeur</span>
+            <a href="{{ path('developer') }}"{{ current is null ? ' class="on"' : '' }}>● Accueil</a>
+            {% for slug, doc in docs %}
+                <a href="{{ path('developer_doc', {slug: slug}) }}"{{ current == slug ? ' class="on"' : '' }}>{{ loop.index }}. {{ doc.title }}</a>
+            {% endfor %}
+        </nav>
+
+        <article class="dev-doc">
+            {{ content|md }}
+
+            <p class="dim" style="margin-top:2.5rem">
+                <a href="{{ path('developer') }}">← Sommaire</a>
+                · Le code est open source — voir
+                <a href="{{ path('developer_doc', {slug: 'contribution'}) }}">Contribuer &amp; PR</a>.
+            </p>
+        </article>
+    </div>
+{% endblock %}
