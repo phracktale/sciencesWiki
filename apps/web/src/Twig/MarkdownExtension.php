@@ -48,6 +48,14 @@ final class MarkdownExtension extends AbstractExtension
             return '';
         }
 
-        return $this->converter->convert($markdown)->getContent();
+        $html = $this->converter->convert($markdown)->getContent();
+
+        // Met en évidence le marqueur de fidélité « [réf. nécessaire] » (vérification
+        // anti-hallucination) : il apparaît en texte littéral dans le HTML rendu.
+        return str_replace(
+            '[réf. nécessaire]',
+            '<span class="ref-needed">[réf. nécessaire]</span>',
+            $html,
+        );
     }
 }
