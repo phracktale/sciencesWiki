@@ -234,11 +234,21 @@
         {% set route = app.request.attributes.get('_route') %}
         <nav>
             <a href="{{ path('home') }}"{{ route in ['home','node'] ? ' class="is-active"' : '' }}>Accueil</a>
-            <a href="{{ path('wiki_search') }}"{{ route == 'wiki_search' ? ' class="is-active"' : '' }}>Rechercher</a>
-            <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
-            <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
-            <a href="{{ path('crt_discover') }}"{{ route starts with 'crt_' ? ' class="is-active"' : '' }}>Découvrir</a>
+            <div class="nav-dd dd-left">
+                <button type="button" class="nav-dd-top" aria-haspopup="true">SciencesWiki</button>
+                <div class="nav-dd-menu">
+                    <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
+                    <a href="{{ path('crt_discover') }}"{{ route == 'crt_discover' ? ' class="is-active"' : '' }}>Découvrir</a>
+                    <a href="{{ path('crt_researchers') }}" class="sub{{ route == 'crt_researchers' ? ' is-active' : '' }}">Chercheurs</a>
+                    <a href="{{ path('crt_journalists') }}" class="sub{{ route == 'crt_journalists' ? ' is-active' : '' }}">Journalistes</a>
+                    <a href="{{ path('crt_teachers') }}" class="sub{{ route == 'crt_teachers' ? ' is-active' : '' }}">Enseignants &amp; élèves</a>
+                    <a href="{{ path('crt_public') }}" class="sub{{ route == 'crt_public' ? ' is-active' : '' }}">Grand public</a>
+                    <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
+                    <a href="{{ path('crt_manifesto') }}"{{ route == 'crt_manifesto' ? ' class="is-active"' : '' }}>Manifeste</a>
+                </div>
+            </div>
             <a href="{{ path('crt_donate') }}" style="color:var(--vul); font-weight:700">★ Soutenir</a>
+            <a href="{{ path('crt_contact') }}"{{ route == 'crt_contact' ? ' class="is-active"' : '' }}>Contact</a>
             {% if current_user.isLogged %}
                 <div class="nav-dd">
                     <button type="button" class="nav-dd-top" aria-haspopup="true">Mon compte<span class="nav-email">{{ current_user.displayName }}</span></button>
@@ -263,6 +273,7 @@
         projet libre, gratuit et open source. <a href="{{ path('project') }}">En savoir plus</a>
         <br>
         <a href="{{ path('crt_discover') }}">Découvrir</a> ·
+        <a href="{{ path('crt_manifesto') }}">Manifeste</a> ·
         <a href="{{ path('crt_pricing') }}">Tarifs</a> ·
         <a href="{{ path('crt_roadmap') }}">Roadmap</a> ·
         <a href="{{ path('crt_changelog') }}">Changelog</a> ·
@@ -341,12 +352,23 @@
        de pouvoir cliquer un lien). Le survol reste un raccourci (cf. CSS). #}
     <script nonce="{{ csp_nonce.value }}">
     (function () {
-        var dd = document.querySelector('.nav-dd');
-        if (!dd) return;
-        var btn = dd.querySelector('.nav-dd-top');
-        btn.addEventListener('click', function (e) { e.stopPropagation(); dd.classList.toggle('open'); });
-        document.addEventListener('click', function (e) { if (!dd.contains(e.target)) dd.classList.remove('open'); });
-        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') dd.classList.remove('open'); });
+        var dds = document.querySelectorAll('.nav-dd');
+        if (!dds.length) return;
+        dds.forEach(function (dd) {
+            var btn = dd.querySelector('.nav-dd-top');
+            if (!btn) return;
+            btn.addEventListener('click', function (e) {
+                e.stopPropagation();
+                dds.forEach(function (o) { if (o !== dd) o.classList.remove('open'); });
+                dd.classList.toggle('open');
+            });
+        });
+        document.addEventListener('click', function (e) {
+            dds.forEach(function (dd) { if (!dd.contains(e.target)) dd.classList.remove('open'); });
+        });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') dds.forEach(function (dd) { dd.classList.remove('open'); });
+        });
     })();
     </script>
 </body>

@@ -64,6 +64,12 @@ header nav a.is-active::after { content:''; position:absolute; left:.9rem; right
 .nav-dd-top::after { content:' ▾'; font-size:.8em; opacity:.7; }
 .nav-dd-menu a { display:block; }
 .nav-dd-logout { border-top:1px solid var(--line); margin-top:.2rem; color:#b91c1c !important; }
+/* Menu « SciencesWiki » : ouvre vers la gauche (il est en début de nav). */
+.nav-dd.dd-left .nav-dd-menu { right:auto; left:0; }
+/* Sous-items (publics sous « Découvrir »). */
+.nav-dd-menu a.sub { padding-left:1.5rem; font-size:.92em; opacity:.92; }
+.nav-dd-menu a.sub::before { content:"– "; opacity:.5; }
+.nav-dd-menu a.is-active { color:var(--accent-dark); font-weight:700; }
 h1 { margin: .3rem 0; font-size:1.7rem; }
 h2 { margin-top:1.6rem; }
 /* Pas de souligné par défaut (boutons, blocs, menus, nav…). Le souligné est
