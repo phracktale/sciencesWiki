@@ -39,6 +39,7 @@ final class GenerateWikiArticlesCommand extends Command
         private readonly LlmClient $llm,
         private readonly EntityManagerInterface $em,
         private readonly \App\Service\SettingsService $settings,
+        private readonly \App\Rag\FaithfulnessChecker $faithfulness,
     ) {
         parent::__construct();
     }
@@ -88,7 +89,8 @@ final class GenerateWikiArticlesCommand extends Command
         foreach ($targets as $node) {
             $io->writeln(\sprintf('• %s (niveau %d)…', $node->getLabel(), $node->getLevel()));
             try {
-                $sources = $this->sources($node, $embedder);
+                $pubs = $this->sourcePublications($node, $embedder);
+                $sources = $this->formatSources($pubs);
                 $related = $this->relatedNodes($node);
                 // Streaming : la rédaction longue dépasse le timeout idle d'un appel
                 // non-streamé ; le flux remet le compteur à zéro à chaque jeton.
@@ -108,6 +110,9 @@ final class GenerateWikiArticlesCommand extends Command
                 // Liens internes garantis (le modèle local les omet souvent) : on lie
                 // la 1re occurrence de chaque domaine voisin dans le corps de l'article.
                 $md = $this->autolink($md, $related, $node->getSlug());
+                // Vérification de fidélité : marque « [réf. nécessaire] » ce que les
+                // sources ne soutiennent pas (anti-hallucination ; le relecteur tranche).
+                $md = $this->faithfulness->annotate($md, $pubs);
                 if (mb_strlen($md) < 800) {
                     $io->warning(\sprintf('  réponse trop courte (%d car.), ignorée.', mb_strlen($md)));
                     continue;
@@ -136,15 +141,32 @@ final class GenerateWikiArticlesCommand extends Command
     }
 
     /** Sources réelles du corpus pour ancrer l'article (recherche sémantique). */
-    private function sources(TreeNode $node, $embedder): string
+    /**
+     * Publications sources (kNN sur le label + description du nœud).
+     *
+     * @return list<\App\Entity\Publication>
+     */
+    private function sourcePublications(TreeNode $node, $embedder): array
     {
         $query = $node->getLabel().'. '.(string) $node->getDescription();
         $embedding = $embedder->embed($query);
-        $hits = $this->publications->nearestTo($embedding, 12);
 
+        return array_map(
+            static fn (array $hit): \App\Entity\Publication => $hit['publication'],
+            $this->publications->nearestTo($embedding, 12),
+        );
+    }
+
+    /**
+     * Bloc sources formaté pour le prompt (l'indexation [n] DOIT correspondre à
+     * l'ordre de la liste passée au vérificateur de fidélité).
+     *
+     * @param list<\App\Entity\Publication> $pubs
+     */
+    private function formatSources(array $pubs): string
+    {
         $lines = [];
-        foreach ($hits as $i => $hit) {
-            $p = $hit['publication'];
+        foreach ($pubs as $i => $p) {
             $year = $p->getPublicationDate()?->format('Y') ?? 's.d.';
             $doi = $p->getDoi() ? 'https://doi.org/'.$p->getDoi() : '';
             $lines[] = \sprintf('[%d] %s (%s)%s', $i + 1, $p->getTitle(), $year, '' !== $doi ? ' — '.$doi : '');

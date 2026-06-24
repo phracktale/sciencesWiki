@@ -29,6 +29,7 @@ final class AnswerDrafter
         private readonly EmbeddingClientFactory $embeddingFactory,
         private readonly EntityManagerInterface $em,
         private readonly \App\Service\SettingsService $settings,
+        private readonly FaithfulnessChecker $faithfulness,
     ) {
     }
 
@@ -81,6 +82,11 @@ final class AnswerDrafter
     public function persistFromText(Question $question, AnswerType $type, array $sources, string $content, ?int $generationMs = null): Answer
     {
         $parsed = $this->analyze($content, $sources);
+
+        // Vérification de fidélité : marque « [réf. nécessaire] » les affirmations
+        // non soutenues par les sources (anti-hallucination). Le relecteur tranche.
+        $parsed['vulgarization'] = $this->faithfulness->annotate($parsed['vulgarization'], $sources);
+        $parsed['academic'] = $this->faithfulness->annotate($parsed['academic'], $sources);
 
         if (null === $question->getTitle() && '' !== $parsed['title']) {
             $question->setTitle($parsed['title']);

@@ -185,7 +185,7 @@
                     <div class="qa-answer">
                         {% if a.title != a.questionText %}<h3 class="qa-title">{{ a.title }}</h3>{% endif %}
                         {% if a.vulgarizationContent %}<div class="md">{{ a.vulgarizationContent|md }}</div>{% endif %}
-                        {% if a.academicContent %}<h3 style="font-size:1.05rem; margin-top:1rem">Faits établis (sourcés)</h3><div class="md">{{ a.academicContent|md }}</div>{% endif %}
+                        {% if a.academicContent %}<h3 style="font-size:1.05rem; margin-top:1rem">Données issues des études citées</h3><div class="md">{{ a.academicContent|md }}</div>{% endif %}
                         {% if a.sources is not empty %}
                             <h3 style="font-size:1rem; margin-top:1rem">📚 Sources citées</h3>
                             <ol>

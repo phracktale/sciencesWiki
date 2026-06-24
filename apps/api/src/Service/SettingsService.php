@@ -20,6 +20,13 @@ final class SettingsService
     public const RAG_MODEL = 'rag.model';
     public const RAG_NEIGHBORS = 'rag.neighbors';
 
+    /**
+     * Vérification de fidélité : après rédaction, une passe marque « [réf. nécessaire] »
+     * les affirmations non soutenues par les sources (cf. stratégie anti-hallucination).
+     * '1' = activée. Le vérificateur utilise le modèle léger (≠ rédacteur).
+     */
+    public const RAG_VERIFY = 'rag.verify';
+
     /** Modèle dédié à la rédaction des articles encyclopédiques (distinct des Q/R). */
     public const WIKI_MODEL = 'wiki.model';
 
@@ -106,6 +113,7 @@ final class SettingsService
         self::RAG_MAX_TOKENS => '10000',
         self::RAG_MODEL => '',
         self::RAG_NEIGHBORS => '6',
+        self::RAG_VERIFY => '1',
         // Articles wiki : modèle le plus capable disponible localement par défaut.
         self::WIKI_MODEL => 'qwen3.6:latest',
         // Tâches légères (extraction de claims…) : petit modèle rapide par défaut.
@@ -165,6 +173,12 @@ final class SettingsService
         $v = $this->get(self::RAG_MODEL);
 
         return null !== $v && '' !== trim($v) ? trim($v) : null;
+    }
+
+    /** Vérification de fidélité activée (marquage « [réf. nécessaire] »). */
+    public function verifyFaithfulness(): bool
+    {
+        return '0' !== trim((string) ($this->get(self::RAG_VERIFY) ?? '1'));
     }
 
     /** Modèle de rédaction des articles wiki (défaut : le plus capable local). */
@@ -280,7 +294,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;
