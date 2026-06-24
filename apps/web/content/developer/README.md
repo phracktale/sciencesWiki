@@ -14,19 +14,27 @@ réponses et des articles de vulgarisation où **chaque affirmation porte ses so
 
 ## Sommaire
 
+> **Nouveau sur le projet ?** Commence par la **Référence fonctionnelle** (n°2) :
+> elle relie chaque fonctionnalité à sa route/commande et à son code — tu sauras
+> immédiatement *ce qui existe* et *où regarder*.
+
 1. **[Architecture](01-architecture.md)** — vue d'ensemble du monorepo, schéma de
    déploiement générique, composants, modèle de données, flux principaux (moisson,
    RAG, analyse, texte intégral), asynchrone, temps réel, sécurité.
-2. **[Choix techniques](02-choix-techniques.md)** — pourquoi ces décisions :
+2. **[Référence fonctionnelle](06-fonctionnalites.md)** — catalogue précis de toutes
+   les fonctionnalités (consultation, recherche, Q/R RAG, chat, outils chercheur,
+   contribution, analyse, moisson, back-office…), chacune reliée à sa route /
+   endpoint / commande et au code correspondant. **La porte d'entrée du code.**
+3. **[Choix techniques](02-choix-techniques.md)** — pourquoi ces décisions :
    Symfony 8 / API Platform, FrankenPHP, PostgreSQL+pgvector (vs base vectorielle
    dédiée), BFF Symfony/Twig (vs SPA), IA auto-hébergée (vs API payantes), RAG
    sourcé, « jeter le PDF / garder l'URL », JWT + session, etc.
-3. **[Démarrage & environnement de dev](03-demarrage.md)** — prérequis, lancer la
+4. **[Démarrage & environnement de dev](03-demarrage.md)** — prérequis, lancer la
    pile en local, commandes console, tests, workflow de développement.
-4. **[Conventions de code](04-conventions-de-code.md)** — style, structure, règles
+5. **[Conventions de code](04-conventions-de-code.md)** — style, structure, règles
    de nommage, patterns (Message/Handler, Mapper, Factory…), Doctrine/migrations,
    Twig, Dart, tests.
-5. **[Contribuer & conventions de PR](05-contribution-et-pr.md)** — workflow Git,
+6. **[Contribuer & conventions de PR](05-contribution-et-pr.md)** — workflow Git,
    format des commits, gabarit de Pull Request, critères de revue, licence.
 
 ## Le dépôt en un coup d'œil

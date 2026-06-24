@@ -27,6 +27,7 @@ final class DeveloperController extends AbstractController
      */
     private const DOCS = [
         'architecture'     => ['file' => '01-architecture.md',       'title' => 'Architecture'],
+        'fonctionnalites'  => ['file' => '06-fonctionnalites.md',     'title' => 'Référence fonctionnelle'],
         'choix-techniques' => ['file' => '02-choix-techniques.md',   'title' => 'Choix techniques'],
         'demarrage'        => ['file' => '03-demarrage.md',          'title' => 'Démarrage & dev'],
         'conventions'      => ['file' => '04-conventions-de-code.md', 'title' => 'Conventions de code'],
