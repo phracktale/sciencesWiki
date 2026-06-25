@@ -281,7 +281,35 @@
         var msg = document.getElementById('ask-msg');
         var out = document.getElementById('stream-out');
         var nodeSlug = form.dataset.node;
-        function render(raw) { out.innerHTML = raw.replace(/^##\s*TITRE\s*$/gmi, '').replace(/^##\s*VULGARISATION\s*$/gmi, '').replace(/^##\s*ACAD[EÉ]MIQUE\s*$/gmi, '<h4>Pour aller plus loin</h4>'); }
+        // Rendu markdown EN DIRECT (sinon le flux affiche du markdown brut illisible).
+        // Léger volontairement : la page finale /q/ID est rendue proprement côté serveur.
+        function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+        function mdInline(s) {
+            return esc(s)
+                .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+                .replace(/\[r[ée]f\.\s*n[ée]cessaire[^\]]*\]/gi, '<span class="ref-needed">[réf. nécessaire]</span>')
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>');
+        }
+        function mdToHtml(raw) {
+            raw = raw.replace(/^##\s*TITRE\s*$/gmi, '').replace(/^##\s*VULGARISATION\s*$/gmi, '').replace(/^##\s*ACAD[EÉ]MIQUE\s*$/gmi, '## Pour aller plus loin');
+            var lines = raw.split('\n'), html = [], para = [], inList = false, inQ = false;
+            function fp() { if (para.length) { html.push('<p>' + mdInline(para.join(' ')) + '</p>'); para = []; } }
+            function fl() { if (inList) { html.push('</ul>'); inList = false; } }
+            function fq() { if (inQ) { html.push('</blockquote>'); inQ = false; } }
+            for (var i = 0; i < lines.length; i++) {
+                var t = lines[i].trim();
+                if (t === '') { fp(); fl(); fq(); continue; }
+                var h = t.match(/^(#{1,4})\s+(.*)$/);
+                if (h) { fp(); fl(); fq(); var lv = Math.min(6, h[1].length + 1); html.push('<h' + lv + '>' + mdInline(h[2]) + '</h' + lv + '>'); continue; }
+                if (/^>\s?/.test(t)) { fp(); fl(); if (!inQ) { html.push('<blockquote>'); inQ = true; } html.push(mdInline(t.replace(/^>\s?/, '')) + '<br>'); continue; }
+                if (/^[-*]\s+/.test(t)) { fp(); fq(); if (!inList) { html.push('<ul>'); inList = true; } html.push('<li>' + mdInline(t.replace(/^[-*]\s+/, '')) + '</li>'); continue; }
+                fq(); fl(); para.push(t);
+            }
+            fp(); fl(); fq();
+            return html.join('\n');
+        }
+        function render(raw) { out.innerHTML = mdToHtml(raw); }
         function setBusy(b) { btn.disabled = b; sbtn.disabled = b; }
         function startStream(streamUrl) {
             msg.innerHTML = '<span class="loader"></span> Rédaction en cours…';

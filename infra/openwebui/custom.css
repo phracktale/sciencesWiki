@@ -39,13 +39,22 @@ html, body {
 [class*="bg-gray-7"], [class*="dark:bg-gray-7"] {
     background-color: var(--sw-panel) !important;
 }
-[class*="text-white"], [class*="text-gray-1"], [class*="text-gray-2"],
-[class*="text-gray-3"], .prose, .prose * {
+/* Texte lisible PARTOUT : Open WebUI colore beaucoup d'éléments (titres, gras,
+ * texte secondaire) avec ses propres gris / variables « prose » que des sélecteurs
+ * étroits ratent → le texte restait sombre. On force le phosphore sur tout le texte. */
+body, body p, body li, body span, body td, body th, body blockquote, body label,
+[class*="text-white"], [class*="text-gray-"], [class*="text-slate-"], [class*="text-zinc-"],
+.prose, .prose * {
     color: var(--sw-fg) !important;
 }
+/* Titres + gras en vert VIF (hiérarchie lisible, fort contraste). */
+h1, h2, h3, h4, h5, h6, strong, b,
+.prose :is(h1, h2, h3, h4, h5, h6), .prose strong, .prose b {
+    color: var(--sw-bright) !important;
+}
 
-/* Liens & accents en vert vif. */
-a, .text-blue-500, [class*="text-blue"] { color: var(--sw-bright) !important; }
+/* Liens & accents en vert vif, soulignés (distincts du gras). */
+a, .text-blue-500, [class*="text-blue"] { color: var(--sw-bright) !important; text-decoration: underline; }
 
 /* Champs de saisie : ardoise sombre, texte vert, bord phosphore. */
 textarea, input, [contenteditable="true"] {
@@ -103,7 +112,7 @@ body::after {
         to bottom,
         rgba(0, 0, 0, 0) 0px,
         rgba(0, 0, 0, 0) 2px,
-        rgba(0, 0, 0, 0.18) 3px
+        rgba(0, 0, 0, 0.05) 3px
     );
-    mix-blend-mode: multiply;
+    /* opacité très faible : l'effet scanline ne doit PAS assombrir le texte. */
 }
