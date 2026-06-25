@@ -613,9 +613,18 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
      */
     public function findOneByExternalId(string $key, string $value): ?Publication
     {
-        $sql = 'SELECT id FROM publication WHERE external_ids ->> :key = :value LIMIT 1';
+        // La clé est INLINÉE (et non liée via :key) pour que PostgreSQL puisse
+        // utiliser l'index d'expression idx_pub_extid_<clé> (external_ids ->> 'clé') :
+        // avec un paramètre lié, le planner retombe en scan séquentiel de toute la
+        // table. Les clés proviennent d'un ensemble fini contrôlé par les mappers
+        // (openalex/doi/arxiv/pmid/pmcid…), jamais d'une saisie utilisateur ; on
+        // valide tout de même le format pour écarter toute injection.
+        if (1 !== preg_match('/^[a-z0-9_]{1,32}$/', $key)) {
+            return null;
+        }
+        $sql = \sprintf("SELECT id FROM publication WHERE external_ids ->> '%s' = :value LIMIT 1", $key);
         $id = $this->getEntityManager()->getConnection()
-            ->executeQuery($sql, ['key' => $key, 'value' => $value])
+            ->executeQuery($sql, ['value' => $value])
             ->fetchOne();
 
         return false === $id ? null : $this->find((int) $id);
