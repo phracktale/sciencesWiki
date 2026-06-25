@@ -144,6 +144,12 @@ L'équipe SciencesWiki
                             {%- endset -%}
                             · <a href="mailto:?subject={{ invite_subject|url_encode }}&body={{ invite_body|url_encode }}" title="Ouvre un e-mail pré-rédigé ; ajoutez l'adresse de l'auteur correspondant (visible sur la page de l'éditeur via le DOI).">✉️ Inviter les auteurs à le partager</a>
                         {% endif %}
+                        {% if passages is defined and passages[s.marker] is defined %}
+                            <details class="src-passage" style="margin:.45rem 0 0">
+                                <summary style="cursor:pointer; color:var(--accent); font-size:.9rem">📄 Voir le passage cité [{{ s.marker }}]</summary>
+                                <blockquote style="margin:.4rem 0 0; padding:.4rem .85rem; border-left:3px solid var(--line); color:var(--muted); font-style:italic">« {{ passages[s.marker] }} »</blockquote>
+                            </details>
+                        {% endif %}
                     </li>
                 {% endfor %}
             </ol>

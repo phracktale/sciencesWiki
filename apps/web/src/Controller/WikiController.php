@@ -289,6 +289,8 @@ final class WikiController extends AbstractController
             'node' => $node,
             'votes' => $votes['tallies'],
             'myVotes' => $votes['mine'],
+            // Locator : extrait source derrière chaque note [n] (vérifiabilité).
+            'passages' => $this->api->answerPassages($id),
         ]);
     }
 

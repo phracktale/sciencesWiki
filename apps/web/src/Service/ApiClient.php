@@ -67,6 +67,23 @@ final class ApiClient
     }
 
     /**
+     * Locator : extrait source par marqueur [n] pour une réponse (best-effort).
+     *
+     * @return array<string,string> passages indexés par numéro de note
+     */
+    public function answerPassages(int $id): array
+    {
+        try {
+            $res = $this->get('/api/answers/'.$id.'/passages');
+            $passages = $res['passages'] ?? null;
+
+            return \is_array($passages) ? $passages : [];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
      * Dernières questions posées (accueil).
      *
      * @return list<array<string,mixed>>
