@@ -125,3 +125,54 @@ Arrêt propre : `docker stop -t 30 …` (Postgres : shutdown clean) puis extinct
   `app:openalex:ingest-snapshot --dir=/snapshot …` (cf. la commande, §5).
 - OpenAlex publie un **nouveau snapshot chaque mois** → re-sync + ré-exécution
   (idempotent par dédup DOI).
+
+---
+
+## 8. Enrichissement & charge (piloté depuis Thor)
+
+La charge CPU de Marvin (embeddings `uvicorn`, GROBID `java`, backends Postgres)
+ne vient PAS du `aws sync` mais de l'**enrichissement**, piloté depuis Thor par :
+
+**Workers Messenger** (conteneurs, `infra/docker-compose.yml`) — répliqués :
+- `worker` (×6) → file `harvester` : moisson + import (dédup + embed inline).
+- `fulltext-worker` (×4) → file `fulltext` : extraction GROBID + embedding des chunks.
+- `analysis-worker` (×1) → file `analysis` : analyse des controverses.
+
+**Crons host** (`crontab -l` de `phracktale@thor`) — scripts versionnés à la racine du repo :
+| Fréquence | Tâche | Effet sur Marvin |
+|---|---|---|
+| `*/10` | `embed-drain.sh` (embed, **suggest-placement** kNN, reap-stale, journals) | embeddings + base |
+| `*/15` | `fulltext-drain.sh` (enfile la file fulltext) | → GROBID via fulltext-worker |
+| `*/20` | `app:harvest:auto --limit=40` | enfile la moisson |
+| `*/30` | `app:stats:refresh` | base |
+| `0 */6` | `app:satellites:link` | base |
+| `0 1-6` | `app:wiki:generate` | **Ollama (LLM)** |
+
+> Les autres lignes de la crontab (sens-urbain, tdah-assistant, planète-découverte,
+> fatplant) sont d'**autres projets** — ne pas y toucher.
+
+### Mettre l'enrichissement en pause (ex. pendant un gros téléchargement)
+```bash
+# Sur Thor — stopper les workers
+cd ~/scienceswiki/infra && docker compose --env-file .env.prod stop worker fulltext-worker analysis-worker
+# Commenter UNIQUEMENT les crons scienceswiki (garde les autres projets)
+crontab -l > ~/cron.bak
+crontab -l | sed -E '/scienceswiki/ s/^([^#])/#\1/' | crontab -
+```
+Reprise — **recréer** les workers (pas `start`) pour embarquer le code à jour :
+```bash
+docker compose --env-file .env.prod up -d --build worker fulltext-worker analysis-worker
+crontab ~/cron.bak
+```
+
+### ⚠️ Perf critique : index du dédup d'import
+Le dédup (`findOneByExternalId`) interroge `external_ids ->> 'clé'`. Sans index =
+scan séquentiel de toute la table `publication` à chaque vérif → ×N workers =
+**Postgres saturé en permanence** (et O(n²) pour OpenAlex). Corrigé par les index
+d'expression `idx_pub_extid_*` (migration `Version20260625120000`) + clé **inlinée**
+dans la requête (un paramètre lié `->> :key` empêche l'usage de l'index). Vérif :
+`EXPLAIN … external_ids ->> 'openalex' = '…'` doit montrer **Index Scan**.
+
+> Piste connexe non encore traitée : `harvester:suggest-placement` fait du kNN
+> pgvector (`<=>`) ; vérifier qu'un index vectoriel (HNSW/IVFFlat) existe, sinon
+> c'est le prochain scan séquentiel coûteux à grande échelle.
