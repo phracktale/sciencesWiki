@@ -283,6 +283,28 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     }
 
     /**
+     * Meilleur passage (chunk de texte intégral) d'une publication vis-à-vis d'un
+     * embedding de requête — sert au « locator » : montrer derrière chaque source [n]
+     * l'extrait exact qui la justifie. kNN sur les seuls chunks de cette publication
+     * (peu nombreux, filtrés par idx_chunk_publication) → rapide. Null si pas de
+     * texte intégral ingéré (on retombera sur le résumé côté appelant).
+     *
+     * @param list<float> $embedding
+     */
+    public function bestPassageFor(int $publicationId, array $embedding): ?string
+    {
+        $content = $this->getEntityManager()->getConnection()->executeQuery(
+            'SELECT content FROM publication_chunk
+             WHERE publication_id = :p
+             ORDER BY embedding <=> CAST(:vec AS halfvec)
+             LIMIT 1',
+            ['p' => $publicationId, 'vec' => (string) new Vector($embedding)],
+        )->fetchOne();
+
+        return false === $content ? null : (string) $content;
+    }
+
+    /**
      * Candidats lexicaux (plein-texte OR sur titre + résumé), classés par ts_rank.
      * Réutilise EXACTEMENT l'expression to_tsvector('simple', …) indexée (GIN) afin
      * d'exploiter l'index. La requête est transformée en tsquery OR sécurisé.

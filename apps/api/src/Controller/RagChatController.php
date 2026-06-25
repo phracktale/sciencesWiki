@@ -127,7 +127,7 @@ final class RagChatController
         }
 
         // Récupération sourcée sur l'index existant (Voie A : embeddings ML + pgvector).
-        [$sources, $noSourceNotice] = $this->retrieve($query);
+        [$sources, $noSourceNotice, $embedding] = $this->retrieve($query);
 
         // Pas de source pertinente : on renvoie un message honnête (garde-fou), sans LLM.
         if (null !== $noSourceNotice) {
@@ -146,12 +146,12 @@ final class RagChatController
         $llm = $this->llmFactory->create();
 
         if (!$stream) {
-            $content = $llm->complete($messages, $opts)->content;
+            $content = $llm->complete($messages, $opts)->content.$this->sourcesAppendix($sources, $embedding);
 
             return $this->jsonText($content, $modelId);
         }
 
-        $response = new StreamedResponse(function () use ($llm, $messages, $opts, $modelId): void {
+        $response = new StreamedResponse(function () use ($llm, $messages, $opts, $modelId, $sources, $embedding): void {
             @set_time_limit(0);
             ignore_user_abort(true);
             $id = 'chatcmpl-'.bin2hex(random_bytes(8));
@@ -177,6 +177,11 @@ final class RagChatController
                 }
             } catch (\Throwable) {
                 $emit(['content' => "\n\n[La génération a échoué — réessayez.]"]);
+            }
+            // Locator : bloc « Sources & extraits » (passage exact derrière chaque [n]).
+            $appendix = $this->sourcesAppendix($sources, $embedding);
+            if ('' !== $appendix) {
+                $emit(['content' => $appendix]);
             }
             $emit([], 'stop');
             echo "data: [DONE]\n\n";
@@ -206,14 +211,15 @@ final class RagChatController
     }
 
     /**
-     * @return array{0:list<Publication>,1:?string} sources + éventuel message « pas de source »
+     * @return array{0:list<Publication>,1:?string,2:list<float>} sources + éventuel
+     *                                                             message « pas de source » + embedding de la requête
      */
     private function retrieve(string $query): array
     {
         try {
             $embedding = $this->embeddingFactory->create()->embed($query);
         } catch (\Throwable) {
-            return [[], "Le service d'indexation est momentanément indisponible. Réessayez dans un instant."];
+            return [[], "Le service d'indexation est momentanément indisponible. Réessayez dans un instant.", []];
         }
 
         $sources = [];
@@ -222,10 +228,47 @@ final class RagChatController
         }
 
         if ([] === $sources) {
-            return [[], "Je n'ai pas trouvé de source scientifique suffisamment proche dans le corpus SciencesWiki pour répondre de façon fiable. Reformulez, ou élargissez le sujet."];
+            return [[], "Je n'ai pas trouvé de source scientifique suffisamment proche dans le corpus SciencesWiki pour répondre de façon fiable. Reformulez, ou élargissez le sujet.", $embedding];
         }
 
-        return [$sources, null];
+        return [$sources, null, $embedding];
+    }
+
+    /**
+     * Bloc « Sources & extraits » ajouté APRÈS la réponse (locator) : pour chaque
+     * source [n], le passage exact qui la justifie (meilleur chunk de texte intégral
+     * vis-à-vis de la question, sinon le résumé). Rend chaque citation vérifiable.
+     *
+     * @param list<Publication> $sources
+     * @param list<float>       $embedding
+     */
+    private function sourcesAppendix(array $sources, array $embedding): string
+    {
+        if ([] === $sources) {
+            return '';
+        }
+        $lines = ["\n\n---", '', '**📚 Sources & extraits**', ''];
+        foreach ($sources as $i => $s) {
+            $authors = implode(', ', array_map(static fn (array $a): string => $a['name'], $s->getAuthors()));
+            $year = $s->getPublicationDate()?->format('Y') ?? 's.d.';
+            $head = \sprintf('**[%d]** %s — %s (%s)', $i + 1, $s->getTitle(), '' !== $authors ? $authors : 'auteurs inconnus', $year);
+            $doi = $s->getDoi();
+            if (null !== $doi && '' !== $doi) {
+                $head .= \sprintf(' · [DOI](https://doi.org/%s)', $doi);
+            }
+            $lines[] = $head;
+
+            $passage = (null !== $s->getId() && [] !== $embedding) ? $this->publications->bestPassageFor($s->getId(), $embedding) : null;
+            $passage ??= $s->getAbstract();
+            if (null !== $passage && '' !== trim($passage)) {
+                $clean = trim((string) preg_replace('/\s+/', ' ', $passage));
+                $excerpt = mb_substr($clean, 0, 320);
+                $lines[] = '> '.$excerpt.(mb_strlen($clean) > 320 ? '…' : '');
+            }
+            $lines[] = '';
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
