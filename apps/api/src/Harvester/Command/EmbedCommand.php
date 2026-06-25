@@ -23,8 +23,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'harvester:embed', description: 'Calcule l\'embedding des publications non encore enrichies.')]
 final class EmbedCommand extends Command
 {
-    private const FLUSH_EVERY = 50;
-
     public function __construct(
         private readonly PublicationRepository $publications,
         private readonly PublicationEmbedder $embedder,
@@ -36,12 +34,16 @@ final class EmbedCommand extends Command
     protected function configure(): void
     {
         $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Nombre maximal de publications à enrichir', '500');
+        // Taille de lot envoyée au service d'embeddings (POST /embed-batch) : un seul
+        // appel encode N textes d'un coup → bien plus de débit que du 1-par-1.
+        $this->addOption('batch', null, InputOption::VALUE_REQUIRED, 'Nombre de textes par appel /embed-batch', '64');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
         $limit = max(1, (int) $input->getOption('limit'));
+        $batch = max(1, (int) $input->getOption('batch'));
 
         $publications = $this->publications->findNeedingEmbedding($limit);
         if ([] === $publications) {
@@ -52,20 +54,18 @@ final class EmbedCommand extends Command
 
         $done = 0;
         $errors = 0;
-        foreach ($publications as $i => $publication) {
+        // Traitement PAR LOTS : un appel /embed-batch encode tout le lot en une passe
+        // (vectorisé) — bien plus rapide que des appels unitaires.
+        foreach (array_chunk($publications, $batch) as $chunk) {
             try {
-                $this->embedder->embed($publication);
-                ++$done;
+                $this->embedder->embedMany($chunk);
+                $done += \count($chunk);
             } catch (\Throwable $e) {
-                ++$errors;
-                $io->warning(\sprintf('Échec embedding publication #%d : %s', (int) $publication->getId(), $e->getMessage()));
+                $errors += \count($chunk);
+                $io->warning(\sprintf('Échec embedding d\'un lot de %d : %s', \count($chunk), $e->getMessage()));
             }
-
-            if (0 === ($i + 1) % self::FLUSH_EVERY) {
-                $this->em->flush();
-            }
+            $this->em->flush();
         }
-        $this->em->flush();
 
         $io->success(\sprintf('Embeddings calculés : %d (erreurs : %d).', $done, $errors));
 
