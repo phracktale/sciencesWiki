@@ -110,7 +110,7 @@
                     <p class="muted" id="art-gen-chrono" style="margin:.3rem 0 0; font-size:.88rem">Cela prend quelques minutes. Vous pouvez quitter la page : l'article apparaîtra pour tous les visiteurs une fois prêt.</p>
                 </div>
             {% elseif admin_session.logged and node.id %}
-                <form method="post" action="{{ path('admin_node_regenerate_article', { id: node.id }) }}" data-busy="⏳ Lancement…" style="margin:.4rem 0 0">
+                <form method="post" action="{{ path('admin_node_regenerate_article', { id: node.id }) }}" data-turbo="false" data-busy="⏳ Lancement…" style="margin:.4rem 0 0">
                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                     <input type="hidden" name="back" value="{{ app.request.requestUri }}">
                     <button type="submit" class="art-edit-btn" style="border-color:var(--accent); color:var(--accent)">🤖 {{ node.articleMd ? '(Re)générer' : 'Générer' }} l'article par l'IA</button>
@@ -141,7 +141,7 @@
             {% if current_user.canEdit and node.id %}
                 <div style="margin:.4rem 0 2rem">
                     <div id="art-edit" hidden style="margin-top:.4rem; border:1px solid var(--line); border-radius:10px; padding:1rem; background:#fafafa">
-                        <form method="post" action="{{ path('article_edit', { id: node.id }) }}">
+                        <form method="post" action="{{ path('article_edit', { id: node.id }) }}" data-turbo="false">
                             <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                             <input type="hidden" name="back" value="{{ app.request.uri }}">
                             <label for="art-md">Contenu (Markdown)</label>
@@ -153,7 +153,7 @@
                             </div>
                         </form>
                         {% if current_user.canValidate and node.articleMd and node.articleStatus != 'valide' %}
-                            <form method="post" action="{{ path('article_validate', { id: node.id }) }}" style="margin-top:.6rem">
+                            <form method="post" action="{{ path('article_validate', { id: node.id }) }}" data-turbo="false" style="margin-top:.6rem">
                                 <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                                 <input type="hidden" name="back" value="{{ app.request.uri }}">
                                 <button type="submit" style="background:#16a34a;color:#fff;border:0;border-radius:8px;padding:.45rem .9rem;cursor:pointer">✅ Valider sans modifier</button>
