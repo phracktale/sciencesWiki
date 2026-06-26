@@ -25,4 +25,10 @@ final class ContentController extends AbstractController
     {
         return $this->render('content/process.html.twig');
     }
+
+    #[Route('/{_locale}/fiabilite-ia', name: 'reliability', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function reliability(): Response
+    {
+        return $this->render('content/reliability.html.twig');
+    }
 }

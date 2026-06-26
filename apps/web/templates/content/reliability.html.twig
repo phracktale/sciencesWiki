@@ -1,0 +1,128 @@
+{% extends 'crt/base.html.twig' %}
+
+{% block title %}Fiabilité de l'IA{% endblock %}
+{% block cwd %}fiabilite{% endblock %}
+{% block command %}./verify --reliability{% endblock %}
+{% block description %}Pourquoi l'IA de SciencesWiki est fiable : RAG strict, abstention, attribution des sources, garde-fou anti-hallucination HHEM, détection de plagiat et de controverses. Défense en profondeur, expliquée.{% endblock %}
+
+{% block body %}
+    <h1 data-typewriter data-text="Fiabilité de l'IA — détecter et bloquer l'hallucination." data-tw-speed="18" data-tw-cursor></h1>
+    <p class="lead">Une IA générative produit du texte <em>plausible</em>, pas forcément <em>vrai</em>.
+    Notre fiabilité ne vient pas d'un modèle « plus intelligent », mais d'une <strong>défense en
+    profondeur</strong> : plusieurs garde-fous indépendants qui se rattrapent les uns les autres.</p>
+
+    <h2>Le problème, en trois failles</h2>
+    <ul style="line-height:1.7">
+        <li><strong>Hallucination</strong> — le modèle affirme un fait, un chiffre ou une référence qui n'existe pas. C'est <em>structurel</em> : l'entraînement standard récompense la réponse confiante et punit le « je ne sais pas ».</li>
+        <li><strong>Erreur d'attribution</strong> — la réponse cite une source… qui ne dit pas ce qu'on lui fait dire.</li>
+        <li><strong>« Garbage in, garbage out »</strong> — même fidèle à ses sources, une IA reste fausse si les sources le sont (préprints, articles rétractés, plagiats).</li>
+    </ul>
+    <p>Nous attaquons les trois, à des couches différentes.</p>
+
+    <h2>Nos six couches de garde-fous</h2>
+    <div class="box">
+        <span class="box-ttl">defense-in-depth.txt</span>
+        <pre class="out">
+ QUESTION
+    │
+    ▼
+ ① RÉCUPÉRATION HYBRIDE     vecteur (sens) + lexical (mots exacts), fusionnés (RRF)
+    │                       → on ramène le BON passage
+    ▼
+ ②  GÉNÉRATION CONTRAINTE   RAG strict + ABSTENTION : 0 source → 0 réponse
+    │                       (on préfère le silence à l'invention)
+    ▼
+ ③  ATTRIBUTION (locator)   l'extrait source EXACT s'affiche derrière chaque [n]
+    │                       → la preuve est inspectable
+    ▼
+ ④  VÉRIF. DE FIDÉLITÉ      chaque phrase vérifiée vs les passages :
+    │                       LLM-juge → plein texte → HHEM (détecteur dédié)
+    │                       non soutenu → [réf. nécessaire]
+    ▼
+ ⑤  JUGE DE LA VÉRITÉ       qualité du corpus : controverses, rétractations,
+    │                       ANTIPLAGIAT (MinHash/LSH + Jaccard)
+    ▼
+ ⑥  LIENS VÉRIFIABLES       liens Wikipédia réels (jamais inventés)
+    │
+    ▼
+ RÉPONSE SOURCÉE, TRAÇABLE, SIGNALÉE</pre>
+    </div>
+
+    <h2>① Récupération hybride — ramener la bonne preuve</h2>
+    <p>Si la recherche rate la preuve, le modèle hallucine — quelle que soit la suite. On combine
+    deux signaux&nbsp;: <strong>sémantique</strong> (similarité de sens via les <em>embeddings</em>, qui
+    attrape la reformulation) et <strong>lexical</strong> (recherche plein texte, qui attrape les termes
+    rares ou exacts qu'un embedding dilue, ex.&nbsp;«&nbsp;COVID&nbsp;»). Les deux classements sont fusionnés par
+    <strong>RRF</strong> (<em>Reciprocal Rank Fusion</em>). Aucun seul ne suffit&nbsp;; combinés, ils maximisent
+    la chance de ramener le bon passage.</p>
+
+    <h2>② Génération contrainte — l'abstention comme vertu</h2>
+    <p>Le prompt <strong>interdit</strong> au modèle d'utiliser ses connaissances internes&nbsp;: il ne répond
+    qu'à partir des sources fournies. Et surtout&nbsp;: <strong>sans source pertinente, aucune réponse n'est
+    produite</strong>. Dire «&nbsp;ce n'est pas dans les sources&nbsp;» vaut mieux qu'une belle réponse inventée —
+    exactement la prudence que l'entraînement standard décourage.</p>
+
+    <h2>③ Attribution — le « locator de passage »</h2>
+    <p>Derrière chaque citation <strong>[n]</strong>, on affiche l'<strong>extrait source exact</strong>&nbsp;: le
+    fragment de l'article qui justifie l'affirmation. Le lecteur <strong>vérifie de ses yeux</strong> que la
+    citation est réellement ancrée — on ne demande pas de faire confiance, on rend la preuve inspectable.</p>
+
+    <h2>④ Vérification de fidélité — le cœur anti-hallucination</h2>
+    <p>Après rédaction, chaque affirmation est <strong>confrontée aux sources</strong>&nbsp;; celles qui ne sont
+    pas soutenues reçoivent le marqueur <code>[réf. nécessaire]</code> (convention Wikipédia). Trois crans,
+    du plus simple au plus rigoureux&nbsp;:</p>
+    <ol class="dosnum" style="line-height:1.7">
+        <li><strong>LLM-juge</strong> — un second modèle relit et marque le non-étayé. Utile, mais un juge généraliste plafonne autour de <strong>50&nbsp;%</strong> de précision.</li>
+        <li><strong>Contre le plein texte</strong> — la vérification se fait contre les passages intégraux (extraits GROBID), pas seulement le résumé&nbsp;: ancrage bien plus strict.</li>
+        <li><strong>HHEM</strong> — un détecteur d'hallucination <em>dédié</em> (modèle NLI de Vectara, multilingue FR), qui mesure si chaque phrase est <strong>logiquement impliquée</strong> par les sources. Il <strong>surpasse les LLM-juges et GPT-4</strong>, tourne en local, et travaille en <strong>« ajout seul »</strong>&nbsp;: il signale, il ne réécrit jamais → aucune corruption possible.</li>
+    </ol>
+    <p>C'est le passage de «&nbsp;espérer qu'il n'hallucine pas&nbsp;» à <strong>«&nbsp;détecter et signaler
+    l'hallucination&nbsp;»</strong>.</p>
+
+    <h2>⑤ Le juge de la vérité — la qualité du corpus</h2>
+    <p><strong>Attention&nbsp;: fidélité ≠ vérité.</strong> Être fidèle au corpus ne garantit pas que le corpus
+    dise vrai. On attaque donc aussi ce niveau&nbsp;:</p>
+    <ul style="line-height:1.7">
+        <li><strong>Controverses &amp; lacunes</strong> — on fait remonter les <em>désaccords</em> entre publications plutôt que de moyenner naïvement des sources qui se contredisent.</li>
+        <li><strong>Rétractations</strong> — une source devenue non fiable est signalée jusque dans les réponses qui s'y appuyaient.</li>
+        <li><strong>Antiplagiat &amp; doublons</strong> — on repère, dans notre corpus, les œuvres au texte largement recouvrant (duplications, auto-plagiat). Méthode&nbsp;: <strong>MinHash/LSH</strong> pour trouver les candidats sans tout comparer, puis <strong>Jaccard exact</strong> pour confirmer le recouvrement mot à mot. Résultat <strong>non décisionnel</strong>&nbsp;: un score + les passages en regard, qu'un <strong>humain</strong> tranche — jamais de verdict automatique.</li>
+    </ul>
+
+    <h2>⑥ Liens vérifiables, jamais inventés</h2>
+    <p>Quand une affirmation manque de source interne, le marqueur <code>[réf. nécessaire]</code> est promu en
+    <strong>lien Wikipédia réel</strong>, résolu via l'API officielle de Wikipédia. Le modèle ne
+    <strong>fabrique jamais</strong> d'URL&nbsp;: soit le lien existe, soit on garde le marqueur honnête.</p>
+
+    <h2>Ce que nous ne prétendons pas</h2>
+    <p>L'honnêteté fait partie de la fiabilité&nbsp;:</p>
+    <ul style="line-height:1.7">
+        <li><strong>Couverture = notre corpus</strong>, pas tout le savoir. «&nbsp;Rien trouvé&nbsp;» ≠ «&nbsp;original&nbsp;» ou «&nbsp;vrai&nbsp;»&nbsp;: les sources hors corpus (web, bases payantes) sont invisibles. Nous ne sommes pas Turnitin.</li>
+        <li><strong>Plein texte partiel</strong> — l'attribution fine et l'antiplagiat verbatim n'opèrent que là où l'on a le texte intégral (PDF en accès ouvert).</li>
+        <li><strong>La similarité n'est pas une preuve</strong> — tout signal d'intégrité reste soumis à validation humaine.</li>
+    </ul>
+
+    <h2>Et on le mesure</h2>
+    <p>Pour ne pas «&nbsp;espérer&nbsp;» mais <strong>mesurer</strong>&nbsp;: une évaluation continue (faithfulness,
+    rappel de contexte, attribution) sur un jeu de questions de référence propre à notre corpus, plus un
+    jeu de <strong>questions-pièges</strong> dont la réponse n'est PAS dans le corpus — pour mesurer le
+    <strong>taux d'abstention correcte</strong> (refuser au lieu d'inventer).</p>
+
+    <div class="box" style="margin-top:1.6rem">
+        <span class="box-ttl">glossaire.txt</span>
+        <pre class="out" style="white-space:pre-wrap">
+RAG ............ on RÉCUPÈRE des passages d'un corpus, puis on GÉNÈRE à partir d'eux.
+embedding ...... vecteur qui représente le SENS d'un texte (sens proche → vecteurs proches).
+kNN ............ recherche des passages les plus proches d'une question.
+RRF ............ fusionne deux classements (sémantique + lexical) de façon robuste.
+chunk .......... fragment de texte intégral (via GROBID) ; unité de preuve.
+abstention ..... répondre « pas dans les sources » plutôt que deviner.
+faithfulness ... à quel point la réponse est ÉTAYÉE par les sources récupérées.
+entailment/NLI . une phrase est-elle LOGIQUEMENT impliquée par les sources ? (mesure de HHEM)
+HHEM ........... détecteur d'hallucination dédié (Vectara), notre garde-fou principal.
+MinHash/LSH .... signatures compactes pour rapprocher les textes SANS tout comparer.
+Jaccard ........ part de mots communs (intersection/union) ; recouvrement verbatim exact.</pre>
+    </div>
+
+    <p class="lead" style="margin-top:1.6rem">En résumé&nbsp;: <strong>on contraint, on trace, on vérifie, on
+    juge le corpus, et on assume nos limites.</strong> La confiance se construit, elle ne se décrète pas.</p>
+{% endblock %}
