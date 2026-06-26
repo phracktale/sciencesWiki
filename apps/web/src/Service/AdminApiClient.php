@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Service;
 
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\HttpFoundation\File\UploadedFile;
+use Symfony\Component\Mime\Part\DataPart;
+use Symfony\Component\Mime\Part\Multipart\FormDataPart;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 /**
@@ -130,6 +133,47 @@ final class AdminApiClient
     public function reviewDuplication(int $id, string $status): array
     {
         return $this->send('POST', '/api/admin/duplications/'.$id.'/review', ['status' => $status]);
+    }
+
+    /**
+     * Import direct d'une source PDF (multipart) → GROBID → corpus.
+     *
+     * @param array<string,string> $meta title (requis), doi, year, venue, abstract
+     *
+     * @return array{ok:bool,status:int,data:array<string,mixed>}
+     */
+    public function uploadPdf(UploadedFile $pdf, array $meta): array
+    {
+        $token = $this->user->token();
+        if (!\is_string($token)) {
+            return ['ok' => false, 'status' => 401, 'data' => ['error' => 'Non authentifié.']];
+        }
+
+        $fields = array_filter([
+            'title' => $meta['title'] ?? '',
+            'doi' => $meta['doi'] ?? '',
+            'year' => $meta['year'] ?? '',
+            'venue' => $meta['venue'] ?? '',
+            'abstract' => $meta['abstract'] ?? '',
+        ], static fn (string $v): bool => '' !== $v);
+
+        $form = new FormDataPart($fields + [
+            'pdf' => DataPart::fromPath($pdf->getPathname(), $pdf->getClientOriginalName() ?: 'source.pdf', 'application/pdf'),
+        ]);
+
+        try {
+            $response = $this->httpClient->request('POST', $this->baseUrl.'/api/admin/publications/upload-pdf', [
+                'headers' => array_merge(['Authorization' => 'Bearer '.$token], $form->getPreparedHeaders()->toArray()),
+                'body' => $form->bodyToIterable(),
+                'timeout' => 240,
+            ]);
+            $status = $response->getStatusCode();
+            $data = $response->toArray(false);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'status' => 0, 'data' => ['error' => $e->getMessage()]];
+        }
+
+        return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'data' => $data];
     }
 
     /**

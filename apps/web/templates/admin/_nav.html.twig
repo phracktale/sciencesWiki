@@ -1,10 +1,11 @@
 {# Menu principal du back-office : regroupé en menus déroulants. #}
 {% set r = app.request.attributes.get('_route') %}
 {% set groups = [
-    { label: 'Corpus', match: ['admin_articles', 'admin_article', 'admin_authors', 'admin_harvest'], items: [
+    { label: 'Corpus', match: ['admin_articles', 'admin_article', 'admin_authors', 'admin_harvest', 'admin_pdf_upload'], items: [
         { label: 'Moisson (suivi)', route: 'admin_harvest' },
         { label: 'Articles', route: 'admin_articles' },
         { label: 'Auteurs', route: 'admin_authors' },
+        { label: 'Importer un PDF', route: 'admin_pdf_upload' },
     ] },
     { label: 'Wiki', match: ['admin_wiki', 'admin_wiki_detail', 'admin_questions', 'admin_duplications'], items: [
         { label: 'Articles wiki', route: 'admin_wiki' },

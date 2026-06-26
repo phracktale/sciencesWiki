@@ -211,6 +211,49 @@ final class AdminController extends AbstractController
         return $this->redirectToRoute('admin_duplications');
     }
 
+    #[Route('/admin/upload-pdf', name: 'admin_pdf_upload', methods: ['GET'])]
+    public function uploadPdfForm(): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/upload_pdf.html.twig');
+    }
+
+    #[Route('/admin/upload-pdf', name: 'admin_pdf_upload_submit', methods: ['POST'])]
+    public function uploadPdfSubmit(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_pdf_upload');
+        }
+        $file = $request->files->get('pdf');
+        if (!$file instanceof \Symfony\Component\HttpFoundation\File\UploadedFile) {
+            $this->addFlash('error', 'Aucun PDF fourni.');
+
+            return $this->redirectToRoute('admin_pdf_upload');
+        }
+        $res = $this->admin->uploadPdf($file, [
+            'title' => trim((string) $request->request->get('title')),
+            'doi' => trim((string) $request->request->get('doi')),
+            'year' => trim((string) $request->request->get('year')),
+            'venue' => trim((string) $request->request->get('venue')),
+            'abstract' => trim((string) $request->request->get('abstract')),
+        ]);
+        if ($res['ok']) {
+            $this->addFlash('success', ($res['data']['message'] ?? 'PDF importé.').' ('.($res['data']['chunks'] ?? 0).' fragments)');
+        } else {
+            $this->addFlash('error', 'Échec : '.($res['data']['error'] ?? 'erreur'));
+        }
+
+        return $this->redirectToRoute('admin_pdf_upload');
+    }
+
     #[Route('/admin/articles', name: 'admin_articles', methods: ['GET'])]
     public function articles(Request $request): Response
     {

@@ -1,0 +1,29 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Importer un PDF{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>📄 Importer une source PDF</h1>
+    <p class="muted" style="font-size:.85rem; max-width:75ch">
+        Le texte est extrait par <strong>GROBID</strong>, découpé et indexé (RAG, locator, antiplagiat).
+        Il faut un <strong>PDF avec couche texte</strong> (un scan image ne donnera rien). La publication
+        est créée (ou retrouvée par DOI) ; l'embedding et le placement suivent via les drains.
+    </p>
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+
+    <form method="post" action="{{ path('admin_pdf_upload_submit') }}" enctype="multipart/form-data" style="max-width:620px; display:grid; gap:.8rem; margin-top:1rem">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+        <label>Fichier PDF *<br><input type="file" name="pdf" accept="application/pdf,.pdf" required style="margin-top:.25rem"></label>
+        <label>Titre *<br><input type="text" name="title" required style="width:100%; margin-top:.25rem"></label>
+        <div style="display:grid; grid-template-columns:2fr 1fr; gap:.8rem">
+            <label>DOI<br><input type="text" name="doi" placeholder="10.xxxx/…" style="width:100%; margin-top:.25rem"></label>
+            <label>Année<br><input type="text" name="year" inputmode="numeric" placeholder="2024" style="width:100%; margin-top:.25rem"></label>
+        </div>
+        <label>Revue / source<br><input type="text" name="venue" style="width:100%; margin-top:.25rem"></label>
+        <label>Résumé (optionnel)<br><textarea name="abstract" rows="3" style="width:100%; margin-top:.25rem"></textarea></label>
+        <div>
+            <button type="submit" style="cursor:pointer; border:1px solid var(--accent); background:var(--accent); color:#fff; border-radius:8px; padding:.6rem 1.2rem; font:inherit; font-weight:600">Importer + extraire</button>
+            <span class="muted" style="font-size:.8rem; margin-left:.5rem">L'extraction GROBID peut prendre plusieurs secondes.</span>
+        </div>
+    </form>
+{% endblock %}
