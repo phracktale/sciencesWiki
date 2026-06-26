@@ -36,6 +36,9 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'app:openalex:ingest-snapshot', description: 'Ingère le sous-ensemble pertinent du snapshot OpenAlex local (rapide, hors API).')]
 final class OpenAlexSnapshotIngestCommand extends Command
 {
+    /** Clé setting (JSON) où la progression est publiée pour le back-office. */
+    public const PROGRESS_KEY = 'openalex.snapshot_progress';
+
     public function __construct(
         private readonly SourceRepository $sources,
         private readonly PublicationImporter $importer,
@@ -124,6 +127,26 @@ final class OpenAlexSnapshotIngestCommand extends Command
         $pending = 0;
         $stop = false;
 
+        // Suivi temps réel pour le back-office (clé setting JSON, survit aux redémarrages).
+        $startedAt = new \DateTimeImmutable();
+        $totalToDo = $skipFiles + \count($files);
+        $writeProgress = function (int $doneFiles, string $partition, bool $finished) use ($startedAt, $totalFiles, $totalToDo, $skipFiles, &$scanned, &$selected, &$created): void {
+            $this->writeProgress([
+                'started_at' => $startedAt->format(\DateTimeInterface::ATOM),
+                'updated_at' => (new \DateTimeImmutable())->format(\DateTimeInterface::ATOM),
+                'total_files' => $totalFiles,
+                'skip_files' => $skipFiles,
+                'target_last_file' => $totalToDo,
+                'done_files' => $doneFiles,
+                'scanned' => $scanned,
+                'selected' => $selected,
+                'created' => $created,
+                'partition' => $partition,
+                'finished' => $finished,
+            ]);
+        };
+        $writeProgress($skipFiles, '', false);
+
         foreach ($files as $i => $file) {
             $fp = gzopen($file, 'rb');
             if (false === $fp) {
@@ -160,8 +183,10 @@ final class OpenAlexSnapshotIngestCommand extends Command
                 }
             }
             gzclose($fp);
+            $partition = basename(\dirname($file));
             $io->writeln(\sprintf('  [%d/%d] %s — scannées=%d · retenues=%d (dont %d nouvelles)',
-                $skipFiles + $i + 1, $totalFiles, basename(\dirname($file)).'/'.basename($file), $scanned, $selected, $created));
+                $skipFiles + $i + 1, $totalFiles, $partition.'/'.basename($file), $scanned, $selected, $created));
+            $writeProgress($skipFiles + $i + 1, $partition, false);
             if ($stop) {
                 break;
             }
@@ -170,9 +195,29 @@ final class OpenAlexSnapshotIngestCommand extends Command
             $this->em->flush();
         }
 
+        $writeProgress($totalToDo, 'terminé', true);
         $io->success(\sprintf('Terminé : %d œuvres scannées, %d retenues, %d nouvelles publications. Embedding + placement assurés par les crons habituels.', $scanned, $selected, $created));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Persiste la progression dans la clé setting « openalex.snapshot_progress »
+     * (JSON). Best-effort : ne doit jamais interrompre l'ingestion.
+     *
+     * @param array<string,mixed> $data
+     */
+    private function writeProgress(array $data): void
+    {
+        try {
+            $this->conn->executeStatement(
+                'INSERT INTO setting (name, value) VALUES (:n, :v)
+                 ON CONFLICT (name) DO UPDATE SET value = EXCLUDED.value',
+                ['n' => self::PROGRESS_KEY, 'v' => json_encode($data, \JSON_UNESCAPED_UNICODE | \JSON_UNESCAPED_SLASHES)],
+            );
+        } catch (\Throwable) {
+            // Pas de suivi ≠ échec d'ingestion.
+        }
     }
 
     /**

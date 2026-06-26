@@ -6,6 +6,30 @@
     <h1>Suivi de la moisson <span id="live" class="pill" style="font-size:.7rem; vertical-align:middle">● en direct</span></h1>
     <p class="muted">État de chaque moisson lancée depuis le back-office : en attente, en cours, terminée ou en erreur. Volume, durée et modèle d'embeddings indiqués. Les dépassements des limites OpenAlex sont signalés en rouge.</p>
 
+    <style>
+        .tabs { display:flex; gap:.3rem; border-bottom:2px solid var(--line); margin:1rem 0 1.2rem; flex-wrap:wrap }
+        .tabs .tab-btn { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px;
+            padding:.6rem 1rem; font:inherit; font-weight:600; color:#6b7280; cursor:pointer; text-decoration:none; border-radius:8px 8px 0 0 }
+        .tabs .tab-btn[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent) }
+        .tabpane[hidden] { display:none }
+        .snap-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.8rem; margin:1rem 0 }
+        .snap-stat { border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fafcff }
+        .snap-stat .k { color:#64748b; font-size:.8rem }
+        .snap-stat .v { font-size:1.5rem; font-weight:700; line-height:1.2 }
+        .snap-art { border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; margin:.6rem 0; background:#fff }
+        .snap-art h4 { margin:.1rem 0 .3rem; font-size:.98rem }
+        .snap-art .meta { font-size:.8rem; color:#475569; display:flex; gap:.5rem; flex-wrap:wrap; align-items:center }
+        .snap-art .ab { font-size:.86rem; color:#334155; margin:.4rem 0 0 }
+        .snap-chip { display:inline-block; font-size:.72rem; font-weight:700; padding:.1rem .5rem; border-radius:999px; background:#eef2ff; color:#3730a3 }
+    </style>
+
+    <div class="tabs" role="tablist">
+        <button role="tab" type="button" class="tab-btn" aria-selected="true" data-pane="pane-harvest">🛰️ Moisson API</button>
+        <button role="tab" type="button" class="tab-btn" aria-selected="false" data-pane="pane-snapshot">📦 Snapshot OpenAlex</button>
+        <a class="tab-btn" href="{{ path('admin_graph3d') }}" target="_blank" rel="noopener" style="margin-left:auto; color:var(--accent)">🌐 Visualiseur 3D ↗</a>
+    </div>
+
+    <section class="tabpane" id="pane-harvest">
     <div class="grid">
         <div class="card">
             <span class="muted">File d'attente (workers)</span><br>
@@ -50,6 +74,34 @@
         <tbody id="jobs"><tr><td colspan="6" class="muted" style="padding:.7rem .4rem">Chargement…</td></tr></tbody>
     </table>
     <p class="muted" style="font-size:.82rem; margin-top:.6rem">Modèle d'embeddings utilisé : <strong id="emb-model">{{ status.embeddingModel ?? '—' }}</strong>.</p>
+    </section>
+
+    <section class="tabpane" id="pane-snapshot" hidden>
+        <h2 style="margin-top:.4rem">Ingestion du snapshot OpenAlex <span id="snap-state" class="pill" style="font-size:.7rem">…</span></h2>
+        <p class="muted">Chargement en masse du sous-ensemble pertinent du snapshot local (hors API). Embedding &amp; placement assurés en continu par le drain. La barre suit les fichiers (partitions <code>updated_date</code>) ; le compte à rebours est ré-estimé en direct.</p>
+
+        <div id="snap-empty" class="muted" hidden style="padding:1rem">Aucune ingestion de snapshot enregistrée. Lancez <code>app:openalex:ingest-snapshot</code>.</div>
+
+        <div id="snap-body" hidden>
+            <div style="margin:.6rem 0 .2rem; display:flex; justify-content:space-between; font-size:.85rem; color:#475569">
+                <span><strong id="snap-pct">0%</strong> · fichier <span id="snap-files">0 / 0</span> <span id="snap-part" class="muted"></span></span>
+                <span id="snap-stale" class="badge warn" hidden>⚠️ aucune mise à jour depuis &gt;30 min — run peut-être arrêté</span>
+            </div>
+            <div style="height:14px; background:var(--line); border-radius:7px; overflow:hidden">
+                <div id="snap-bar" style="height:100%; width:0%; background:var(--accent); transition:width .5s"></div>
+            </div>
+
+            <div class="snap-cards">
+                <div class="snap-stat"><div class="k">Articles intégrés</div><div class="v" id="snap-selected">—</div><div class="k" id="snap-projected"></div></div>
+                <div class="snap-stat"><div class="k">Œuvres scannées</div><div class="v" id="snap-scanned">—</div><div class="k" id="snap-retention"></div></div>
+                <div class="snap-stat"><div class="k">Temps écoulé (ce run)</div><div class="v" id="snap-elapsed">—</div><div class="k" id="snap-rate"></div></div>
+                <div class="snap-stat"><div class="k">Durée restante estimée</div><div class="v" id="snap-eta">—</div><div class="k" id="snap-finish"></div></div>
+            </div>
+
+            <h3>Derniers articles intégrés <span class="muted" style="font-size:.8rem">(aperçu live)</span></h3>
+            <div id="snap-arts"><p class="muted">Chargement…</p></div>
+        </div>
+    </section>
 
     <script type="application/json" id="bootstrap">{{ status|json_encode|raw }}</script>
     <script nonce="{{ csp_nonce.value }}">
@@ -235,6 +287,109 @@
         try { render(JSON.parse(document.getElementById('bootstrap').textContent)); } catch (e) {}
         var timer = setInterval(poll, 4000);
         document.addEventListener('turbo:before-cache', function () { clearInterval(timer); }, { once: true });
+    })();
+    </script>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        // --- Onglets ---
+        var tabs = Array.prototype.slice.call(document.querySelectorAll('.tabs .tab-btn[data-pane]'));
+        function show(pane) {
+            tabs.forEach(function (t) {
+                var on = t.dataset.pane === pane;
+                t.setAttribute('aria-selected', on ? 'true' : 'false');
+                var p = document.getElementById(t.dataset.pane);
+                if (p) p.hidden = !on;
+            });
+            if (pane === 'pane-snapshot') { snapPoll(); startSnap(); } else { stopSnap(); }
+        }
+        tabs.forEach(function (t) {
+            t.addEventListener('click', function () { show(t.dataset.pane); history.replaceState(null, '', '#' + t.dataset.pane); });
+        });
+
+        // --- Helpers ---
+        function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+        function fmtDur(sec) {
+            if (sec == null) return '—';
+            sec = Math.max(0, Math.round(sec));
+            var d = Math.floor(sec / 86400), h = Math.floor((sec % 86400) / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+            if (d > 0) return d + ' j ' + h + ' h';
+            if (h > 0) return h + ' h ' + (m < 10 ? '0' : '') + m + ' min';
+            if (m > 0) return m + ' min ' + (s < 10 ? '0' : '') + s + ' s';
+            return s + ' s';
+        }
+        var OA = { gold:'#d4af37', green:'#16a34a', diamond:'#06b6d4', hybrid:'#f59e0b', bronze:'#b45309', closed:'#6b7280', unknown:'#94a3b8' };
+        function oaChip(st) { var c = OA[st] || '#94a3b8'; return '<span class="snap-chip" style="background:' + c + '22; color:' + c + '">' + esc(st || 'inconnu') + '</span>'; }
+
+        // --- État live (recalcul du chrono/compte à rebours entre deux polls) ---
+        var live = null, recvAt = 0, snapTimer = null, tick = null;
+
+        function paintTick() {
+            if (!live) return;
+            var dt = (Date.now() - recvAt) / 1000;
+            document.getElementById('snap-elapsed').textContent = fmtDur((live.elapsed_run_sec || 0) + (live.finished ? 0 : dt));
+            if (live.finished) { document.getElementById('snap-eta').textContent = 'terminé ✅'; return; }
+            if (live.eta_sec == null) { document.getElementById('snap-eta').textContent = '—'; return; }
+            document.getElementById('snap-eta').textContent = fmtDur(Math.max(0, live.eta_sec - dt));
+        }
+
+        function renderSnap(data) {
+            var empty = document.getElementById('snap-empty'), body = document.getElementById('snap-body'), st = document.getElementById('snap-state');
+            if (!data || !data.progress || !data.derived) {
+                empty.hidden = false; body.hidden = true; st.textContent = 'inactif'; st.style.background = '#f1f5f9';
+                return;
+            }
+            empty.hidden = true; body.hidden = false;
+            var d = data.derived;
+            st.textContent = d.finished ? 'terminé' : (d.stale ? 'arrêté ?' : 'en cours');
+            st.style.background = d.finished ? '#dcfce7' : (d.stale ? '#fee2e2' : '#dbeafe');
+
+            document.getElementById('snap-pct').textContent = d.percent + '%';
+            document.getElementById('snap-files').textContent = (d.done_files || 0).toLocaleString('fr-FR') + ' / ' + (d.total_files || 0).toLocaleString('fr-FR');
+            document.getElementById('snap-part').textContent = data.progress.partition ? '· ' + esc(data.progress.partition) : '';
+            var bar = document.getElementById('snap-bar');
+            bar.style.width = Math.min(100, d.percent) + '%';
+            bar.style.background = d.finished ? '#16a34a' : (d.stale ? '#dc2626' : 'var(--accent)');
+            document.getElementById('snap-stale').hidden = !d.stale;
+
+            document.getElementById('snap-selected').textContent = (d.selected || 0).toLocaleString('fr-FR');
+            document.getElementById('snap-projected').textContent = d.projected_selected ? '≈ ' + d.projected_selected.toLocaleString('fr-FR') + ' au total (projeté)' : '';
+            document.getElementById('snap-scanned').textContent = (d.scanned || 0).toLocaleString('fr-FR');
+            document.getElementById('snap-retention').textContent = 'rétention ' + (d.retention_pct || 0) + '%';
+            document.getElementById('snap-rate').textContent = (d.files_per_min || 0) + ' fichiers/min';
+            document.getElementById('snap-finish').textContent = d.eta_finish_at && !d.finished ? 'fin ≈ ' + new Date(d.eta_finish_at).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+
+            live = d; recvAt = Date.now(); paintTick();
+
+            var arts = document.getElementById('snap-arts');
+            var rows = data.samples || [];
+            arts.innerHTML = rows.length ? rows.map(function (a) {
+                var title = a.url ? '<a href="' + esc(a.url) + '" target="_blank" rel="noopener">' + esc(a.title) + '</a>' : esc(a.title);
+                var meta = [];
+                if (a.domain) meta.push('<span class="snap-chip">' + esc(a.domain) + '</span>');
+                meta.push(oaChip(a.oa_status));
+                if (a.type) meta.push(esc(a.type));
+                if (a.pub_date) meta.push('📅 ' + esc(a.pub_date));
+                if (a.cited_by_count) meta.push('📈 ' + a.cited_by_count + ' cit.');
+                if (a.language) meta.push('🗣 ' + esc(a.language));
+                var authors = a.authors ? '<div class="meta"><em>' + esc(a.authors) + '</em></div>' : '';
+                var ab = a.has_abstract ? '<p class="ab">' + esc(a.abstract) + (a.abstract && a.abstract.length >= 320 ? '…' : '') + '</p>' : '<p class="ab muted"><em>(pas de résumé)</em></p>';
+                return '<div class="snap-art"><h4>' + title + '</h4><div class="meta">' + meta.join(' ') + '</div>' + authors + ab + '</div>';
+            }).join('') : '<p class="muted">Aucune publication récente.</p>';
+        }
+
+        function snapPoll() {
+            fetch('/admin/harvest/snapshot-status.json', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) { if (d) renderSnap(d); })
+                .catch(function () {});
+        }
+        function startSnap() { if (!snapTimer) snapTimer = setInterval(snapPoll, 5000); if (!tick) tick = setInterval(paintTick, 1000); }
+        function stopSnap() { if (snapTimer) { clearInterval(snapTimer); snapTimer = null; } if (tick) { clearInterval(tick); tick = null; } }
+        document.addEventListener('turbo:before-cache', stopSnap, { once: true });
+
+        // Ouverture directe sur l'onglet via #pane-snapshot.
+        if (location.hash === '#pane-snapshot') { show('pane-snapshot'); }
     })();
     </script>
 {% endblock %}

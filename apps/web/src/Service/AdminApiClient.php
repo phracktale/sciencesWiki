@@ -370,6 +370,23 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : ['jobs' => [], 'queued' => 0, 'running' => [], 'openalex' => ['used' => 0, 'cap' => 100000, 'exhausted' => false]];
     }
 
+    /** @return array<string,mixed> suivi de l'ingestion du snapshot OpenAlex + échantillon */
+    public function snapshotStatus(): array
+    {
+        $res = $this->send('GET', '/api/admin/harvest/snapshot-status', null);
+
+        return $res['ok'] ? $res['data'] : ['active' => false, 'progress' => null, 'derived' => null, 'samples' => []];
+    }
+
+    /** @return array<string,mixed> graphe 3D (nœuds + liens de similarité) pour le visualiseur */
+    public function graph3d(string $domain, int $limit): array
+    {
+        $qs = http_build_query(array_filter(['domain' => $domain, 'limit' => $limit]));
+        $res = $this->send('GET', '/api/admin/graph3d?'.$qs, null);
+
+        return $res['ok'] ? $res['data'] : ['nodes' => [], 'links' => [], 'domains' => [], 'meta' => ['count' => 0, 'error' => $res['data']['error'] ?? 'indisponible']];
+    }
+
     /**
      * @param array<string,mixed>|null $body
      *

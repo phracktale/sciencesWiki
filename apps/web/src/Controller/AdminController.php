@@ -645,6 +645,41 @@ final class AdminController extends AbstractController
         return new JsonResponse($this->admin->harvestStatus());
     }
 
+    /** Polling AJAX du suivi de l'ingestion du snapshot OpenAlex (onglet dédié). */
+    #[Route('/admin/harvest/snapshot-status.json', name: 'admin_snapshot_status', methods: ['GET'])]
+    public function snapshotStatus(): JsonResponse
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+
+        return new JsonResponse($this->admin->snapshotStatus());
+    }
+
+    /** Visualiseur 3D des publications (three.js / 3d-force-graph). */
+    #[Route('/admin/graph3d', name: 'admin_graph3d', methods: ['GET'])]
+    public function graph3d(): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/graph3d.html.twig');
+    }
+
+    /** Données du graphe 3D (fetch JSON depuis la page du visualiseur). */
+    #[Route('/admin/graph3d.json', name: 'admin_graph3d_data', methods: ['GET'])]
+    public function graph3dData(Request $request): JsonResponse
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+        $domain = trim((string) $request->query->get('domain', ''));
+        $limit = (int) $request->query->get('limit', '200');
+
+        return new JsonResponse($this->admin->graph3d($domain, $limit));
+    }
+
     /** Relance/annule une moisson depuis le suivi (fetch JSON ; CSRF dans le corps). */
     #[Route('/admin/harvest/{op}', name: 'admin_harvest_op', methods: ['POST'], requirements: ['op' => 'relaunch|cancel|delete'])]
     public function harvestOp(string $op, Request $request): JsonResponse

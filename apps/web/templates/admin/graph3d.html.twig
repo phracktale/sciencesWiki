@@ -1,0 +1,177 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Visualiseur 3D des publications{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+
+    <h1 style="margin-bottom:.2rem">Visualiseur 3D des publications 🌐</h1>
+    <p class="muted" style="margin-top:0">Carte sémantique du corpus : chaque <strong>sphère</strong> = une publication (taille ∝ citations, couleur = domaine). Les <strong>liens</strong> = proximité sémantique (embeddings) — <span style="color:#fff;background:#222;padding:0 .3rem;border-radius:3px">fort</span> = très similaire, <span style="color:#7c93ff">faible</span> = modéré. Citations en arête : à venir (non encore ingérées).</p>
+
+    <style>
+        .g3-toolbar { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin:.6rem 0 }
+        .g3-toolbar select, .g3-toolbar input { font:inherit; padding:.35rem .5rem; border:1px solid var(--line); border-radius:8px }
+        .g3-toolbar button { font:inherit; padding:.35rem .8rem; border:1px solid var(--accent); background:var(--accent); color:#fff; border-radius:8px; cursor:pointer }
+        .g3-wrap { position:relative; width:100%; height:78vh; min-height:520px; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#05060a }
+        #g3-graph { width:100%; height:100% }
+        .g3-legend { position:absolute; left:12px; top:12px; background:rgba(8,10,18,.82); color:#dde; border:1px solid #2a2f45; border-radius:10px; padding:.6rem .7rem; font-size:.78rem; max-width:230px; max-height:60%; overflow:auto }
+        .g3-legend h4 { margin:.1rem 0 .4rem; font-size:.82rem; color:#fff }
+        .g3-legend .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:.35rem; vertical-align:middle }
+        .g3-help { position:absolute; right:12px; bottom:12px; background:rgba(8,10,18,.82); color:#aab; border:1px solid #2a2f45; border-radius:10px; padding:.5rem .65rem; font-size:.74rem; max-width:260px }
+        .g3-count { position:absolute; left:12px; bottom:12px; background:rgba(8,10,18,.82); color:#cde; border:1px solid #2a2f45; border-radius:10px; padding:.4rem .6rem; font-size:.76rem }
+        .g3-panel { position:absolute; right:12px; top:12px; width:320px; max-width:42%; max-height:82%; overflow:auto; background:rgba(12,14,24,.95); color:#e7e9f5; border:1px solid #313655; border-radius:12px; padding:1rem; box-shadow:0 8px 30px rgba(0,0,0,.5) }
+        .g3-panel[hidden] { display:none }
+        .g3-panel h3 { margin:.1rem 0 .5rem; font-size:1.02rem; color:#fff; line-height:1.3 }
+        .g3-panel .row { font-size:.85rem; margin:.3rem 0; color:#c7cbe6 }
+        .g3-panel .row b { color:#9fb0ff }
+        .g3-panel a.studylink { display:inline-block; margin-top:.6rem; background:var(--accent); color:#fff; text-decoration:none; padding:.4rem .8rem; border-radius:8px; font-size:.85rem }
+        .g3-panel .close { position:absolute; right:.5rem; top:.4rem; background:none; border:none; color:#aab; font-size:1.2rem; cursor:pointer }
+        .g3-chip { display:inline-block; font-size:.72rem; font-weight:700; padding:.1rem .5rem; border-radius:999px; background:#21264a; color:#aeb6ff }
+        #g3-error { color:#fca5a5; padding:1rem }
+    </style>
+
+    <div class="g3-toolbar">
+        <label>Domaine :
+            <select id="g3-domain"><option value="">Tous</option></select>
+        </label>
+        <label>Nœuds :
+            <select id="g3-limit">
+                <option value="120">120</option>
+                <option value="200" selected>200</option>
+                <option value="300">300</option>
+                <option value="400">400</option>
+            </select>
+        </label>
+        <input id="g3-search" type="search" placeholder="🔍 Rechercher un titre…" style="min-width:220px">
+        <button id="g3-reload" type="button">↻ Recharger</button>
+        <span id="g3-status" class="muted" style="font-size:.85rem"></span>
+    </div>
+
+    <div class="g3-wrap">
+        <div id="g3-graph"></div>
+        <div id="g3-error" hidden></div>
+        <div class="g3-legend" id="g3-legend"><h4>Légende</h4><div id="g3-legend-domains" class="muted">…</div>
+            <h4 style="margin-top:.5rem">Liens</h4>
+            <div><span class="dot" style="background:#ffffff"></span>fort (similarité ≥ 0.80)</div>
+            <div><span class="dot" style="background:#7c93ff"></span>faible (≥ 0.62)</div>
+        </div>
+        <div class="g3-count" id="g3-count">—</div>
+        <div class="g3-help">Souris : glisser = rotation · molette = zoom · <b>clic droit</b> ou <b>Espace+clic gauche</b> = translation · clic sur une sphère = détails.</div>
+        <div class="g3-panel" id="g3-panel" hidden>
+            <button class="close" id="g3-close" aria-label="Fermer">×</button>
+            <div id="g3-panel-content"></div>
+        </div>
+    </div>
+
+    <script src="{{ asset('/js/3d-force-graph.min.js') }}" nonce="{{ csp_nonce.value }}"></script>
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var el = document.getElementById('g3-graph');
+        var errBox = document.getElementById('g3-error');
+        if (typeof ForceGraph3D === 'undefined') {
+            errBox.hidden = false; errBox.textContent = 'Librairie 3D non chargée (3d-force-graph.min.js).'; return;
+        }
+        function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]; }); }
+
+        var PALETTE = ['#e6194b','#3cb44b','#4363d8','#f58231','#911eb4','#42d4f4','#f032e6','#bfef45','#fabed4','#469990','#dcbeff','#9a6324','#e6beff','#fffac8','#aaffc3','#ffd8b1','#a9a9a9','#ffe119','#808000','#000075'];
+        var domainColor = {};
+        function colorFor(dom) {
+            if (!dom) return '#8a8f9e';
+            if (!(dom in domainColor)) domainColor[dom] = PALETTE[Object.keys(domainColor).length % PALETTE.length];
+            return domainColor[dom];
+        }
+        function sizeFor(c) { return Math.max(1.2, Math.log10((c || 0) + 1) * 4); }
+
+        var Graph = ForceGraph3D()(el)
+            .backgroundColor('#05060a')
+            .nodeId('id')
+            .nodeLabel(function (n) { return '<div style="background:#111;color:#fff;padding:.2rem .4rem;border-radius:4px;font-size:.8rem">' + esc(n.title) + '</div>'; })
+            .nodeVal(function (n) { return sizeFor(n.citations); })
+            .nodeColor(function (n) { return colorFor(n.domain); })
+            .nodeOpacity(0.92)
+            .linkColor(function (l) { return l.kind === 'strong' ? '#ffffff' : '#5566aa'; })
+            .linkWidth(function (l) { return l.kind === 'strong' ? 1.4 : 0.4; })
+            .linkOpacity(0.45)
+            .linkDirectionalParticles(function (l) { return l.kind === 'strong' ? 2 : 0; })
+            .linkDirectionalParticleWidth(1.2)
+            .linkDirectionalParticleSpeed(0.006)
+            .onNodeClick(function (n) { focusNode(n); showPanel(n); })
+            .onBackgroundClick(function () { document.getElementById('g3-panel').hidden = true; });
+
+        // Espace + clic gauche = translation (sinon clic droit). OrbitControls: LEFT=0 (rotation), 2 (pan).
+        try {
+            Graph.controlType('orbit');
+            var controls = Graph.controls();
+            document.addEventListener('keydown', function (e) { if (e.code === 'Space' && controls.mouseButtons) { controls.mouseButtons.LEFT = 2; e.preventDefault(); } });
+            document.addEventListener('keyup', function (e) { if (e.code === 'Space' && controls.mouseButtons) { controls.mouseButtons.LEFT = 0; } });
+        } catch (e) {}
+
+        function focusNode(n) {
+            var d = 90; var r = Math.hypot(n.x, n.y, n.z) || 1;
+            var k = 1 + d / r;
+            Graph.cameraPosition({ x: n.x * k, y: n.y * k, z: n.z * k }, n, 900);
+        }
+
+        function showPanel(n) {
+            var p = document.getElementById('g3-panel'), c = document.getElementById('g3-panel-content');
+            var rows = '';
+            if (n.domain) rows += '<div class="row"><b>Domaine :</b> <span class="g3-chip">' + esc(n.domain) + '</span></div>';
+            if (n.authors) rows += '<div class="row"><b>Auteurs :</b> ' + esc(n.authors) + '</div>';
+            if (n.year) rows += '<div class="row"><b>Année :</b> ' + n.year + '</div>';
+            rows += '<div class="row"><b>État :</b> ' + esc(n.oaStatus || 'inconnu') + (n.type ? ' · ' + esc(n.type) : '') + '</div>';
+            rows += '<div class="row"><b>Citations :</b> ' + (n.citations || 0).toLocaleString('fr-FR') + '</div>';
+            var link = n.url ? '<a class="studylink" href="' + esc(n.url) + '" target="_blank" rel="noopener">Ouvrir l\'étude ↗</a>' : '<span class="muted">pas de lien</span>';
+            c.innerHTML = '<h3>' + esc(n.title) + '</h3>' + rows + link;
+            p.hidden = false;
+        }
+        document.getElementById('g3-close').addEventListener('click', function () { document.getElementById('g3-panel').hidden = true; });
+
+        function legend(domains) {
+            var box = document.getElementById('g3-legend-domains');
+            if (!domains || !domains.length) { box.innerHTML = '<span class="muted">aucun domaine</span>'; return; }
+            box.innerHTML = domains.map(function (d) { return '<div><span class="dot" style="background:' + colorFor(d) + '"></span>' + esc(d) + '</div>'; }).join('') +
+                '<div style="margin-top:.2rem"><span class="dot" style="background:#8a8f9e"></span>non classé</div>';
+        }
+
+        var statusEl = document.getElementById('g3-status'), countEl = document.getElementById('g3-count');
+        function load() {
+            var domain = document.getElementById('g3-domain').value;
+            var limit = document.getElementById('g3-limit').value;
+            statusEl.textContent = 'Chargement…'; errBox.hidden = true;
+            fetch('/admin/graph3d.json?domain=' + encodeURIComponent(domain) + '&limit=' + encodeURIComponent(limit), { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.json(); })
+                .then(function (data) {
+                    if (data.meta && data.meta.error) { errBox.hidden = false; errBox.textContent = 'Erreur : ' + data.meta.error; }
+                    // Remplit le sélecteur de domaines (une seule fois).
+                    var sel = document.getElementById('g3-domain');
+                    if (sel.options.length <= 1 && data.domains) {
+                        data.domains.forEach(function (d) { var o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); });
+                    }
+                    // Couleurs domaines présents dans le jeu.
+                    var present = {};
+                    (data.nodes || []).forEach(function (n) { if (n.domain) present[n.domain] = true; });
+                    legend(Object.keys(present).sort());
+                    Graph.graphData({ nodes: data.nodes || [], links: data.links || [] });
+                    countEl.textContent = (data.meta ? data.meta.count : (data.nodes || []).length) + ' nœuds · ' + ((data.links || []).length) + ' liens';
+                    statusEl.textContent = '';
+                })
+                .catch(function (err) { statusEl.textContent = ''; errBox.hidden = false; errBox.textContent = 'Échec du chargement : ' + err; });
+        }
+
+        // Recherche : focalise le 1er nœud dont le titre matche.
+        document.getElementById('g3-search').addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter') return;
+            var q = this.value.trim().toLowerCase();
+            if (!q) return;
+            var data = Graph.graphData();
+            var hit = (data.nodes || []).filter(function (n) { return (n.title || '').toLowerCase().indexOf(q) >= 0; })[0];
+            if (hit) { focusNode(hit); showPanel(hit); } else { statusEl.textContent = 'Aucun résultat'; setTimeout(function () { statusEl.textContent = ''; }, 1500); }
+        });
+
+        document.getElementById('g3-reload').addEventListener('click', load);
+        document.getElementById('g3-domain').addEventListener('change', load);
+        document.getElementById('g3-limit').addEventListener('change', load);
+        window.addEventListener('resize', function () { Graph.width(el.clientWidth).height(el.clientHeight); });
+        Graph.width(el.clientWidth).height(el.clientHeight);
+        load();
+    })();
+    </script>
+{% endblock %}
