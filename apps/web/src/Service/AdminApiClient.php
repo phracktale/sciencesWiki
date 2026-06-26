@@ -135,6 +135,12 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/duplications/'.$id.'/review', ['status' => $status]);
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} lance la (re)génération d'article (async) */
+    public function regenerateNodeArticle(int $id): array
+    {
+        return $this->send('POST', '/api/admin/nodes/'.$id.'/regenerate-article', []);
+    }
+
     /**
      * Import direct d'une source PDF (multipart) → GROBID → corpus.
      *

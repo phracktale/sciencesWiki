@@ -45,6 +45,9 @@ framework:
             # Analyse « controverses & pistes » d'un nœud (cf. spec controverses §7bis).
             # File DÉDIÉE (pas harvester) pour ne pas être affamée par la moisson.
             App\Analysis\Message\AnalyzeNodeMessage: analysis
+            # (Re)génération d'article wiki à la demande (bouton admin du wiki public) :
+            # tâche LLM longue au niveau nœud → même file isolée que l'analyse.
+            App\Harvester\Message\GenerateNodeArticle: analysis
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism

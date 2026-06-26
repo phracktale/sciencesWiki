@@ -100,6 +100,14 @@
             {% endset %}
             <div class="art-edit-bar">{{ editBtn }}</div>
 
+            {% if admin_session.logged and node.id %}
+                <form method="post" action="{{ path('admin_node_regenerate_article', { id: node.id }) }}" data-busy="⏳ Lancement…" style="margin:.4rem 0 0">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <input type="hidden" name="back" value="{{ app.request.requestUri }}">
+                    <button type="submit" class="art-edit-btn" style="border-color:var(--accent); color:var(--accent)">🤖 {{ node.articleMd ? '(Re)générer' : 'Générer' }} l'article par l'IA</button>
+                </form>
+            {% endif %}
+
             {% if node.articleMd %}
                 <article class="md wiki-article">
                     {{ node.articleMd|md }}

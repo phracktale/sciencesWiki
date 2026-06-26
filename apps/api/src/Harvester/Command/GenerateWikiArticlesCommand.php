@@ -85,53 +85,17 @@ final class GenerateWikiArticlesCommand extends Command
             return Command::SUCCESS;
         }
 
-        $embedder = $this->embeddings->create();
         $done = 0;
         foreach ($targets as $node) {
             $io->writeln(\sprintf('• %s (niveau %d)…', $node->getLabel(), $node->getLevel()));
             try {
-                [$sourcePubs, $sourceEmbedding] = $this->sourcePublications($node, $embedder);
-                $sources = $this->formatSources($sourcePubs);
-                $related = $this->relatedNodes($node);
-                // Streaming : la rédaction longue dépasse le timeout idle d'un appel
-                // non-streamé ; le flux remet le compteur à zéro à chaque jeton.
-                $md = '';
-                foreach ($this->llm->stream(
-                    $this->buildMessages($node, $sources, $this->formatRelated($related)),
-                    ['temperature' => 0.3, 'max_tokens' => 12000, 'model' => $model],
-                ) as $delta) {
-                    $md .= $delta;
+                $chars = $this->generateOne($node, $model);
+                if ($chars > 0) {
+                    ++$done;
+                    $io->writeln(\sprintf('  ✓ %d signes', $chars));
+                } else {
+                    $io->warning('  réponse trop courte, ignorée.');
                 }
-                // Retire d'éventuelles traces de raisonnement (modèles « thinking » type Qwen3)
-                // + un éventuel bloc de code englobant ```markdown … ```.
-                $md = preg_replace('#<think>.*?</think>#is', '', $md) ?? $md;
-                $md = trim($md);
-                $md = preg_replace('#^```(?:markdown|md)?\s*\n(.*)\n```$#is', '$1', $md) ?? $md;
-                $md = trim($md);
-                // Liens internes garantis (le modèle local les omet souvent) : on lie
-                // la 1re occurrence de chaque domaine voisin dans le corps de l'article.
-                $md = $this->autolink($md, $related, $node->getSlug());
-                // Anti-hallucination (cran 2) : marque les affirmations non soutenues
-                // par les PASSAGES plein texte des sources, puis promeut les marqueurs
-                // en liens Wikipédia réels. Gardé par le réglage RAG_VERIFY.
-                $md = $this->wikipedia->resolve($this->faithfulness->annotate($md, $sourcePubs, $sourceEmbedding));
-                if (mb_strlen($md) < 800) {
-                    $io->warning(\sprintf('  réponse trop courte (%d car.), ignorée.', mb_strlen($md)));
-                    continue;
-                }
-                $node->setArticleMd($md)
-                    ->setArticleModel($model)
-                    ->setArticleStatus('non_relu')
-                    ->setArticleGeneratedAt(new \DateTimeImmutable());
-                // Révision (historique + diff en back-office) — paternité IA.
-                $this->em->persist(
-                    (new \App\Entity\ArticleRevision($node, $md, 'ia'))
-                        ->setAuthorLabel($model)
-                        ->setChangeSummary('Génération IA')
-                );
-                $this->em->flush();
-                ++$done;
-                $io->writeln(\sprintf('  ✓ %d signes', mb_strlen($md)));
             } catch (\Throwable $e) {
                 $io->warning(\sprintf('  échec : %s', $e->getMessage()));
             }
@@ -140,6 +104,53 @@ final class GenerateWikiArticlesCommand extends Command
         $io->success(\sprintf('%d article(s) rédigé(s).', $done));
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Génère (et persiste) l'article d'UNE rubrique — réutilisable hors CLI (handler
+     * async du bouton admin). Renvoie le nombre de signes écrits, 0 si trop court.
+     * Pipeline complet : sources corpus → rédaction LLM → liens internes → cran 2
+     * (faithfulness + liens Wikipédia) → ArticleRevision.
+     */
+    public function generateOne(TreeNode $node, ?string $model = null): int
+    {
+        $model = ('' !== (string) $model) ? (string) $model : $this->settings->wikiModel();
+        $embedder = $this->embeddings->create();
+
+        [$sourcePubs, $sourceEmbedding] = $this->sourcePublications($node, $embedder);
+        $related = $this->relatedNodes($node);
+
+        // Streaming interne : la rédaction longue dépasse le timeout idle non-streamé.
+        $md = '';
+        foreach ($this->llm->stream(
+            $this->buildMessages($node, $this->formatSources($sourcePubs), $this->formatRelated($related)),
+            ['temperature' => 0.3, 'max_tokens' => 12000, 'model' => $model],
+        ) as $delta) {
+            $md .= $delta;
+        }
+        // Nettoie traces de raisonnement (modèles « thinking ») + bloc de code englobant.
+        $md = trim((string) preg_replace('#<think>.*?</think>#is', '', $md));
+        $md = trim((string) preg_replace('#^```(?:markdown|md)?\s*\n(.*)\n```$#is', '$1', $md));
+        // Liens internes garantis + anti-hallucination (cran 2, gardé par RAG_VERIFY).
+        $md = $this->autolink($md, $related, $node->getSlug());
+        $md = $this->wikipedia->resolve($this->faithfulness->annotate($md, $sourcePubs, $sourceEmbedding));
+
+        if (mb_strlen($md) < 800) {
+            return 0;
+        }
+
+        $node->setArticleMd($md)
+            ->setArticleModel($model)
+            ->setArticleStatus('non_relu')
+            ->setArticleGeneratedAt(new \DateTimeImmutable());
+        $this->em->persist(
+            (new \App\Entity\ArticleRevision($node, $md, 'ia'))
+                ->setAuthorLabel($model)
+                ->setChangeSummary('Génération IA')
+        );
+        $this->em->flush();
+
+        return mb_strlen($md);
     }
 
     /**

@@ -254,6 +254,28 @@ final class AdminController extends AbstractController
         return $this->redirectToRoute('admin_pdf_upload');
     }
 
+    /** Bouton admin du wiki PUBLIC : lance la (re)génération IA de l'article d'une rubrique. */
+    #[Route('/admin/node/{id}/regenerate-article', name: 'admin_node_regenerate_article', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function regenerateNodeArticle(int $id, Request $request): Response
+    {
+        $back = (string) $request->request->get('back', '/');
+        $back = str_starts_with($back, '/') ? $back : '/';
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirect($back);
+        }
+        $res = $this->admin->regenerateNodeArticle($id);
+        $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok']
+            ? ($res['data']['message'] ?? 'Génération lancée.')
+            : 'Échec : '.($res['data']['error'] ?? 'erreur'));
+
+        return $this->redirect($back);
+    }
+
     #[Route('/admin/articles', name: 'admin_articles', methods: ['GET'])]
     public function articles(Request $request): Response
     {
