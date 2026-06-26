@@ -100,7 +100,16 @@
             {% endset %}
             <div class="art-edit-bar">{{ editBtn }}</div>
 
-            {% if admin_session.logged and node.id %}
+            {% if node.articleGeneratingAt %}
+                {# Génération en cours : loader persistant (état serveur), visible par tous,
+                   survit au reload. Le JS poll l'API et rafraîchit dès que l'article est prêt. #}
+                <div class="art-generating" id="art-generating" role="status" aria-live="polite"
+                     data-slug="{{ node.slug }}" data-started="{{ node.articleGeneratingAt }}"
+                     style="margin:.6rem 0; padding:.8rem 1rem; border:1px solid var(--accent); border-radius:10px; background:#f5f8ff">
+                    <p style="margin:0"><span class="loader"></span> <strong>🤖 Rédaction de l'article par l'IA en cours…</strong></p>
+                    <p class="muted" id="art-gen-chrono" style="margin:.3rem 0 0; font-size:.88rem">Cela prend quelques minutes. Vous pouvez quitter la page : l'article apparaîtra pour tous les visiteurs une fois prêt.</p>
+                </div>
+            {% elseif admin_session.logged and node.id %}
                 <form method="post" action="{{ path('admin_node_regenerate_article', { id: node.id }) }}" data-busy="⏳ Lancement…" style="margin:.4rem 0 0">
                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                     <input type="hidden" name="back" value="{{ app.request.requestUri }}">
@@ -348,6 +357,33 @@
             post('/api/questions/ask', { name: name, question: question, node: nodeSlug }, 'Envoi…');
         });
         sbtn.addEventListener('click', function () { post('/api/questions/suggest', { node: nodeSlug }, 'L\'IA imagine une question…'); });
+
+        // --- Article IA : loader persistant + polling pendant la (re)génération ---
+        // Même modèle que les controverses : état serveur (article_generating_at),
+        // on interroge l'API publique et on rafraîchit dès que l'article est prêt.
+        var artGen = document.getElementById('art-generating');
+        if (artGen) {
+            var artSlug = artGen.dataset.slug;
+            var artRefresh = function () {
+                if (window.Turbo && typeof Turbo.visit === 'function') { Turbo.visit(window.location.href, { action: 'replace' }); }
+                else { window.location.reload(); }
+            };
+            (function pollArt() {
+                fetch('/api/tree_nodes/' + encodeURIComponent(artSlug), { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) { if (!d.articleGeneratingAt) { artRefresh(); } else { setTimeout(pollArt, 5000); } })
+                    .catch(function () { setTimeout(pollArt, 9000); });
+            })();
+            // Chrono live (depuis data-started, format ISO).
+            var artStarted = new Date(artGen.dataset.started || '');
+            var artChrono = document.getElementById('art-gen-chrono');
+            if (artChrono && !isNaN(artStarted.getTime())) {
+                var artBase = artChrono.textContent;
+                var artFmt = function (sec) { sec = Math.max(0, Math.round(sec)); var m = Math.floor(sec / 60), s = sec % 60; return m > 0 ? (m + ' min ' + (s < 10 ? '0' : '') + s + ' s') : (s + ' s'); };
+                var artTick = function () { artChrono.textContent = artBase + ' (écoulé ' + artFmt((Date.now() - artStarted.getTime()) / 1000) + ')'; };
+                artTick(); setInterval(artTick, 1000);
+            }
+        }
     })();
-    </script>
+</script>
 {% endblock %}

@@ -136,6 +136,11 @@ class TreeNode
     #[Groups(['node:read'])]
     private ?\DateTimeImmutable $articleGeneratedAt = null;
 
+    /** Début de la (re)génération IA en cours (non-null = en cours) ; pour le loader/chrono côté UI. */
+    #[ORM\Column(name: 'article_generating_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['node:read'])]
+    private ?\DateTimeImmutable $articleGeneratingAt = null;
+
     #[ORM\Column(name: 'article_reviewed_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
     #[Groups(['node:item'])]
     private ?\DateTimeImmutable $articleReviewedAt = null;
@@ -184,6 +189,18 @@ class TreeNode
     public function setArticleGeneratedAt(?\DateTimeImmutable $at): self
     {
         $this->articleGeneratedAt = $at;
+
+        return $this;
+    }
+
+    public function getArticleGeneratingAt(): ?\DateTimeImmutable
+    {
+        return $this->articleGeneratingAt;
+    }
+
+    public function setArticleGeneratingAt(?\DateTimeImmutable $at): self
+    {
+        $this->articleGeneratingAt = $at;
 
         return $this;
     }
