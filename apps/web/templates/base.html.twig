@@ -226,6 +226,7 @@
     </script>
 </head>
 <body{{ crt ? (crt_framed ? ' class="theme-crt crt-framed"' : ' class="theme-crt"') : '' }}>
+    {% include '_alpha_banner.html.twig' %}
     {% set route = app.request.attributes.get('_route') %}
     {% if crt_framed %}<div class="crt-overlay" aria-hidden="true"></div><div class="crt-flicker" aria-hidden="true"></div>
     {# Cadre « terminal » unifié ; le bloc compte est ancré à droite dans la barre. #}
