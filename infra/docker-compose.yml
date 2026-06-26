@@ -257,13 +257,14 @@ services:
       # Notre endpoint RAG (compatible OpenAI) : Open WebUI y ajoute /chat/completions et /models.
       OPENAI_API_BASE_URL: "http://api/api/rag"
       OPENAI_API_KEY: "sk-scienceswiki-rag"
-      # Modèles LLM bruts (choix de l'utilisateur), EN PLUS de l'assistant RAG, via
-      # l'Ollama de Marvin. Le chat direct n'est PAS sourcé : pour des réponses
-      # sourcées, choisir le modèle « scienceswiki-rag ».
-      ENABLE_OLLAMA_API: "true"
+      # Assistant VERROUILLÉ : seul le RAG sourcé (« scienceswiki-rag-mistral »,
+      # exposé par /api/rag) est disponible. On COUPE l'accès aux LLM bruts d'Ollama
+      # → aucun chat non sourcé possible, et un seul modèle = pas de sélection
+      # possible côté utilisateur (la demande : brider + supprimer le changement de modèle).
+      ENABLE_OLLAMA_API: "false"
       OLLAMA_BASE_URL: "http://192.168.1.171:11434"
-      # Modèle proposé par défaut à l'ouverture d'un chat.
-      DEFAULT_MODELS: "qwen3.6:latest"
+      # Modèle unique ouvert par défaut (= l'assistant RAG sourcé Mistral).
+      DEFAULT_MODELS: "scienceswiki-rag-mistral"
       # SSO : l'identité vient du forward-auth Heimdall (en-têtes de confiance que
       # le proxy POSE et que le client ne peut pas usurper, cf. chat.scienceswiki.eu.conf).
       # Open WebUI retrouve/ouvre le compte d'après l'e-mail du header → pas de mot

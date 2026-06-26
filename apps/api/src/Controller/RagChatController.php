@@ -41,20 +41,17 @@ final class RagChatController
      */
     private const CHAT_NEIGHBORS = 12;
 
-    /** Modèle RAG par défaut (LLM = réglage rag.model / LLM_MODEL courant). */
-    private const MODEL_ID = 'scienceswiki-rag';
-
     /**
-     * « Modèles » RAG exposés à Open WebUI : MÊME pipeline (récupération hybride +
-     * garde-fous sourcés), mais LLM différent dessous → comparaison côte à côte via
-     * le « + » d'Open WebUI, sur les MÊMES sources. La valeur = le tag Ollama à
-     * utiliser ; null = LLM courant. Ajuste/complète selon les modèles tirés sur Marvin.
+     * Assistant UNIQUE exposé à Open WebUI : le RAG sourcé de SciencesWiki, rédigé
+     * par Mistral Small 3.2. Modèle VERROUILLÉ — plus de sélection ni de comparaison
+     * côté utilisateur (les variantes qwen/gemma et l'accès aux LLM bruts d'Ollama
+     * sont retirés ; voir aussi ENABLE_OLLAMA_API=false dans infra/docker-compose.yml).
+     * La valeur = le tag Ollama à utiliser.
      */
+    private const MODEL_ID = 'scienceswiki-rag-mistral';
+
     private const RAG_MODELS = [
-        self::MODEL_ID => null,
-        'scienceswiki-rag-mistral' => 'mistral-medium-3.5:latest',
-        'scienceswiki-rag-qwen' => 'qwen3.6:latest',
-        'scienceswiki-rag-gemma' => 'gemma4:latest',
+        self::MODEL_ID => 'mistral-small3.2:24b-instruct-2506-q4_K_M',
     ];
 
     private const CHAT_SYSTEM = <<<'TXT'
