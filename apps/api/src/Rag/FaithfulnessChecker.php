@@ -7,6 +7,7 @@ namespace App\Rag;
 use App\Ai\Llm\LlmClient;
 use App\Ai\Llm\LlmMessage;
 use App\Entity\Publication;
+use App\Repository\PublicationRepository;
 use App\Service\SettingsService;
 
 /**
@@ -18,8 +19,9 @@ use App\Service\SettingsService;
  * Principes : vérificateur ≠ rédacteur (modèle léger, distinct), conservateur (au
  * doute, on marque), best-effort (en cas d'échec on ne dégrade pas le contenu).
  *
- * Le « texte source » est générique (résumé aujourd'hui) : le jour où l'on dispose
- * des passages plein texte (locator GROBID), il suffira d'enrichir sourceText().
+ * Cran 2 : la vérification se fait contre les PASSAGES de texte intégral (locator
+ * GROBID) en plus du résumé, dès qu'un embedding de contexte est fourni et que la
+ * publication a été ingérée en plein texte → ancrage bien plus strict.
  */
 final class FaithfulnessChecker
 {
@@ -31,7 +33,8 @@ final class FaithfulnessChecker
 
     private const SYSTEM = <<<'TXT'
         Tu es un VÉRIFICATEUR DE FIDÉLITÉ, strict et conservateur. On te donne des
-        SOURCES (titre + résumé) et un TEXTE rédigé censé s'appuyer dessus.
+        SOURCES (titre + résumé, et souvent des EXTRAITS du texte intégral) et un
+        TEXTE rédigé censé s'appuyer dessus.
 
         Ta tâche : repérer les affirmations factuelles du TEXTE qui NE SONT PAS
         explicitement soutenues par au moins une SOURCE — en priorité les CHIFFRES,
@@ -58,6 +61,7 @@ final class FaithfulnessChecker
     public function __construct(
         private readonly LlmClient $llm,
         private readonly SettingsService $settings,
+        private readonly PublicationRepository $publications,
     ) {
     }
 
@@ -65,16 +69,21 @@ final class FaithfulnessChecker
      * Annoter le texte avec des marqueurs « [réf. nécessaire] ». Renvoie le texte
      * inchangé si la vérification est désactivée, sans sources, ou en cas d'échec.
      *
+     * Cran 2 : si un embedding (de la question/du sujet) est fourni, la vérification
+     * se fait contre les PASSAGES de texte intégral les plus pertinents de chaque
+     * source (locator), et non seulement le résumé → ancrage bien plus strict.
+     *
      * @param list<Publication> $sources
+     * @param list<float>|null  $embedding contexte pour sélectionner les passages plein texte
      */
-    public function annotate(string $text, array $sources): string
+    public function annotate(string $text, array $sources, ?array $embedding = null): string
     {
         $text = trim($text);
         if (!$this->settings->verifyFaithfulness() || '' === $text || [] === $sources) {
             return $text;
         }
 
-        $sourcesBlock = $this->sourcesBlock($sources);
+        $sourcesBlock = $this->sourcesBlock($sources, $embedding);
         $out = [];
         foreach ($this->batches($text) as $batch) {
             $out[] = $this->annotateBatch($batch, $sourcesBlock);
@@ -146,16 +155,34 @@ final class FaithfulnessChecker
     }
 
     /**
-     * Texte de référence par source (aujourd'hui : titre + résumé ; demain : passage
-     * plein texte via le locator).
+     * Texte de référence par source : titre + résumé, ENRICHI (cran 2) des passages
+     * de texte intégral les plus pertinents quand un embedding de contexte est fourni
+     * et que la publication a été ingérée en plein texte (locator). Vérifier contre le
+     * VRAI texte cité, et plus seulement le résumé, resserre fortement l'ancrage.
      *
      * @param list<Publication> $sources
+     * @param list<float>|null  $embedding
      */
-    private function sourcesBlock(array $sources): string
+    private function sourcesBlock(array $sources, ?array $embedding = null): string
     {
         $lines = ['SOURCES :'];
         foreach ($sources as $i => $s) {
-            $lines[] = \sprintf("[%d] %s\n    %s", $i + 1, $s->getTitle(), mb_substr($s->getAbstract() ?? '(pas de résumé)', 0, 900));
+            $ref = mb_substr($s->getAbstract() ?? '', 0, 700);
+
+            $pubId = $s->getId();
+            if (null !== $embedding && null !== $pubId) {
+                foreach ($this->publications->topPassagesFor($pubId, $embedding, 2) as $passage) {
+                    $clean = trim((string) preg_replace('/\s+/', ' ', $passage));
+                    if ('' !== $clean) {
+                        $ref .= "\n    EXTRAIT : « ".mb_substr($clean, 0, 650).' »';
+                    }
+                }
+            }
+
+            if ('' === trim($ref)) {
+                $ref = '(pas de résumé)';
+            }
+            $lines[] = \sprintf("[%d] %s\n    %s", $i + 1, $s->getTitle(), $ref);
         }
 
         return implode("\n", $lines);

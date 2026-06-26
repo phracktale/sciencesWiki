@@ -90,8 +90,8 @@ final class GenerateWikiArticlesCommand extends Command
         foreach ($targets as $node) {
             $io->writeln(\sprintf('• %s (niveau %d)…', $node->getLabel(), $node->getLevel()));
             try {
-                $pubs = $this->sourcePublications($node, $embedder);
-                $sources = $this->formatSources($pubs);
+                [$sourcePubs, $sourceEmbedding] = $this->sourcePublications($node, $embedder);
+                $sources = $this->formatSources($sourcePubs);
                 $related = $this->relatedNodes($node);
                 // Streaming : la rédaction longue dépasse le timeout idle d'un appel
                 // non-streamé ; le flux remet le compteur à zéro à chaque jeton.
@@ -111,10 +111,10 @@ final class GenerateWikiArticlesCommand extends Command
                 // Liens internes garantis (le modèle local les omet souvent) : on lie
                 // la 1re occurrence de chaque domaine voisin dans le corps de l'article.
                 $md = $this->autolink($md, $related, $node->getSlug());
-                // Vérification de fidélité : marque ce que les sources ne soutiennent
-                // pas, puis promeut les marqueurs en liens Wikipédia réels si possible
-                // (anti-hallucination ; le relecteur tranche le reste).
-                $md = $this->wikipedia->resolve($this->faithfulness->annotate($md, $pubs));
+                // Anti-hallucination (cran 2) : marque les affirmations non soutenues
+                // par les PASSAGES plein texte des sources, puis promeut les marqueurs
+                // en liens Wikipédia réels. Gardé par le réglage RAG_VERIFY.
+                $md = $this->wikipedia->resolve($this->faithfulness->annotate($md, $sourcePubs, $sourceEmbedding));
                 if (mb_strlen($md) < 800) {
                     $io->warning(\sprintf('  réponse trop courte (%d car.), ignorée.', mb_strlen($md)));
                     continue;
@@ -142,26 +142,27 @@ final class GenerateWikiArticlesCommand extends Command
         return Command::SUCCESS;
     }
 
-    /** Sources réelles du corpus pour ancrer l'article (recherche sémantique). */
     /**
-     * Publications sources (kNN sur le label + description du nœud).
+     * Publications réelles du corpus pour ancrer l'article (recherche sémantique).
+     * Renvoie aussi l'embedding de contexte (sert à la vérification de fidélité
+     * cran 2 : passages plein texte les plus pertinents par source).
      *
-     * @return list<\App\Entity\Publication>
+     * @return array{0:list<\App\Entity\Publication>,1:list<float>}
      */
     private function sourcePublications(TreeNode $node, $embedder): array
     {
         $query = $node->getLabel().'. '.(string) $node->getDescription();
         $embedding = $embedder->embed($query);
-
-        return array_map(
+        $pubs = array_map(
             static fn (array $hit): \App\Entity\Publication => $hit['publication'],
             $this->publications->nearestTo($embedding, 12),
         );
+
+        return [$pubs, $embedding];
     }
 
     /**
-     * Bloc sources formaté pour le prompt (l'indexation [n] DOIT correspondre à
-     * l'ordre de la liste passée au vérificateur de fidélité).
+     * Bloc de sources formaté pour le prompt rédacteur.
      *
      * @param list<\App\Entity\Publication> $pubs
      */

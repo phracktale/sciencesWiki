@@ -86,9 +86,11 @@ final class AnswerDrafter
 
         // Vérification de fidélité : marque les affirmations non soutenues, puis
         // promeut les marqueurs en liens Wikipédia réels quand un article existe
-        // (anti-hallucination ; le relecteur tranche le reste).
-        $parsed['vulgarization'] = $this->wikipedia->resolve($this->faithfulness->annotate($parsed['vulgarization'], $sources));
-        $parsed['academic'] = $this->wikipedia->resolve($this->faithfulness->annotate($parsed['academic'], $sources));
+        // (anti-hallucination ; le relecteur tranche le reste). Cran 2 : on passe
+        // l'embedding de la question pour vérifier contre les PASSAGES plein texte.
+        $embedding = $question->getEmbedding()?->toArray();
+        $parsed['vulgarization'] = $this->wikipedia->resolve($this->faithfulness->annotate($parsed['vulgarization'], $sources, $embedding));
+        $parsed['academic'] = $this->wikipedia->resolve($this->faithfulness->annotate($parsed['academic'], $sources, $embedding));
 
         if (null === $question->getTitle() && '' !== $parsed['title']) {
             $question->setTitle($parsed['title']);

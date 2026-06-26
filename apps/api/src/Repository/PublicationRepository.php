@@ -293,15 +293,33 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
      */
     public function bestPassageFor(int $publicationId, array $embedding): ?string
     {
-        $content = $this->getEntityManager()->getConnection()->executeQuery(
-            'SELECT content FROM publication_chunk
-             WHERE publication_id = :p
-             ORDER BY embedding <=> CAST(:vec AS halfvec)
-             LIMIT 1',
-            ['p' => $publicationId, 'vec' => (string) new Vector($embedding)],
-        )->fetchOne();
+        return $this->topPassagesFor($publicationId, $embedding, 1)[0] ?? null;
+    }
 
-        return false === $content ? null : (string) $content;
+    /**
+     * Les N meilleurs passages (chunks de texte intégral) d'une publication vis-à-vis
+     * d'un embedding, du plus proche au moins proche. Sert au locator (extrait affiché)
+     * ET à la vérification de fidélité contre le VRAI texte cité (cf. FaithfulnessChecker).
+     * Vide si pas de texte intégral ingéré.
+     *
+     * @param list<float> $embedding
+     *
+     * @return list<string>
+     */
+    public function topPassagesFor(int $publicationId, array $embedding, int $n = 2): array
+    {
+        $rows = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                'SELECT content FROM publication_chunk
+                 WHERE publication_id = :p
+                 ORDER BY embedding <=> CAST(:vec AS halfvec)
+                 LIMIT %d',
+                max(1, $n),
+            ),
+            ['p' => $publicationId, 'vec' => (string) new Vector($embedding)],
+        )->fetchFirstColumn();
+
+        return array_map(static fn ($c): string => (string) $c, $rows);
     }
 
     /**
