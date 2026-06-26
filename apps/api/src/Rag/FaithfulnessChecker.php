@@ -62,6 +62,7 @@ final class FaithfulnessChecker
         private readonly LlmClient $llm,
         private readonly SettingsService $settings,
         private readonly PublicationRepository $publications,
+        private readonly HhemVerifier $hhem,
     ) {
     }
 
@@ -83,6 +84,12 @@ final class FaithfulnessChecker
             return $text;
         }
 
+        // Garde-fou RIGOUREUX : détecteur NLI dédié HHEM si disponible (bat les
+        // LLM-juges, append-only) — sinon repli sur la vérification LLM ci-dessous.
+        if ($this->hhem->isEnabled()) {
+            return $this->hhem->annotate($text, $this->evidenceText($sources, $embedding));
+        }
+
         $sourcesBlock = $this->sourcesBlock($sources, $embedding);
         $out = [];
         foreach ($this->batches($text) as $batch) {
@@ -90,6 +97,31 @@ final class FaithfulnessChecker
         }
 
         return implode("\n\n", $out);
+    }
+
+    /**
+     * Évidence brute (résumés + passages plein texte les plus pertinents) servant de
+     * premise au scoring HHEM.
+     *
+     * @param list<Publication> $sources
+     * @param list<float>|null  $embedding
+     */
+    private function evidenceText(array $sources, ?array $embedding): string
+    {
+        $parts = [];
+        foreach ($sources as $s) {
+            if (null !== ($abstract = $s->getAbstract()) && '' !== trim($abstract)) {
+                $parts[] = $abstract;
+            }
+            $pubId = $s->getId();
+            if (null !== $embedding && null !== $pubId) {
+                foreach ($this->publications->topPassagesFor($pubId, $embedding, 2) as $passage) {
+                    $parts[] = $passage;
+                }
+            }
+        }
+
+        return implode("\n", $parts);
     }
 
     private function annotateBatch(string $text, string $sourcesBlock): string

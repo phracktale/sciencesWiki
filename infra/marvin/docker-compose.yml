@@ -69,3 +69,21 @@ services:
       retries: 5
       start_period: 60s
     restart: unless-stopped
+
+  # Garde-fou anti-hallucination : HHEM-2.1-Open (Vectara), détecteur NLI dédié (FR/EN/DE).
+  # L'API de Thor le joint via HHEM_URL pour scorer l'entailment réponse↔passages.
+  hhem:
+    build:
+      context: ../../ml/hhem
+      dockerfile: Dockerfile
+    image: scienceswiki-hhem:latest
+    ports:
+      # Réseau privé homelab uniquement (ne pas publier sur Internet).
+      - "8002:8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8002/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+    restart: unless-stopped

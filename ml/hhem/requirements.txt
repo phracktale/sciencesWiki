@@ -1,0 +1,7 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+transformers>=4.40
+torch>=2.2
+sentencepiece>=0.2
+protobuf>=4.25
+accelerate>=0.30
