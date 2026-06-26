@@ -27,6 +27,13 @@ framework:
                 retry_strategy:
                     max_retries: 1
                     delay: 10000
+            # File dédiée à la détection plagiat/doublons (empreintes MinHash/LSH + scan).
+            # Isolée comme analysis : un scan lourd ne doit ni affamer la moisson ni l'inverse.
+            plagiarism:
+                dsn: 'doctrine://default?queue_name=plagiarism&redeliver_timeout=7200'
+                retry_strategy:
+                    max_retries: 1
+                    delay: 10000
             failed: 'doctrine://default?queue_name=failed'
             sync: 'sync://'
 
@@ -38,6 +45,9 @@ framework:
             # Analyse « controverses & pistes » d'un nœud (cf. spec controverses §7bis).
             # File DÉDIÉE (pas harvester) pour ne pas être affamée par la moisson.
             App\Analysis\Message\AnalyzeNodeMessage: analysis
+            # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
+            App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
+            App\Analysis\Plagiarism\Message\ScanPublication: plagiarism
 
 # when@test:
 #    framework:
