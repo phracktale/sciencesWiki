@@ -6,9 +6,10 @@
         { label: 'Articles', route: 'admin_articles' },
         { label: 'Auteurs', route: 'admin_authors' },
     ] },
-    { label: 'Wiki', match: ['admin_wiki', 'admin_wiki_detail', 'admin_questions'], items: [
+    { label: 'Wiki', match: ['admin_wiki', 'admin_wiki_detail', 'admin_questions', 'admin_duplications'], items: [
         { label: 'Articles wiki', route: 'admin_wiki' },
         { label: 'Questions / Réponses', route: 'admin_questions' },
+        { label: 'Doublons & plagiat', route: 'admin_duplications' },
     ] },
     { label: 'Administration', match: ['admin_users', 'admin_join', 'admin_roadmap', 'admin_newsletter', 'admin_activity'], items: [
         { label: 'Utilisateurs', route: 'admin_users' },

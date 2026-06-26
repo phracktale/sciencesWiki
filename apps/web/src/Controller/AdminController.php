@@ -184,6 +184,33 @@ final class AdminController extends AbstractController
         return $this->render('admin/wiki_detail.html.twig', ['article' => $article]);
     }
 
+    #[Route('/admin/duplications', name: 'admin_duplications', methods: ['GET'])]
+    public function duplications(): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+
+        return $this->render('admin/duplications.html.twig', ['data' => $this->admin->duplications()]);
+    }
+
+    #[Route('/admin/duplications/{id}/review', name: 'admin_duplication_review', requirements: ['id' => '\d+'], methods: ['POST'])]
+    public function reviewDuplication(int $id, Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_duplications');
+        }
+        $res = $this->admin->reviewDuplication($id, (string) $request->request->get('status'));
+        $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok'] ? 'Décision enregistrée.' : 'Échec de l\'enregistrement.');
+
+        return $this->redirectToRoute('admin_duplications');
+    }
+
     #[Route('/admin/articles', name: 'admin_articles', methods: ['GET'])]
     public function articles(Request $request): Response
     {

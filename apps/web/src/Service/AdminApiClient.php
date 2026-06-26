@@ -118,6 +118,20 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : null;
     }
 
+    /** @return array<string,mixed> file des rapprochements de contenu (doublons/plagiat) à examiner */
+    public function duplications(): array
+    {
+        $res = $this->send('GET', '/api/admin/duplications', null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'unreviewed' => 0];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} décision comité sur un rapprochement */
+    public function reviewDuplication(int $id, string $status): array
+    {
+        return $this->send('POST', '/api/admin/duplications/'.$id.'/review', ['status' => $status]);
+    }
+
     /**
      * @param list<string> $types filtre optionnel par type(s) de publication (scope la volumétrie)
      *

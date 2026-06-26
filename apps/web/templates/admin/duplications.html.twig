@@ -1,0 +1,60 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Doublons & plagiat{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>🔍 Doublons &amp; plagiat</h1>
+    <p class="muted" style="font-size:.85rem; max-width:75ch">
+        Rapprochements de contenu détectés <strong>dans le corpus indexé</strong> (non décisionnel).
+        « Rien » ≠ original (sources hors corpus invisibles). La similarité n'est pas une preuve :
+        tranchez vous-même. <strong>Rien n'est affiché publiquement tant que non confirmé.</strong>
+    </p>
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+
+    {% if data.items is empty %}
+        <p class="muted">Aucun rapprochement à examiner. Lancez <code>app:plagiarism:fingerprint</code> puis <code>app:plagiarism:scan</code>.</p>
+    {% else %}
+        <p class="muted">{{ data.unreviewed }} rapprochement(s) à examiner.</p>
+        {% for f in data.items %}
+            <div style="border:1px solid var(--line); border-radius:10px; padding:1rem; margin:1rem 0">
+                <div style="display:flex; justify-content:space-between; gap:1rem; flex-wrap:wrap; align-items:baseline">
+                    <strong>{{ f.typeLabel }}{% if f.sharesAuthor %} <span class="muted">· auteur commun</span>{% endif %}</strong>
+                    <span class="muted" style="font-size:.85rem">
+                        recouvrement {{ (f.overlapRatio * 100)|round }}% · Jaccard max {{ (f.maxJaccard * 100)|round }}%{% if f.semanticSim > 0 %} · sémantique {{ (f.semanticSim * 100)|round }}%{% endif %}
+                    </span>
+                </div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:.6rem; font-size:.9rem">
+                    <div>
+                        <span class="muted" style="font-size:.8rem">Source (la plus récente)</span><br>
+                        <strong>{{ f.source.title }}</strong> ({{ f.source.year ?? 's.d.' }}){% if f.source.doi %} · <a href="https://doi.org/{{ f.source.doi }}" target="_blank" rel="noopener">doi</a>{% endif %}
+                    </div>
+                    <div>
+                        <span class="muted" style="font-size:.8rem">Cible (antériorité présumée)</span><br>
+                        <strong>{{ f.target.title }}</strong> ({{ f.target.year ?? 's.d.' }}){% if f.target.doi %} · <a href="https://doi.org/{{ f.target.doi }}" target="_blank" rel="noopener">doi</a>{% endif %}
+                    </div>
+                </div>
+                {% if f.passages is not empty %}
+                    <details style="margin-top:.7rem">
+                        <summary style="cursor:pointer; color:var(--accent); font-size:.9rem">Passages en regard ({{ f.passages|length }})</summary>
+                        {% for p in f.passages %}
+                            <div style="display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-top:.5rem; font-size:.82rem">
+                                <blockquote style="border-left:3px solid var(--line); padding:.3rem .6rem; margin:0; font-style:italic">« {{ p.srcText }} »</blockquote>
+                                <blockquote style="border-left:3px solid var(--line); padding:.3rem .6rem; margin:0; font-style:italic">« {{ p.tgtText }} »</blockquote>
+                            </div>
+                            <div class="muted" style="font-size:.72rem; text-align:center; margin-top:.15rem">Jaccard {{ (p.jaccard * 100)|round }}%</div>
+                        {% endfor %}
+                    </details>
+                {% endif %}
+                <div style="display:flex; gap:.5rem; margin-top:.85rem; flex-wrap:wrap">
+                    {% for st, lbl in {'confirmed': '✓ Confirmer', 'legitimate': '≈ Légitime', 'dismissed': '✕ Écarter'} %}
+                        <form method="post" action="{{ path('admin_duplication_review', {id: f.id}) }}" style="margin:0">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="status" value="{{ st }}">
+                            <button type="submit" style="cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:8px; padding:.4rem .8rem; font:inherit">{{ lbl }}</button>
+                        </form>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endfor %}
+    {% endif %}
+{% endblock %}
