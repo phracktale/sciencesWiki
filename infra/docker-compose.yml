@@ -79,6 +79,11 @@ services:
       # Coffre de secrets persistant (survit aux rebuilds) : clés + secrets chiffrés
       # (OPENALEX_API_KEY, BREVO_*…). Généré une fois via secrets:generate-keys.
       - secrets_vault:/app/config/secrets:rw
+      # Snapshot OpenAlex en LECTURE SEULE pour l'ingestion en masse
+      # (app:openalex:ingest-snapshot --dir=/openalexSnapshot). En prod (Thor) :
+      # OPENALEX_SNAPSHOT_DIR=/mnt/marvin-data2/openalex-snapshot (NFS Marvin /data2).
+      # Hors prod : placeholder vide pour ne pas casser le `up`.
+      - ${OPENALEX_SNAPSHOT_DIR:-./.snapshot-placeholder}:/openalexSnapshot:ro
     ports:
       - "${API_PORT:-8000}:80"
     restart: unless-stopped
