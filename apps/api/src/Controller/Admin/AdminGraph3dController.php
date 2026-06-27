@@ -37,7 +37,7 @@ final class AdminGraph3dController
         $limit = min(self::MAX_LIMIT, max(20, (int) $request->query->get('limit', (string) self::DEFAULT_LIMIT)));
         $domain = trim((string) $request->query->get('domain', ''));
 
-        $params = ['lim' => $limit];
+        $params = [];
         $domainFilter = '';
         if ('' !== $domain) {
             $domainFilter = 'AND EXISTS (SELECT 1 FROM placement_suggestion ps
@@ -57,7 +57,7 @@ final class AdminGraph3dController
                  WHERE p.embedding IS NOT NULL
                  $domainFilter
                  ORDER BY p.cited_by_count DESC NULLS LAST
-                 LIMIT :lim
+                 LIMIT $limit
              )
              SELECT p.id, p.title, p.oa_status, p.type, p.cited_by_count,
                     p.doi, p.oa_url, p.landing_page_url,
@@ -79,7 +79,6 @@ final class AdminGraph3dController
              ) auth ON true
              ORDER BY p.cited_by_count DESC NULLS LAST",
             $params,
-            ['lim' => \PDO::PARAM_INT],
         );
 
         $nodes = [];
