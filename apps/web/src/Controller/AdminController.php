@@ -656,6 +656,17 @@ final class AdminController extends AbstractController
         return new JsonResponse($this->admin->snapshotStatus());
     }
 
+    /** Polling AJAX des indicateurs d'enrichissement (embeddings, placement, plein texte). */
+    #[Route('/admin/harvest/enrichment-status.json', name: 'admin_enrichment_status', methods: ['GET'])]
+    public function enrichmentStatus(): JsonResponse
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+
+        return new JsonResponse($this->admin->enrichmentStatus());
+    }
+
     /** Visualiseur 3D des publications (three.js / 3d-force-graph). */
     #[Route('/admin/graph3d', name: 'admin_graph3d', methods: ['GET'])]
     public function graph3d(): Response

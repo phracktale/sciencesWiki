@@ -378,6 +378,14 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : ['active' => false, 'progress' => null, 'derived' => null, 'samples' => []];
     }
 
+    /** @return array<string,mixed> indicateurs des drains (embeddings, placement, plein texte) */
+    public function enrichmentStatus(): array
+    {
+        $res = $this->send('GET', '/api/admin/harvest/enrichment-status', null);
+
+        return $res['ok'] ? $res['data'] : ['total_pub' => 0, 'embed_backlog' => 0, 'place_backlog' => 0, 'fulltext_queue' => 0];
+    }
+
     /** @return array<string,mixed> graphe 3D (nœuds + liens de similarité) pour le visualiseur */
     public function graph3d(string $domain, int $limit): array
     {

@@ -14,8 +14,11 @@
         .tabpane[hidden] { display:none }
         /* Cartes/aperçus = fond clair → on FORCE un texte sombre (sinon illisible
            sous le thème CRT dont la couleur par défaut est claire). */
-        #pane-snapshot { color:#1e293b }
-        #pane-snapshot h2, #pane-snapshot h3 { color:#0f172a }
+        #pane-snapshot, #pane-enrichment { color:#1e293b }
+        #pane-snapshot h2, #pane-snapshot h3, #pane-enrichment h2, #pane-enrichment h3 { color:#0f172a }
+        .enr-bar-track { height:12px; background:var(--line); border-radius:6px; overflow:hidden; margin:.3rem 0 }
+        .enr-trend-down { color:#16a34a; font-weight:700 }
+        .enr-trend-up { color:#dc2626; font-weight:700 }
         .snap-progress-line { color:#334155 !important }
         .snap-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.8rem; margin:1rem 0 }
         .snap-stat { border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fafcff; color:#1e293b }
@@ -34,6 +37,7 @@
     <div class="tabs" role="tablist">
         <button role="tab" type="button" class="tab-btn" aria-selected="true" data-pane="pane-harvest">🛰️ Moisson API</button>
         <button role="tab" type="button" class="tab-btn" aria-selected="false" data-pane="pane-snapshot">📦 Snapshot OpenAlex</button>
+        <button role="tab" type="button" class="tab-btn" aria-selected="false" data-pane="pane-enrichment">📈 Enrichissement</button>
         <a class="tab-btn" href="{{ path('admin_graph3d') }}" target="_blank" rel="noopener" style="margin-left:auto; color:var(--accent)">🌐 Visualiseur 3D ↗</a>
     </div>
 
@@ -109,6 +113,31 @@
             <h3>Derniers articles intégrés <span class="muted" style="font-size:.8rem">(aperçu live)</span></h3>
             <div id="snap-arts"><p class="muted">Chargement…</p></div>
         </div>
+    </section>
+
+    <section class="tabpane" id="pane-enrichment" hidden>
+        <h2 style="margin-top:.4rem">Enrichissement du corpus <span id="enr-state" class="pill" style="font-size:.7rem">…</span></h2>
+        <p class="muted">Après l'ingestion (métadonnées + résumé), deux drains tournent en continu. <strong>Backlog</strong> = ce qu'il reste à traiter ; un backlog qui <span class="enr-trend-down">descend</span> = l'enrichissement rattrape, qui <span class="enr-trend-up">monte</span> = l'ingestion va plus vite que l'enrichissement. Débits recalculés en direct (fenêtre récente).</p>
+
+        <h3>🧠 Embeddings &amp; placement <span class="muted" style="font-size:.8rem">— cron embed-drain (*/10)</span></h3>
+        <div style="display:flex; justify-content:space-between; font-size:.85rem; color:#475569; margin-top:.4rem">
+            <span>Couverture embeddings : <strong id="enr-embed-pct">—</strong></span>
+            <span id="enr-embed-count" class="muted"></span>
+        </div>
+        <div class="enr-bar-track"><div id="enr-embed-bar" style="height:100%; width:0%; background:var(--accent); transition:width .5s"></div></div>
+        <div class="snap-cards">
+            <div class="snap-stat"><div class="k">Reste à embedder</div><div class="v" id="enr-embed-backlog">—</div><div class="k" id="enr-embed-trend">—</div></div>
+            <div class="snap-stat"><div class="k">Reste à placer (arbre)</div><div class="v" id="enr-place-backlog">—</div><div class="k" id="enr-place-trend">—</div></div>
+            <div class="snap-stat"><div class="k">Publications (corpus)</div><div class="v" id="enr-total">—</div><div class="k">≈ estimation rapide</div></div>
+        </div>
+
+        <h3 style="margin-top:1.2rem">📄 Plein texte <span class="muted" style="font-size:.8rem">— cron fulltext-drain (*/15) + GROBID</span></h3>
+        <div class="snap-cards">
+            <div class="snap-stat"><div class="k">File plein texte (à traiter)</div><div class="v" id="enr-ft-queue">—</div><div class="k" id="enr-ft-trend">—</div></div>
+            <div class="snap-stat"><div class="k">Fragments indexés (chunks)</div><div class="v" id="enr-chunks">—</div><div class="k" id="enr-chunks-rate">—</div></div>
+            <div class="snap-stat"><div class="k">Échecs (file failed)</div><div class="v" id="enr-failed">—</div><div class="k">re-tentés automatiquement</div></div>
+        </div>
+        <p class="muted" id="enr-updated" style="font-size:.8rem; margin-top:.6rem"></p>
     </section>
 
     <script type="application/json" id="bootstrap">{{ status|json_encode|raw }}</script>
@@ -310,6 +339,7 @@
                 if (p) p.hidden = !on;
             });
             if (pane === 'pane-snapshot') { snapPoll(); startSnap(); } else { stopSnap(); }
+            if (pane === 'pane-enrichment') { enrPoll(); startEnr(); } else { stopEnr(); }
         }
         tabs.forEach(function (t) {
             t.addEventListener('click', function () { show(t.dataset.pane); history.replaceState(null, '', '#' + t.dataset.pane); });
@@ -436,8 +466,61 @@
         function stopSnap() { if (snapTimer) { clearInterval(snapTimer); snapTimer = null; } if (tick) { clearInterval(tick); tick = null; } }
         document.addEventListener('turbo:before-cache', stopSnap, { once: true });
 
-        // Ouverture directe sur l'onglet via #pane-snapshot.
+        // ===================== Onglet Enrichissement =====================
+        // Backlogs = EXACTS et temps réel (index partiels) → tendances fiables.
+        // Totaux (corpus, chunks) = approximés (reltuples) → volume indicatif.
+        var enrHist = [], enrTimer = null, ENR_WINDOW_MS = 5 * 60 * 1000;
+        function enrRate(e) {
+            var now = Date.now();
+            enrHist.push({ t: now, eb: e.embed_backlog, pb: e.place_backlog, fq: e.fulltext_queue });
+            var cut = now - ENR_WINDOW_MS;
+            while (enrHist.length > 2 && enrHist[0].t < cut) enrHist.shift();
+            if (enrHist.length < 2) return null;
+            var a = enrHist[0], b = enrHist[enrHist.length - 1];
+            var dtMin = (b.t - a.t) / 60000;
+            if (dtMin <= 0) return null;
+            return { eb: (b.eb - a.eb) / dtMin, pb: (b.pb - a.pb) / dtMin, fq: (b.fq - a.fq) / dtMin };
+        }
+        function trendBacklog(perMin) {
+            if (perMin == null) return 'tendance…';
+            var r = Math.round(perMin);
+            if (r <= -1) return '<span class="enr-trend-down">↓ ' + Math.abs(r).toLocaleString('fr-FR') + '/min (résorption)</span>';
+            if (r >= 1) return '<span class="enr-trend-up">↑ ' + r.toLocaleString('fr-FR') + '/min (accumulation)</span>';
+            return 'stable';
+        }
+        function renderEnr(e) {
+            if (!e) return;
+            var st = document.getElementById('enr-state');
+            st.textContent = 'en direct'; st.style.background = '#dbeafe';
+            document.getElementById('enr-embed-pct').textContent = (e.embed_pct != null ? e.embed_pct : 0) + '%';
+            document.getElementById('enr-embed-count').textContent = '≈ ' + (e.embedded || 0).toLocaleString('fr-FR') + ' / ' + (e.total_pub || 0).toLocaleString('fr-FR');
+            document.getElementById('enr-embed-bar').style.width = Math.min(100, e.embed_pct || 0) + '%';
+            document.getElementById('enr-embed-backlog').textContent = (e.embed_backlog || 0).toLocaleString('fr-FR');
+            document.getElementById('enr-place-backlog').textContent = (e.place_backlog || 0).toLocaleString('fr-FR');
+            document.getElementById('enr-total').textContent = '≈ ' + (e.total_pub || 0).toLocaleString('fr-FR');
+            document.getElementById('enr-ft-queue').textContent = (e.fulltext_queue || 0).toLocaleString('fr-FR');
+            document.getElementById('enr-chunks').textContent = '≈ ' + (e.total_chunks || 0).toLocaleString('fr-FR');
+            document.getElementById('enr-chunks-rate').textContent = 'volume total (approx.)';
+            document.getElementById('enr-failed').textContent = (e.failed_queue || 0).toLocaleString('fr-FR');
+            var r = enrRate(e);
+            document.getElementById('enr-embed-trend').innerHTML = r ? trendBacklog(r.eb) : 'tendance…';
+            document.getElementById('enr-place-trend').innerHTML = r ? trendBacklog(r.pb) : 'tendance…';
+            document.getElementById('enr-ft-trend').innerHTML = r ? trendBacklog(r.fq) : 'tendance…';
+            document.getElementById('enr-updated').textContent = 'Mis à jour à ' + new Date().toLocaleTimeString('fr-FR') + ' · tendances sur ~5 min';
+        }
+        function enrPoll() {
+            fetch('/admin/harvest/enrichment-status.json', { headers: { 'Accept': 'application/json' } })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (e) { if (e) renderEnr(e); })
+                .catch(function () {});
+        }
+        function startEnr() { if (!enrTimer) enrTimer = setInterval(enrPoll, 10000); }
+        function stopEnr() { if (enrTimer) { clearInterval(enrTimer); enrTimer = null; } }
+        document.addEventListener('turbo:before-cache', stopEnr, { once: true });
+
+        // Ouverture directe sur un onglet via #ancre.
         if (location.hash === '#pane-snapshot') { show('pane-snapshot'); }
+        if (location.hash === '#pane-enrichment') { show('pane-enrichment'); }
     })();
     </script>
 {% endblock %}
