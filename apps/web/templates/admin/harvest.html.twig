@@ -12,14 +12,22 @@
             padding:.6rem 1rem; font:inherit; font-weight:600; color:#6b7280; cursor:pointer; text-decoration:none; border-radius:8px 8px 0 0 }
         .tabs .tab-btn[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent) }
         .tabpane[hidden] { display:none }
+        /* Cartes/aperçus = fond clair → on FORCE un texte sombre (sinon illisible
+           sous le thème CRT dont la couleur par défaut est claire). */
+        #pane-snapshot { color:#1e293b }
+        #pane-snapshot h2, #pane-snapshot h3 { color:#0f172a }
+        .snap-progress-line { color:#334155 !important }
         .snap-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:.8rem; margin:1rem 0 }
-        .snap-stat { border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fafcff }
-        .snap-stat .k { color:#64748b; font-size:.8rem }
-        .snap-stat .v { font-size:1.5rem; font-weight:700; line-height:1.2 }
-        .snap-art { border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; margin:.6rem 0; background:#fff }
-        .snap-art h4 { margin:.1rem 0 .3rem; font-size:.98rem }
+        .snap-stat { border:1px solid var(--line); border-radius:12px; padding:.9rem 1rem; background:#fafcff; color:#1e293b }
+        .snap-stat .k { color:#475569; font-size:.8rem }
+        .snap-stat .v { font-size:1.5rem; font-weight:700; line-height:1.2; color:#0f172a }
+        .snap-art { border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; margin:.6rem 0; background:#fff; color:#1e293b }
+        .snap-art h4 { margin:.1rem 0 .3rem; font-size:.98rem; color:#0f172a }
+        .snap-art h4 a { color:#1d4ed8; text-decoration:underline }
         .snap-art .meta { font-size:.8rem; color:#475569; display:flex; gap:.5rem; flex-wrap:wrap; align-items:center }
+        .snap-art .meta em { color:#475569; font-style:italic }
         .snap-art .ab { font-size:.86rem; color:#334155; margin:.4rem 0 0 }
+        .snap-art .ab.muted { color:#94a3b8 }
         .snap-chip { display:inline-block; font-size:.72rem; font-weight:700; padding:.1rem .5rem; border-radius:999px; background:#eef2ff; color:#3730a3 }
     </style>
 
@@ -341,16 +349,19 @@
             }
             empty.hidden = true; body.hidden = false;
             var d = data.derived;
-            st.textContent = d.finished ? 'terminé' : (d.stale ? 'arrêté ?' : 'en cours');
-            st.style.background = d.finished ? '#dcfce7' : (d.stale ? '#fee2e2' : '#dbeafe');
+            // Un gros fichier peut prendre >30 min : on ne crie « arrêté » qu'au-delà
+            // de 90 min sans mise à jour (sinon faux positif pendant un fichier lent).
+            var isStale = !d.finished && (d.since_update_sec || 0) > 5400;
+            st.textContent = d.finished ? 'terminé' : (isStale ? 'arrêté ?' : 'en cours');
+            st.style.background = d.finished ? '#dcfce7' : (isStale ? '#fee2e2' : '#dbeafe');
 
             document.getElementById('snap-pct').textContent = d.percent + '%';
             document.getElementById('snap-files').textContent = (d.done_files || 0).toLocaleString('fr-FR') + ' / ' + (d.total_files || 0).toLocaleString('fr-FR');
             document.getElementById('snap-part').textContent = data.progress.partition ? '· ' + esc(data.progress.partition) : '';
             var bar = document.getElementById('snap-bar');
             bar.style.width = Math.min(100, d.percent) + '%';
-            bar.style.background = d.finished ? '#16a34a' : (d.stale ? '#dc2626' : 'var(--accent)');
-            document.getElementById('snap-stale').hidden = !d.stale;
+            bar.style.background = d.finished ? '#16a34a' : (isStale ? '#dc2626' : 'var(--accent)');
+            document.getElementById('snap-stale').hidden = !isStale;
 
             document.getElementById('snap-selected').textContent = (d.selected || 0).toLocaleString('fr-FR');
             document.getElementById('snap-projected').textContent = d.projected_selected ? '≈ ' + d.projected_selected.toLocaleString('fr-FR') + ' au total (projeté)' : '';
