@@ -332,12 +332,36 @@
         // --- État live (recalcul du chrono/compte à rebours entre deux polls) ---
         var live = null, recvAt = 0, snapTimer = null, tick = null;
 
+        // Débit INSTANTANÉ : fenêtre glissante sur les derniers fichiers terminés
+        // (on ignore tout l'historique → réagit aux accélérations/ralentissements).
+        // On n'enregistre un point que quand done_files change (1 fichier ≈ qqs min).
+        var snapEvents = [];           // {t, done, scanned}
+        var SNAP_WINDOW = 7;           // ~6 intervalles inter-fichiers
+        function pushEvent(d) {
+            var last = snapEvents[snapEvents.length - 1];
+            if (!last || last.done !== d.done_files || last.scanned !== d.scanned) {
+                snapEvents.push({ t: Date.now(), done: d.done_files, scanned: d.scanned });
+                if (snapEvents.length > SNAP_WINDOW) snapEvents.shift();
+            }
+        }
+        function instantRate() {
+            if (snapEvents.length < 2) return null;
+            var a = snapEvents[0], b = snapEvents[snapEvents.length - 1];
+            var dtSec = (b.t - a.t) / 1000;
+            if (dtSec <= 0 || b.done <= a.done) return null;
+            return {
+                filesPerMin: (b.done - a.done) / (dtSec / 60),
+                worksPerSec: (b.scanned - a.scanned) / dtSec,
+                spanSec: dtSec,
+            };
+        }
+
         function paintTick() {
             if (!live) return;
             var dt = (Date.now() - recvAt) / 1000;
             document.getElementById('snap-elapsed').textContent = fmtDur((live.elapsed_run_sec || 0) + (live.finished ? 0 : dt));
             if (live.finished) { document.getElementById('snap-eta').textContent = 'terminé ✅'; return; }
-            if (live.eta_sec == null) { document.getElementById('snap-eta').textContent = '—'; return; }
+            if (live.eta_sec == null) { document.getElementById('snap-eta').textContent = 'estimation…'; return; }
             document.getElementById('snap-eta').textContent = fmtDur(Math.max(0, live.eta_sec - dt));
         }
 
@@ -367,10 +391,23 @@
             document.getElementById('snap-projected').textContent = d.projected_selected ? '≈ ' + d.projected_selected.toLocaleString('fr-FR') + ' au total (projeté)' : '';
             document.getElementById('snap-scanned').textContent = (d.scanned || 0).toLocaleString('fr-FR');
             document.getElementById('snap-retention').textContent = 'rétention ' + (d.retention_pct || 0) + '%';
-            document.getElementById('snap-rate').textContent = (d.files_per_min || 0) + ' fichiers/min';
-            document.getElementById('snap-finish').textContent = d.eta_finish_at && !d.finished ? 'fin ≈ ' + new Date(d.eta_finish_at).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
 
-            live = d; recvAt = Date.now(); paintTick();
+            // Débit + ETA INSTANTANÉS (fenêtre récente, on ignore l'historique lent).
+            pushEvent(d);
+            var inst = instantRate();
+            var remaining = (d.remaining_files != null) ? d.remaining_files : Math.max(0, (d.total_files || 0) - (d.done_files || 0));
+            var etaSec = d.finished ? 0 : (inst && inst.filesPerMin > 0 ? Math.round(remaining / inst.filesPerMin * 60) : null);
+
+            document.getElementById('snap-rate').textContent = inst
+                ? (Math.round(inst.worksPerSec).toLocaleString('fr-FR') + ' œuvres/s · ' + inst.filesPerMin.toFixed(2) + ' fichiers/min')
+                : (d.finished ? '—' : 'mesure du débit en cours…');
+            document.getElementById('snap-finish').textContent = (etaSec != null && !d.finished)
+                ? 'fin ≈ ' + new Date(Date.now() + etaSec * 1000).toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' })
+                : (d.finished ? '' : 'estimation en cours…');
+
+            // Le compte à rebours s'appuie sur l'ETA INSTANTANÉ, pas la moyenne du run.
+            live = { finished: d.finished, elapsed_run_sec: d.elapsed_run_sec, eta_sec: etaSec };
+            recvAt = Date.now(); paintTick();
 
             var arts = document.getElementById('snap-arts');
             var rows = data.samples || [];
