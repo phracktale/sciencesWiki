@@ -26,6 +26,14 @@
         .badge2 { display:inline-block; padding:.08rem .5rem; border-radius:999px; font-size:.72rem; font-weight:600; }
         .xp-empty { color:#6b7280; padding:2rem 1rem; text-align:center; }
         .xp-crumbs a { color:var(--accent-dark); }
+        .axis-band { display:inline-block; padding:.1rem .55rem; border-radius:999px; font-size:.72rem; font-weight:700; color:#fff; }
+        .axis-high { background:#065f46; } .axis-moderate { background:#b45309; }
+        .axis-low { background:#b91c1c; } .axis-insufficient { background:#6b7280; }
+        ul.axis-items { list-style:none; margin:.4rem 0 0; padding:0; font-size:.84rem; }
+        ul.axis-items li { padding:.28rem 0; border-bottom:1px solid var(--line); display:flex; gap:.5rem; align-items:flex-start; }
+        ul.axis-items .ax-ic { flex:0 0 1.1rem; text-align:center; font-weight:700; }
+        .ax-yes { color:#065f46; } .ax-no { color:#b91c1c; } .ax-unclear { color:#9ca3af; }
+        .axis-note { font-size:.74rem; color:#6b7280; margin-top:.5rem; font-style:italic; }
     </style>
 
     <p class="crumbs muted"><a href="/{{ app.request.locale }}/{{ slug }}">← {{ node.label }}</a></p>
@@ -187,6 +195,40 @@
             fetch('/api/articles/' + id).then(function (r) { return r.json(); }).then(renderDetail);
         }
 
+        // Panneau « Évaluation méthodologique (AXIS) » de la fiche article.
+        function axisHtml(ax) {
+            var bands = { high: 'Fiabilité élevée', moderate: 'Fiabilité modérée', low: 'Fiabilité faible', insufficient: 'Information insuffisante' };
+            var icons = { yes: ['✓', 'ax-yes'], no: ['✗', 'ax-no'], unclear: ['?', 'ax-unclear'] };
+            var h = '<hr class="sep"><div class="meta"><b>Évaluation méthodologique (AXIS)</b><br>';
+            // Verrou d'applicabilité : pour un design non transversal, AXIS est hors-sujet.
+            if (ax.applicability === 'not_applicable') {
+                h += '<span class="muted">' + esc(ax.applicabilityLabel) +
+                     (ax.studyDesign ? ' — étude : ' + esc(ax.studyDesign) : '') + '</span>';
+                h += '<div class="axis-note">' + esc(ax.disclaimer) + '</div></div>';
+                return h;
+            }
+            if (ax.reliabilityBand) {
+                h += '<span class="axis-band axis-' + esc(ax.reliabilityBand) + '">' + esc(bands[ax.reliabilityBand] || ax.reliabilityBand) + '</span> ';
+                h += '<span class="muted" style="font-size:.78rem">' + ax.favorableCount + '/' + ax.assessableCount + ' critères favorables';
+                if (ax.sourceScope === 'abstract') h += ' · résumé seul';
+                h += '</span>';
+            }
+            if (ax.summary) h += '<div style="margin-top:.4rem">' + esc(ax.summary) + '</div>';
+            if (ax.items && ax.items.length) {
+                h += '<details style="margin-top:.4rem"><summary class="muted" style="cursor:pointer; font-size:.82rem">Voir les 20 critères</summary><ul class="axis-items">';
+                ax.items.forEach(function (it) {
+                    var ic = icons[it.answer] || icons.unclear;
+                    var li = '<li><span class="ax-ic ' + ic[1] + '">' + ic[0] + '</span><span>' + esc(it.question);
+                    if (it.quote) li += '<br><span class="muted" style="font-size:.76rem">« ' + esc(it.quote) + ' »</span>';
+                    li += '</span></li>';
+                    h += li;
+                });
+                h += '</ul></details>';
+            }
+            h += '<div class="axis-note">' + esc(ax.disclaimer) + '</div></div>';
+            return h;
+        }
+
         function renderDetail(a) {
             if (a.error) { detail.innerHTML = '<div class="xp-empty">' + esc(a.error) + '</div>'; return; }
             var m = '';
@@ -230,6 +272,7 @@
                      a.hierarchy.map(function (h) { return '<a href="/{{ app.request.locale }}/' + esc(h.slug) + '">' + esc(h.label) + '</a>'; }).join(' › ') +
                      '</div>';
             }
+            if (a.axis) m += axisHtml(a.axis);
             detail.innerHTML = m;
             var trBtn = detail.querySelector('.xp-tr');
             if (trBtn) {

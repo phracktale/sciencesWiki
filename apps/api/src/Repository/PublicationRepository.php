@@ -669,4 +669,21 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
 
         return false === $id ? null : $this->find((int) $id);
     }
+
+    /**
+     * Texte intégral conservé d'une publication, fragments concaténés dans l'ordre
+     * du document (`ord`), borné en caractères. Vide si aucun chunk ingéré. Sert à
+     * l'évaluation AXIS (méthodes/résultats indisponibles dans le seul résumé).
+     */
+    public function fulltextFor(int $publicationId, int $maxChars = 16000): string
+    {
+        $chunks = $this->getEntityManager()->getConnection()->executeQuery(
+            'SELECT content FROM publication_chunk WHERE publication_id = :p ORDER BY ord ASC',
+            ['p' => $publicationId],
+        )->fetchFirstColumn();
+
+        $text = trim(implode("\n\n", array_map(static fn ($c): string => (string) $c, $chunks)));
+
+        return mb_substr($text, 0, $maxChars);
+    }
 }
