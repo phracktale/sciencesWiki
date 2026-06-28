@@ -327,6 +327,19 @@ final class GenerateWikiArticlesCommand extends Command
               qu'une information fausse). Choisis des chercheurs réellement emblématiques du domaine.
             - Ne fabrique pas de DOI ; n'ajoute pas de sources qui ne te sont pas fournies.
 
+            INTÉGRITÉ SCIENTIFIQUE (démarcation — IMPÉRATIF)
+            - SciencesWiki est une encyclopédie de SCIENCE. Ne présente JAMAIS comme un savoir établi
+              les théories rejetées par le consensus scientifique ou relevant de la pseudoscience
+              (par ex. psychanalyse, homéopathie, astrologie, mémoire de l'eau, créationnisme).
+            - Si une telle approche est historiquement rattachée au domaine, mentionne-la UNIQUEMENT pour
+              expliciter son statut NON scientifique (absence de validation empirique, non-réfutabilité,
+              non-reproductibilité) — jamais comme un acquis ni sur un pied d'égalité avec la science.
+            - Dans « ## Chercheurs essentiels », ne liste QUE des scientifiques dont l'apport est validé par
+              la méthode scientifique. N'y inscris JAMAIS une figure dont la contribution majeure est
+              pseudoscientifique (par ex. Sigmund Freud pour la psychanalyse). Si une telle figure est
+              incontournable historiquement, évoque-la dans le corps du texte AVEC le recul critique requis,
+              pas dans la liste des chercheurs de référence.
+
             SORTIE
             - Réponds UNIQUEMENT par l'article en Markdown (de l'introduction à « ## Références »),
               sans préambule, sans bloc de code englobant, sans commentaire.

@@ -95,6 +95,11 @@
         <div id="snap-empty" class="muted" hidden style="padding:1rem">Aucune ingestion de snapshot enregistrée. Lancez <code>app:openalex:ingest-snapshot</code>.</div>
 
         <div id="snap-body" hidden>
+            <div style="display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; margin:.2rem 0 1rem; padding:.6rem .9rem; border:1px solid var(--line); border-radius:10px; background:#f5f8ff">
+                <span style="font-size:.85rem; color:#475569">📚 Corpus total :</span>
+                <strong id="snap-corpus" style="font-size:1.7rem; color:#0f172a">—</strong>
+                <span class="muted" style="font-size:.8rem">publications en base (toutes sources confondues · ≈ estimation rapide). Le détail ci-dessous ne concerne que <strong>la passe d'ingestion en cours</strong>.</span>
+            </div>
             <div style="margin:.6rem 0 .2rem; display:flex; justify-content:space-between; font-size:.85rem; color:#475569">
                 <span><strong id="snap-pct">0%</strong> · fichier <span id="snap-files">0 / 0</span> <span id="snap-part" class="muted"></span></span>
                 <span id="snap-stale" class="badge warn" hidden>⚠️ aucune mise à jour depuis &gt;30 min — run peut-être arrêté</span>
@@ -104,8 +109,8 @@
             </div>
 
             <div class="snap-cards">
-                <div class="snap-stat"><div class="k">Articles intégrés</div><div class="v" id="snap-selected">—</div><div class="k" id="snap-projected"></div></div>
-                <div class="snap-stat"><div class="k">Œuvres scannées</div><div class="v" id="snap-scanned">—</div><div class="k" id="snap-retention"></div></div>
+                <div class="snap-stat"><div class="k">Retenus (cette passe)</div><div class="v" id="snap-selected">—</div><div class="k" id="snap-projected">depuis la dernière reprise</div></div>
+                <div class="snap-stat"><div class="k">Œuvres scannées (cette passe)</div><div class="v" id="snap-scanned">—</div><div class="k" id="snap-retention"></div></div>
                 <div class="snap-stat"><div class="k">Temps écoulé (ce run)</div><div class="v" id="snap-elapsed">—</div><div class="k" id="snap-rate"></div></div>
                 <div class="snap-stat"><div class="k">Durée restante estimée</div><div class="v" id="snap-eta">—</div><div class="k" id="snap-finish"></div></div>
             </div>
@@ -128,7 +133,7 @@
         <div class="snap-cards">
             <div class="snap-stat"><div class="k">Reste à embedder</div><div class="v" id="enr-embed-backlog">—</div><div class="k" id="enr-embed-trend">—</div></div>
             <div class="snap-stat"><div class="k">Reste à placer (arbre)</div><div class="v" id="enr-place-backlog">—</div><div class="k" id="enr-place-trend">—</div></div>
-            <div class="snap-stat"><div class="k">Publications (corpus)</div><div class="v" id="enr-total">—</div><div class="k">≈ estimation rapide</div></div>
+            <div class="snap-stat"><div class="k">📚 Corpus total</div><div class="v" id="enr-total">—</div><div class="k">publications en base · ≈ estimation rapide</div></div>
         </div>
 
         <h3 style="margin-top:1.2rem">📄 Plein texte <span class="muted" style="font-size:.8rem">— cron fulltext-drain (*/15) + GROBID</span></h3>
@@ -418,7 +423,7 @@
             document.getElementById('snap-stale').hidden = !isStale;
 
             document.getElementById('snap-selected').textContent = (d.selected || 0).toLocaleString('fr-FR');
-            document.getElementById('snap-projected').textContent = d.projected_selected ? '≈ ' + d.projected_selected.toLocaleString('fr-FR') + ' au total (projeté)' : '';
+            if (data.corpus_total) document.getElementById('snap-corpus').textContent = '≈ ' + data.corpus_total.toLocaleString('fr-FR');
             document.getElementById('snap-scanned').textContent = (d.scanned || 0).toLocaleString('fr-FR');
             document.getElementById('snap-retention').textContent = 'rétention ' + (d.retention_pct || 0) + '%';
 

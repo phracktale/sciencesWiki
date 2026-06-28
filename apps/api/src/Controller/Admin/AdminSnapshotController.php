@@ -34,6 +34,12 @@ final class AdminSnapshotController
             $derived = $this->derive($progress);
         }
 
+        // Taille RÉELLE du corpus (approx. rapide via reltuples). MÊME source que
+        // l'onglet Enrichissement → un seul « Corpus total » cohérent partout.
+        // « scanned/selected » du suivi ne valent QUE pour le run courant (le
+        // compteur repart à 0 à chaque reprise --skip-files), d'où ce total séparé.
+        $corpusTotal = (int) $conn->fetchOne("SELECT reltuples::bigint FROM pg_class WHERE relname = 'publication'");
+
         // Échantillon des dernières publications intégrées (la moisson API étant en
         // pause, les plus récentes sont celles du snapshot). Abstract tronqué.
         $samples = $conn->fetchAllAssociative(
@@ -72,6 +78,7 @@ final class AdminSnapshotController
 
         return new JsonResponse([
             'active' => \is_array($progress) && !($progress['finished'] ?? false),
+            'corpus_total' => $corpusTotal,
             'progress' => $progress,
             'derived' => $derived,
             'samples' => $samples,
