@@ -135,12 +135,12 @@
                 } %}
                 {% set defaultKey = node.articleMd ? 'adulte' : (node.articleMdAdo ? 'ado' : 'chercheur') %}
                 <div class="art-subtabs" role="tablist" aria-label="Niveau de lecture">
-                    {% for key, v in versions if v.md %}
+                    {% for key, v in versions %}{% if v.md %}
                         <button type="button" role="tab" class="art-subtab" data-arttab="art-{{ key }}" aria-selected="{{ key == defaultKey ? 'true' : 'false' }}">{{ v.label }}</button>
-                    {% endfor %}
+                    {% endif %}{% endfor %}
                     <span class="art-subtabs-hint muted">Choisissez votre niveau de lecture</span>
                 </div>
-                {% for key, v in versions if v.md %}
+                {% for key, v in versions %}{% if v.md %}
                     <section class="art-subpane" id="art-{{ key }}" role="tabpanel"{{ key == defaultKey ? '' : ' hidden' }}>
                         <article class="md wiki-article">
                             {{ v.md|md }}
@@ -163,7 +163,7 @@
                             {% endif %}
                         </article>
                     </section>
-                {% endfor %}
+                {% endif %}{% endfor %}
             {% else %}
                 <p class="muted">Aucun article encyclopédique n'a encore été rédigé pour cette rubrique.</p>
             {% endif %}
