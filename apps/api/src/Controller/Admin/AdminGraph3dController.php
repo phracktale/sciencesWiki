@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Harvester\Ai\EmbeddingClientFactory;
 use Doctrine\ORM\EntityManagerInterface;
+use Pgvector\Vector;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
@@ -26,8 +28,10 @@ final class AdminGraph3dController
     private const STRONG = 0.80;      // cosinus ≥ → lien « fort »
     private const WEAK = 0.62;        // cosinus ≥ → lien « faible »
 
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly EmbeddingClientFactory $embeddings,
+    ) {
     }
 
     #[Route('/api/admin/graph3d', name: 'admin_graph3d', methods: ['GET'])]
@@ -35,49 +39,69 @@ final class AdminGraph3dController
     {
         $conn = $this->em->getConnection();
         $limit = min(self::MAX_LIMIT, max(20, (int) $request->query->get('limit', (string) self::DEFAULT_LIMIT)));
+        $q = trim((string) $request->query->get('q', ''));
         $domain = trim((string) $request->query->get('domain', ''));
 
-        $params = [];
-        $domainFilter = '';
-        if ('' !== $domain) {
-            $domainFilter = 'AND EXISTS (SELECT 1 FROM placement_suggestion ps
-                 JOIN tree_node tn ON tn.id = ps.tree_node_id
-                 WHERE ps.publication_id = p.id AND tn.domain = :domain)';
-            $params['domain'] = $domain;
+        // Vecteur de requête : recherche sémantique NL (q) > champ choisi (domain)
+        // > sinon les plus cités. q = on EMBED la requête en langage naturel ;
+        // domain = on prend le CENTROÏDE du champ OpenAlex (voisinage du domaine).
+        $vec = null;
+        $mode = 'cités';
+        if ('' !== $q) {
+            $vec = (string) new Vector($this->embeddings->create()->embed($q));
+            $mode = 'recherche';
+        } elseif ('' !== $domain) {
+            $found = $conn->fetchOne(
+                "SELECT embedding::text FROM tree_node
+                 WHERE openalex_concept_id LIKE 'fields/%' AND label = :d AND embedding IS NOT NULL
+                 LIMIT 1",
+                ['d' => $domain],
+            );
+            if (\is_string($found) && '' !== $found) {
+                $vec = $found;
+                $mode = 'domaine';
+            }
         }
 
-        // CTE : on choisit d'abord les N plus cités AYANT un embedding (index
-        // idx_pub_cited), PUIS on calcule les latéraux (domaine, auteurs) sur ces
-        // N lignes seulement — pas sur tout le corpus.
+        $params = [];
+        if (null !== $vec) {
+            $order = 'p.embedding <=> CAST(:vec AS vector)';      // plus proches d'abord (HNSW)
+            $params['vec'] = $vec;
+            $conn->executeStatement('SET hnsw.ef_search = '.max(120, $limit * 2));
+        } else {
+            $order = 'p.cited_by_count DESC NULLS LAST';          // index idx_pub_cited
+        }
+
+        // CTE : on choisit d'abord les N publications cibles, PUIS on calcule les
+        // latéraux (CHAMP scientifique le plus proche pour la couleur, auteurs) sur
+        // ces N lignes seulement — pas sur tout le corpus.
         $rows = $conn->fetchAllAssociative(
             "WITH picked AS (
                  SELECT p.id, p.title, p.oa_status, p.type, p.cited_by_count,
                         p.doi, p.oa_url, p.landing_page_url, p.publication_date, p.embedding
                  FROM publication p
                  WHERE p.embedding IS NOT NULL
-                 $domainFilter
-                 ORDER BY p.cited_by_count DESC NULLS LAST
+                 ORDER BY $order
                  LIMIT $limit
              )
              SELECT p.id, p.title, p.oa_status, p.type, p.cited_by_count,
                     p.doi, p.oa_url, p.landing_page_url,
                     EXTRACT(YEAR FROM p.publication_date)::int AS year,
-                    dom.domain AS domain,
+                    dom.label AS domain,
                     auth.names AS authors,
                     p.embedding::text AS emb
              FROM picked p
              LEFT JOIN LATERAL (
-                 SELECT tn.domain FROM placement_suggestion ps
-                 JOIN tree_node tn ON tn.id = ps.tree_node_id
-                 WHERE ps.publication_id = p.id AND tn.domain IS NOT NULL
-                 ORDER BY ps.score DESC LIMIT 1
+                 SELECT tn.label FROM tree_node tn
+                 WHERE tn.embedding IS NOT NULL AND tn.openalex_concept_id LIKE 'fields/%'
+                 ORDER BY tn.embedding <=> p.embedding LIMIT 1
              ) dom ON true
              LEFT JOIN LATERAL (
                  SELECT string_agg(a.name, ', ' ORDER BY au.position) AS names
                  FROM (SELECT author_id, position FROM authorship WHERE publication_id = p.id ORDER BY position LIMIT 6) au
                  JOIN author a ON a.id = au.author_id
              ) auth ON true
-             ORDER BY p.cited_by_count DESC NULLS LAST",
+             ORDER BY $order",
             $params,
         );
 
@@ -105,7 +129,10 @@ final class AdminGraph3dController
 
         $links = $this->similarityLinks($nodes, $vecs);
 
-        $domains = $conn->fetchFirstColumn('SELECT DISTINCT domain FROM tree_node WHERE domain IS NOT NULL ORDER BY domain');
+        // Champs scientifiques OpenAlex (≈26) pour la légende et le filtre.
+        $domains = $conn->fetchFirstColumn(
+            "SELECT label FROM tree_node WHERE openalex_concept_id LIKE 'fields/%' AND embedding IS NOT NULL ORDER BY label"
+        );
 
         return new JsonResponse([
             'nodes' => $nodes,
@@ -115,9 +142,13 @@ final class AdminGraph3dController
                 'count' => \count($nodes),
                 'links' => \count($links),
                 'limit' => $limit,
+                'mode' => $mode,                                   // recherche | domaine | cités
+                'query' => '' !== $q ? $q : null,
                 'domain' => '' !== $domain ? $domain : null,
                 'thresholds' => ['strong' => self::STRONG, 'weak' => self::WEAK],
-                'note' => 'Liens = similarité sémantique (embeddings). Les citations ne sont pas encore ingérées comme arêtes.',
+                'note' => 'recherche' === $mode
+                    ? 'Sous-graphe sémantique autour de votre requête (les '.\count($nodes).' publications les plus proches). Liens = similarité d’embeddings.'
+                    : 'Liens = similarité sémantique (embeddings). Couleur = champ scientifique le plus proche.',
             ],
         ]);
     }

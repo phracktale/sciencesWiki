@@ -4,7 +4,7 @@
     {% include 'admin/_nav.html.twig' %}
 
     <h1 style="margin-bottom:.2rem">Visualiseur 3D des publications 🌐</h1>
-    <p class="muted" style="margin-top:0">Carte sémantique du corpus : chaque <strong>sphère</strong> = une publication (taille ∝ citations, couleur = domaine). Les <strong>liens</strong> = proximité sémantique (embeddings) — <span style="color:#fff;background:#222;padding:0 .3rem;border-radius:3px">fort</span> = très similaire, <span style="color:#7c93ff">faible</span> = modéré. Citations en arête : à venir (non encore ingérées).</p>
+    <p class="muted" style="margin-top:0"><strong>Tape une question/notion en langage naturel</strong> → le graphe affiche le sous-ensemble du corpus le plus proche sémantiquement (recherche d'embeddings sur les 8 M+ publications). Chaque <strong>sphère</strong> = une publication (taille ∝ citations, couleur = <strong>champ scientifique</strong> le plus proche). Les <strong>liens</strong> = proximité sémantique — <span style="color:#fff;background:#222;padding:0 .3rem;border-radius:3px">fort</span> = très similaire, <span style="color:#7c93ff">faible</span> = modéré. <em>(Phase 1 ; liens citation et clusters par zoom = à venir.)</em></p>
 
     <style>
         .g3-toolbar { display:flex; gap:.6rem; flex-wrap:wrap; align-items:center; margin:.6rem 0 }
@@ -29,8 +29,9 @@
     </style>
 
     <div class="g3-toolbar">
-        <label>Domaine :
-            <select id="g3-domain"><option value="">Tous</option></select>
+        <input id="g3-search" type="search" placeholder="🔍 Recherche sémantique (ex. : comment le cerveau mémorise)…" style="min-width:340px; flex:1">
+        <label>Champ :
+            <select id="g3-domain"><option value="">— (les plus cités)</option></select>
         </label>
         <label>Nœuds :
             <select id="g3-limit">
@@ -40,7 +41,6 @@
                 <option value="400">400</option>
             </select>
         </label>
-        <input id="g3-search" type="search" placeholder="🔍 Rechercher un titre…" style="min-width:220px">
         <button id="g3-reload" type="button">↻ Recharger</button>
         <span id="g3-status" class="muted" style="font-size:.85rem"></span>
     </div>
@@ -133,41 +133,44 @@
 
         var statusEl = document.getElementById('g3-status'), countEl = document.getElementById('g3-count');
         function load() {
+            var q = document.getElementById('g3-search').value.trim();
             var domain = document.getElementById('g3-domain').value;
             var limit = document.getElementById('g3-limit').value;
-            statusEl.textContent = 'Chargement…'; errBox.hidden = true;
-            fetch('/admin/graph3d.json?domain=' + encodeURIComponent(domain) + '&limit=' + encodeURIComponent(limit), { headers: { 'Accept': 'application/json' } })
+            statusEl.textContent = q ? 'Recherche sémantique…' : 'Chargement…'; errBox.hidden = true;
+            fetch('/admin/graph3d.json?q=' + encodeURIComponent(q) + '&domain=' + encodeURIComponent(domain) + '&limit=' + encodeURIComponent(limit), { headers: { 'Accept': 'application/json' } })
                 .then(function (r) { return r.json(); })
                 .then(function (data) {
                     if (data.meta && data.meta.error) { errBox.hidden = false; errBox.textContent = 'Erreur : ' + data.meta.error; }
-                    // Remplit le sélecteur de domaines (une seule fois).
+                    // Remplit le sélecteur de champs (une seule fois).
                     var sel = document.getElementById('g3-domain');
                     if (sel.options.length <= 1 && data.domains) {
                         data.domains.forEach(function (d) { var o = document.createElement('option'); o.value = d; o.textContent = d; sel.appendChild(o); });
                     }
-                    // Couleurs domaines présents dans le jeu.
+                    // Couleurs des champs présents dans le jeu.
                     var present = {};
                     (data.nodes || []).forEach(function (n) { if (n.domain) present[n.domain] = true; });
                     legend(Object.keys(present).sort());
                     Graph.graphData({ nodes: data.nodes || [], links: data.links || [] });
-                    countEl.textContent = (data.meta ? data.meta.count : (data.nodes || []).length) + ' nœuds · ' + ((data.links || []).length) + ' liens';
+                    var mode = data.meta && data.meta.mode;
+                    var prefix = mode === 'recherche' ? '🔍 « ' + q + ' » — ' : (mode === 'domaine' ? '🎯 ' + domain + ' — ' : '⭐ plus cités — ');
+                    countEl.textContent = prefix + (data.meta ? data.meta.count : (data.nodes || []).length) + ' nœuds · ' + ((data.links || []).length) + ' liens';
                     statusEl.textContent = '';
                 })
                 .catch(function (err) { statusEl.textContent = ''; errBox.hidden = false; errBox.textContent = 'Échec du chargement : ' + err; });
         }
 
-        // Recherche : focalise le 1er nœud dont le titre matche.
+        // Recherche SÉMANTIQUE en langage naturel : Entrée → on interroge le serveur
+        // (embedding de la requête → plus proches du corpus entier). Prime sur le champ.
         document.getElementById('g3-search').addEventListener('keydown', function (e) {
             if (e.key !== 'Enter') return;
-            var q = this.value.trim().toLowerCase();
-            if (!q) return;
-            var data = Graph.graphData();
-            var hit = (data.nodes || []).filter(function (n) { return (n.title || '').toLowerCase().indexOf(q) >= 0; })[0];
-            if (hit) { focusNode(hit); showPanel(hit); } else { statusEl.textContent = 'Aucun résultat'; setTimeout(function () { statusEl.textContent = ''; }, 1500); }
+            e.preventDefault();
+            document.getElementById('g3-domain').value = '';
+            load();
         });
 
         document.getElementById('g3-reload').addEventListener('click', load);
-        document.getElementById('g3-domain').addEventListener('change', load);
+        // Choisir un champ vide la recherche (q et champ sont exclusifs).
+        document.getElementById('g3-domain').addEventListener('change', function () { document.getElementById('g3-search').value = ''; load(); });
         document.getElementById('g3-limit').addEventListener('change', load);
         window.addEventListener('resize', function () { Graph.width(el.clientWidth).height(el.clientHeight); });
         Graph.width(el.clientWidth).height(el.clientHeight);
