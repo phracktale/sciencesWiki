@@ -47,6 +47,13 @@
         .qa-title { font-size:1.05rem; margin:.6rem 0 .4rem; color:var(--accent-dark); }
         .qa-warn { border:1px solid #fcd34d; background:#fffbeb; color:#92400e; border-radius:8px; padding:.55rem .8rem; margin:1rem 0 .2rem; font-size:.85rem; }
         @media (prefers-reduced-motion: reduce){ .qa-summary::after { transition:none; } }
+        /* Sous-onglets « niveau de lecture » (Ado / Adulte / Chercheur) */
+        .art-subtabs { display:flex; gap:.4rem; align-items:center; flex-wrap:wrap; margin:.4rem 0 1rem; }
+        .art-subtab { background:#f1f5f9; border:1px solid var(--line); border-radius:999px; padding:.4rem 1rem; font:inherit; font-weight:600; color:#475569; cursor:pointer; transition:all .12s; }
+        .art-subtab:hover { border-color:var(--accent); color:var(--accent); }
+        .art-subtab[aria-selected="true"] { background:var(--accent); border-color:var(--accent); color:#fff; }
+        .art-subtabs-hint { font-size:.78rem; margin-left:.3rem; }
+        .art-subpane[hidden] { display:none; }
     </style>
 
     {% if crumbs|length > 1 %}
@@ -117,21 +124,46 @@
                 </form>
             {% endif %}
 
-            {% if node.articleMd %}
-                <article class="md wiki-article">
-                    {{ node.articleMd|md }}
-                    {% if node.articleStatus != 'valide' %}
-                        <aside class="ai-banner">
-                            <strong>⚠️ Contenu assisté par IA — non garanti par le comité scientifique.</strong>
-                            Cet article a été {{ node.articleModel ? 'rédigé par une intelligence artificielle (' ~ node.articleModel ~ ')' : 'généré automatiquement' }} et peut comporter des imprécisions. Sa fiabilité n'engage pas le comité tant qu'il n'est pas validé.
-                            {% if current_user.canEdit %}
-                                <a href="#art-edit" data-show="art-edit" data-scroll>✏️ Relire et corriger cet article</a>.
+            {% set hasAny = node.articleMd or node.articleMdAdo or node.articleMdChercheur %}
+            {% if hasAny %}
+                {# Trois niveaux de lecture. « adulte » = version canonique relue/éditable ;
+                   « ado » & « chercheur » = variantes IA en lecture seule. #}
+                {% set versions = {
+                    'ado':       { label: '🧒 Ado',       md: node.articleMdAdo },
+                    'adulte':    { label: '👤 Adulte',    md: node.articleMd },
+                    'chercheur': { label: '🎓 Chercheur', md: node.articleMdChercheur }
+                } %}
+                {% set defaultKey = node.articleMd ? 'adulte' : (node.articleMdAdo ? 'ado' : 'chercheur') %}
+                <div class="art-subtabs" role="tablist" aria-label="Niveau de lecture">
+                    {% for key, v in versions if v.md %}
+                        <button type="button" role="tab" class="art-subtab" data-arttab="art-{{ key }}" aria-selected="{{ key == defaultKey ? 'true' : 'false' }}">{{ v.label }}</button>
+                    {% endfor %}
+                    <span class="art-subtabs-hint muted">Choisissez votre niveau de lecture</span>
+                </div>
+                {% for key, v in versions if v.md %}
+                    <section class="art-subpane" id="art-{{ key }}" role="tabpanel"{{ key == defaultKey ? '' : ' hidden' }}>
+                        <article class="md wiki-article">
+                            {{ v.md|md }}
+                            {% if key == 'adulte' %}
+                                {% if node.articleStatus != 'valide' %}
+                                    <aside class="ai-banner">
+                                        <strong>⚠️ Contenu assisté par IA — non garanti par le comité scientifique.</strong>
+                                        Cet article a été {{ node.articleModel ? 'rédigé par une intelligence artificielle (' ~ node.articleModel ~ ')' : 'généré automatiquement' }} et peut comporter des imprécisions. Sa fiabilité n'engage pas le comité tant qu'il n'est pas validé.
+                                        {% if current_user.canEdit %}
+                                            <a href="#art-edit" data-show="art-edit" data-scroll>✏️ Relire et corriger cet article</a>.
+                                        {% else %}
+                                            Vous êtes chercheur·e ou contributeur·rice&nbsp;? <a href="{{ path('login', { back: app.request.uri }) }}">Connectez-vous pour le relire et le corriger</a>.
+                                        {% endif %}
+                                    </aside>
+                                {% endif %}
                             {% else %}
-                                Vous êtes chercheur·e ou contributeur·rice&nbsp;? <a href="{{ path('login', { back: app.request.uri }) }}">Connectez-vous pour le relire et le corriger</a>.
+                                <aside class="ai-banner">
+                                    <strong>⚠️ Variante « {{ key == 'ado' ? 'ado' : 'chercheur' }} » générée par IA</strong> — déclinée de l'article pour ce niveau de lecture, à partir des mêmes sources. Non éditable&nbsp;; la version de référence relue par le comité est l'onglet «&nbsp;Adulte&nbsp;».
+                                </aside>
                             {% endif %}
-                        </aside>
-                    {% endif %}
-                </article>
+                        </article>
+                    </section>
+                {% endfor %}
             {% else %}
                 <p class="muted">Aucun article encyclopédique n'a encore été rédigé pour cette rubrique.</p>
             {% endif %}
@@ -383,6 +415,18 @@
                 var artTick = function () { artChrono.textContent = artBase + ' (écoulé ' + artFmt((Date.now() - artStarted.getTime()) / 1000) + ')'; };
                 artTick(); setInterval(artTick, 1000);
             }
+        }
+
+        // --- Sous-onglets « niveau de lecture » (Ado / Adulte / Chercheur) ---
+        var artSubtabs = Array.prototype.slice.call(document.querySelectorAll('.art-subtab'));
+        if (artSubtabs.length) {
+            var artPanes = Array.prototype.slice.call(document.querySelectorAll('.art-subpane'));
+            artSubtabs.forEach(function (t) {
+                t.addEventListener('click', function () {
+                    artSubtabs.forEach(function (b) { b.setAttribute('aria-selected', b === t ? 'true' : 'false'); });
+                    artPanes.forEach(function (p) { p.hidden = (p.id !== t.dataset.arttab); });
+                });
+            });
         }
     })();
 </script>

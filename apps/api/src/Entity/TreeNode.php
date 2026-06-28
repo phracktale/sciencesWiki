@@ -117,10 +117,20 @@ class TreeNode
     #[Groups(['node:read'])]
     private ?\DateTimeImmutable $analysisStartedAt = null;
 
-    /** Article encyclopédique long (Markdown), rédigé par IA puis relu. */
+    /** Article encyclopédique long (Markdown), rédigé par IA puis relu. Version « adulte » (canonique). */
     #[ORM\Column(name: 'article_md', type: Types::TEXT, nullable: true)]
     #[Groups(['node:item'])]
     private ?string $articleMd = null;
+
+    /** Variante « ado » (~13-17 ans) générée par IA, en lecture seule (vulgarisation accessible). */
+    #[ORM\Column(name: 'article_md_ado', type: Types::TEXT, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?string $articleMdAdo = null;
+
+    /** Variante « chercheur » générée par IA, en lecture seule (registre technique/académique). */
+    #[ORM\Column(name: 'article_md_chercheur', type: Types::TEXT, nullable: true)]
+    #[Groups(['node:item'])]
+    private ?string $articleMdChercheur = null;
 
     /** Paternité (comme les réponses) : 'non_relu' (IA seule) | 'valide' (relu humain). */
     #[ORM\Column(name: 'article_status', length: 20, options: ['default' => 'non_relu'])]
@@ -153,6 +163,30 @@ class TreeNode
     public function setArticleMd(?string $md): self
     {
         $this->articleMd = $md;
+
+        return $this;
+    }
+
+    public function getArticleMdAdo(): ?string
+    {
+        return $this->articleMdAdo;
+    }
+
+    public function setArticleMdAdo(?string $md): self
+    {
+        $this->articleMdAdo = $md;
+
+        return $this;
+    }
+
+    public function getArticleMdChercheur(): ?string
+    {
+        return $this->articleMdChercheur;
+    }
+
+    public function setArticleMdChercheur(?string $md): self
+    {
+        $this->articleMdChercheur = $md;
 
         return $this;
     }

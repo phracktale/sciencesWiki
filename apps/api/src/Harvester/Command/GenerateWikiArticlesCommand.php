@@ -119,11 +119,54 @@ final class GenerateWikiArticlesCommand extends Command
 
         [$sourcePubs, $sourceEmbedding] = $this->sourcePublications($node, $embedder);
         $related = $this->relatedNodes($node);
+        $sources = $this->formatSources($sourcePubs);
+        $relatedFmt = $this->formatRelated($related);
 
+        $total = 0;
+        // Trois registres : « adulte » = version CANONIQUE (article_md, éditable /
+        // validable / historisée) ; « ado » et « chercheur » = variantes IA en
+        // lecture seule, déclinées du même fond sourcé.
+        foreach (['adulte', 'ado', 'chercheur'] as $audience) {
+            $md = $this->renderVersion($node, $sources, $relatedFmt, $related, $sourcePubs, $sourceEmbedding, $model, $audience);
+            if (mb_strlen($md) < 500) {
+                continue; // version trop courte (échec/troncature) : on n'écrase pas
+            }
+            if ('adulte' === $audience) {
+                $node->setArticleMd($md)
+                    ->setArticleModel($model)
+                    ->setArticleStatus('non_relu')
+                    ->setArticleGeneratedAt(new \DateTimeImmutable());
+                $this->em->persist(
+                    (new \App\Entity\ArticleRevision($node, $md, 'ia'))
+                        ->setAuthorLabel($model)
+                        ->setChangeSummary('Génération IA')
+                );
+            } elseif ('ado' === $audience) {
+                $node->setArticleMdAdo($md);
+            } else {
+                $node->setArticleMdChercheur($md);
+            }
+            $total += mb_strlen($md);
+        }
+        $this->em->flush();
+
+        return $total;
+    }
+
+    /**
+     * Génère UNE version de l'article pour une cible de lectorat (stream LLM →
+     * nettoyage → liens internes garantis → vérif de fidélité cran 2 → Wikipédia).
+     *
+     * @param list<\App\Entity\Publication>          $sourcePubs
+     * @param list<float>                            $sourceEmbedding
+     * @param list<array{label:string,slug:string}>  $related
+     */
+    private function renderVersion(TreeNode $node, string $sources, string $relatedFmt, array $related, array $sourcePubs, array $sourceEmbedding, string $model, string $audience): string
+    {
         // Streaming interne : la rédaction longue dépasse le timeout idle non-streamé.
         $md = '';
         foreach ($this->llm->stream(
-            $this->buildMessages($node, $this->formatSources($sourcePubs), $this->formatRelated($related)),
+            $this->buildMessages($node, $sources, $relatedFmt, $audience),
             ['temperature' => 0.3, 'max_tokens' => 12000, 'model' => $model],
         ) as $delta) {
             $md .= $delta;
@@ -133,24 +176,8 @@ final class GenerateWikiArticlesCommand extends Command
         $md = trim((string) preg_replace('#^```(?:markdown|md)?\s*\n(.*)\n```$#is', '$1', $md));
         // Liens internes garantis + anti-hallucination (cran 2, gardé par RAG_VERIFY).
         $md = $this->autolink($md, $related, $node->getSlug());
-        $md = $this->wikipedia->resolve($this->faithfulness->annotate($md, $sourcePubs, $sourceEmbedding));
 
-        if (mb_strlen($md) < 800) {
-            return 0;
-        }
-
-        $node->setArticleMd($md)
-            ->setArticleModel($model)
-            ->setArticleStatus('non_relu')
-            ->setArticleGeneratedAt(new \DateTimeImmutable());
-        $this->em->persist(
-            (new \App\Entity\ArticleRevision($node, $md, 'ia'))
-                ->setAuthorLabel($model)
-                ->setChangeSummary('Génération IA')
-        );
-        $this->em->flush();
-
-        return mb_strlen($md);
+        return $this->wikipedia->resolve($this->faithfulness->annotate($md, $sourcePubs, $sourceEmbedding));
     }
 
     /**
@@ -257,7 +284,7 @@ final class GenerateWikiArticlesCommand extends Command
     }
 
     /** @return list<LlmMessage> */
-    private function buildMessages(TreeNode $node, string $sources, string $related): array
+    private function buildMessages(TreeNode $node, string $sources, string $related, string $audience = 'adulte'): array
     {
         $system = <<<'SYS'
             Tu es un rédacteur encyclopédique scientifique francophone, du niveau de Wikipédia.
@@ -305,6 +332,13 @@ final class GenerateWikiArticlesCommand extends Command
               sans préambule, sans bloc de code englobant, sans commentaire.
             SYS;
 
+        // Cible de lectorat : « adulte » = prompt encyclopédique de référence (inchangé) ;
+        // « ado »/« chercheur » = une directive PRIORITAIRE en tête redéfinit ton, longueur
+        // et profondeur, sans toucher aux sources ni aux garde-fous anti-hallucination.
+        if ('adulte' !== $audience) {
+            $system = $this->audienceDirective($audience)."\n\n".$system;
+        }
+
         $breadcrumb = implode(' › ', array_map(static fn (array $b): string => $b['label'] ?? '', $node->getBreadcrumb()));
 
         $user = <<<TXT
@@ -329,5 +363,35 @@ final class GenerateWikiArticlesCommand extends Command
             TXT;
 
         return [LlmMessage::system($system."\n\n".\App\Service\SettingsService::GEO_SCOPE_GUARD), LlmMessage::user($user)];
+    }
+
+    /**
+     * Consigne PRIORITAIRE de cible de lectorat, placée en tête du prompt système
+     * pour décliner la même matière sourcée en « ado » ou « chercheur ».
+     */
+    private function audienceDirective(string $audience): string
+    {
+        if ('ado' === $audience) {
+            return <<<'ADO'
+                ⚑ CIBLE DE LECTORAT : ADOLESCENT (≈ 13-17 ans). CETTE CONSIGNE PRIME sur le style générique ci-dessous.
+                - Vise une vulgarisation ACCESSIBLE mais EXACTE : explique CHAQUE terme technique par une analogie ou un
+                  exemple concret du quotidien. Phrases courtes, ton vivant et clair, sans être enfantin ni condescendant.
+                - PLUS COURT : 6 000 à 9 000 signes. Seulement ~5-6 intertitres ## (l'essentiel : c'est quoi, à quoi ça
+                  sert, comment ça marche, histoire en bref, débats/limites). Pas de sous-sections ### superflues.
+                - Évite le formalisme mathématique lourd ; si une formule est vraiment centrale, explique-la avec des mots.
+                - Garde tout de même « ## Chercheurs essentiels » (5 suffisent), « ## Applications essentielles » et
+                  « ## Références ». MÊMES garde-fous anti-hallucination : aucun fait, chiffre, date ou source inventé.
+                ADO;
+        }
+
+        return <<<'CHE'
+            ⚑ CIBLE DE LECTORAT : CHERCHEUR / NIVEAU AVANCÉ. CETTE CONSIGNE PRIME sur le style générique ci-dessous.
+            - Registre TECHNIQUE et académique : le lecteur maîtrise les bases, n'explique pas les notions élémentaires.
+            - Insiste sur les formalismes et lois clés, les méthodes et protocoles, les résultats de pointe, les
+              CONTROVERSES, les LIMITES et les QUESTIONS OUVERTES, et l'état de l'art. Terminologie précise ; dense est permis.
+            - LONG : 15 000 à 22 000 signes, avec davantage de sous-sections ### techniques.
+            - Garde « ## Chercheurs essentiels » (10), « ## Applications essentielles » (orientées recherche/transfert) et
+              « ## Références ». MÊMES garde-fous anti-hallucination : aucun DOI ni source inventé.
+            CHE;
     }
 }
