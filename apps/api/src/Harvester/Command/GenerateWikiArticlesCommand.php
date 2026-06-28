@@ -11,6 +11,7 @@ use App\Harvester\Ai\EmbeddingClientFactory;
 use App\Repository\PublicationRepository;
 use App\Repository\TreeNodeRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Pgvector\Vector;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -121,13 +122,16 @@ final class GenerateWikiArticlesCommand extends Command
         $related = $this->relatedNodes($node);
         $sources = $this->formatSources($sourcePubs);
         $relatedFmt = $this->formatRelated($related);
+        // Vrais contributeurs du domaine (données corpus, anti star-system) — calculé
+        // une fois, identique pour les 3 versions.
+        $contributors = $this->topContributors($sourceEmbedding);
 
         $total = 0;
         // Trois registres : « adulte » = version CANONIQUE (article_md, éditable /
         // validable / historisée) ; « ado » et « chercheur » = variantes IA en
         // lecture seule, déclinées du même fond sourcé.
         foreach (['adulte', 'ado', 'chercheur'] as $audience) {
-            $md = $this->renderVersion($node, $sources, $relatedFmt, $related, $sourcePubs, $sourceEmbedding, $model, $audience);
+            $md = $this->renderVersion($node, $sources, $relatedFmt, $related, $sourcePubs, $sourceEmbedding, $model, $audience, $contributors);
             if (mb_strlen($md) < 500) {
                 continue; // version trop courte (échec/troncature) : on n'écrase pas
             }
@@ -161,12 +165,12 @@ final class GenerateWikiArticlesCommand extends Command
      * @param list<float>                            $sourceEmbedding
      * @param list<array{label:string,slug:string}>  $related
      */
-    private function renderVersion(TreeNode $node, string $sources, string $relatedFmt, array $related, array $sourcePubs, array $sourceEmbedding, string $model, string $audience): string
+    private function renderVersion(TreeNode $node, string $sources, string $relatedFmt, array $related, array $sourcePubs, array $sourceEmbedding, string $model, string $audience, string $contributors = ''): string
     {
         // Streaming interne : la rédaction longue dépasse le timeout idle non-streamé.
         $md = '';
         foreach ($this->llm->stream(
-            $this->buildMessages($node, $sources, $relatedFmt, $audience),
+            $this->buildMessages($node, $sources, $relatedFmt, $audience, $contributors),
             ['temperature' => 0.3, 'max_tokens' => 12000, 'model' => $model],
         ) as $delta) {
             $md .= $delta;
@@ -284,7 +288,7 @@ final class GenerateWikiArticlesCommand extends Command
     }
 
     /** @return list<LlmMessage> */
-    private function buildMessages(TreeNode $node, string $sources, string $related, string $audience = 'adulte'): array
+    private function buildMessages(TreeNode $node, string $sources, string $related, string $audience = 'adulte', string $contributors = ''): array
     {
         $system = <<<'SYS'
             Tu es un rédacteur encyclopédique scientifique francophone, du niveau de Wikipédia.
@@ -308,9 +312,16 @@ final class GenerateWikiArticlesCommand extends Command
               objet et périmètre d'étude ; histoire et grandes étapes ; concepts et théories fondamentales ;
               formalismes/lois clés ; méthodes et instruments ; principales sous-disciplines ; résultats et
               découvertes majeurs ; débats, limites et questions ouvertes ; liens avec les domaines voisins.
-            - AVANT-DERNIÈRE section « ## Chercheurs essentiels » : une liste de 10 chercheurs marquants du domaine,
-              une puce chacun, au format :
-              « - **Prénom Nom** (année de naissance–année de mort, ou « né en … » si vivant) — connu·e pour … — prix majeur(s) le cas échéant ».
+            - AVANT-DERNIÈRE section « ## Chercheurs essentiels » : une liste de ~10 chercheurs, une puce chacun.
+              PRINCIPE ANTI STAR-SYSTEM : la science est COLLECTIVE. Quand des « CONTRIBUTEURS RÉELS DU CORPUS »
+              te sont fournis (premiers-auteurs, ceux qui ont fait le travail), PRIVILÉGIE-les ; pour eux,
+              décris leur rôle de façon FACTUELLE sans rien inventer (« premier·e auteur·e de N publications très
+              citées du corpus sur [sous-thème] »), n'invente NI dates NI prix.
+              Tu peux compléter avec quelques figures historiques incontournables (format « - **Prénom Nom**
+              (naissance–mort) — connu·e pour … — prix le cas échéant »), MAIS : attribue honnêtement (un nom-totem
+              cache une équipe : écris « l'équipe de …, dont X et Y » plutôt qu'un seul homme), n'inscris pas une
+              figure dont l'apport majeur est pseudoscientifique (cf. garde-fou démarcation), et un prix prestigieux
+              ne vaut PAS caution sur ses autres prises de position.
             - DERNIÈRE section « ## Applications essentielles » : une liste à puces des applications concrètes
               majeures du domaine (technologies, usages, retombées), chacune en une phrase explicative.
             - Termine par « ## Références » listant les sources fournies (numéro, titre, année, lien DOI s'il existe).
@@ -354,6 +365,10 @@ final class GenerateWikiArticlesCommand extends Command
 
         $breadcrumb = implode(' › ', array_map(static fn (array $b): string => $b['label'] ?? '', $node->getBreadcrumb()));
 
+        $contributorsBlock = '' !== trim($contributors)
+            ? "CONTRIBUTEURS RÉELS DU CORPUS (premiers-auteurs des publications les plus citées du domaine — à PRIVILÉGIER dans « ## Chercheurs essentiels », rôle décrit FACTUELLEMENT, sans inventer dates ni prix) :\n".$contributors."\n"
+            : '';
+
         $user = <<<TXT
             Rédige l'article encyclopédique de RÉFÉRENCE du domaine scientifique suivant, en respectant
             scrupuleusement la structure et les garde-fous.
@@ -368,6 +383,7 @@ final class GenerateWikiArticlesCommand extends Command
             LIENS INTERNES AUTORISÉS (à placer naturellement dans le texte) :
             {$related}
 
+            {$contributorsBlock}
             Sois EXHAUSTIF : couvre l'ensemble des sujets essentiels du domaine (objet, histoire, concepts et
             théories, formalismes, méthodes, sous-disciplines, découvertes majeures, débats et limites, liens
             avec les domaines voisins). Termine impérativement par « ## Chercheurs essentiels » (liste de 10,
@@ -376,6 +392,58 @@ final class GenerateWikiArticlesCommand extends Command
             TXT;
 
         return [LlmMessage::system($system."\n\n".\App\Service\SettingsService::GEO_SCOPE_GUARD), LlmMessage::user($user)];
+    }
+
+    /**
+     * Vrais contributeurs du domaine : PREMIERS-auteurs (souvent ceux qui ont fait
+     * le travail, vs le dernier auteur = directeur/PI) des publications du corpus
+     * les plus proches sémantiquement du nœud, classés par citations cumulées.
+     * Ancrage DONNÉES contre le « star-system » : surface des chercheurs réels du
+     * corpus (sans hallucination), pas seulement les célébrités connues du modèle.
+     * NB : corpus depuis 2015 → contributeurs ACTIFS récents (les fondateurs
+     * historiques restent du ressort de la connaissance du modèle).
+     *
+     * @param list<float> $embedding
+     */
+    private function topContributors(array $embedding): string
+    {
+        if ([] === $embedding) {
+            return '';
+        }
+        try {
+            $conn = $this->em->getConnection();
+            $conn->executeStatement('SET hnsw.ef_search = 300');
+            $rows = $conn->fetchAllAssociative(
+                "WITH near AS (
+                     SELECT id, cited_by_count
+                     FROM publication
+                     WHERE embedding IS NOT NULL
+                     ORDER BY embedding <=> CAST(:vec AS vector)
+                     LIMIT 300
+                 )
+                 SELECT a.name AS name, count(*) AS papers, COALESCE(sum(n.cited_by_count), 0) AS cits
+                 FROM near n
+                 JOIN authorship au ON au.publication_id = n.id AND au.position = 1
+                 JOIN author a ON a.id = au.author_id
+                 GROUP BY a.id, a.name
+                 ORDER BY cits DESC, papers DESC
+                 LIMIT 12",
+                ['vec' => (string) new Vector($embedding)],
+            );
+        } catch (\Throwable) {
+            return ''; // pas de contributeurs ≠ échec de génération
+        }
+
+        $lines = [];
+        foreach ($rows as $r) {
+            $papers = (int) $r['papers'];
+            $lines[] = \sprintf(
+                '- %s — premier·e auteur·e de %d publication%s du corpus (%s citations cumulées)',
+                (string) $r['name'], $papers, $papers > 1 ? 's' : '', number_format((int) $r['cits'], 0, ',', ' '),
+            );
+        }
+
+        return implode("\n", $lines);
     }
 
     /**
