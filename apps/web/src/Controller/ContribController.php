@@ -54,9 +54,39 @@ final class ContribController extends AbstractController
         return $this->render('wiki/login.html.twig', ['back' => (string) $request->query->get('back', '')]);
     }
 
+    /** Inscription self-service (chercheur / enseignant / élève) + connexion immédiate. */
+    #[Route('/{_locale}/inscription', name: 'register', requirements: ['_locale' => 'fr'], methods: ['GET', 'POST'])]
+    public function register(Request $request): Response
+    {
+        if ($request->isMethod('GET') && $this->user->isLogged()) {
+            return $this->redirect($this->postLoginTarget(''));
+        }
+        if ($request->isMethod('POST')) {
+            if (!$this->csrf->isValid($request)) {
+                $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+                return $this->redirectToRoute('register');
+            }
+            $res = $this->user->register(
+                mb_strtolower(trim((string) $request->request->get('email'))),
+                (string) $request->request->get('password'),
+                trim((string) $request->request->get('real_name')),
+                (string) $request->request->get('role'),
+            );
+            if ($res['ok']) {
+                $this->addFlash('success', 'Bienvenue '.$this->user->displayName().' ! Votre espace est prêt.');
+
+                return $this->redirect($this->postLoginTarget(''));
+            }
+            $this->addFlash('error', $res['error'] ?? 'Inscription refusée.');
+        }
+
+        return $this->render('wiki/register.html.twig');
+    }
+
     /**
      * Destination après authentification : la cible « back » si elle est locale et
-     * sûre, sinon le dashboard du rôle le plus élevé (admin > chercheur > accueil).
+     * sûre, sinon le dashboard du rôle le plus élevé.
      */
     private function postLoginTarget(string $back): string
     {
@@ -68,6 +98,12 @@ final class ContribController extends AbstractController
         }
         if ($this->user->hasRole('ROLE_RESEARCHER')) {
             return $this->generateUrl('researcher_dashboard');
+        }
+        if ($this->user->hasRole('ROLE_TEACHER')) {
+            return $this->generateUrl('teacher_dashboard');
+        }
+        if ($this->user->hasRole('ROLE_STUDENT')) {
+            return $this->generateUrl('student_dashboard');
         }
 
         return $this->generateUrl('home');

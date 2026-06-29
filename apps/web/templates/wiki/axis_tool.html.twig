@@ -1,0 +1,60 @@
+{% extends 'base.html.twig' %}
+{% block title %}Outil AXIS — SciencesWiki{% endblock %}
+{% block body %}
+    <h1>Évaluation méthodologique AXIS 🔬</h1>
+    <p class="muted">Grille de lecture critique des <strong>études transversales</strong> (Downes et al., BMJ Open 2016). Saisissez l'identifiant d'une étude : l'IA applique les 20 critères et signale si l'étude n'est pas évaluable. <strong>Ce n'est pas une note</strong> — un signal pour vous aider à juger, jamais un verdict.</p>
+
+    <form class="ask" method="post" action="{{ path('axis_tool') }}" style="max-width:420px; display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+        <div style="flex:1; min-width:200px">
+            <label for="a-id">Identifiant de l'étude</label>
+            <input type="number" id="a-id" name="publication_id" min="1" required value="{{ pubId > 0 ? pubId : '' }}">
+        </div>
+        <button type="submit">Évaluer</button>
+    </form>
+
+    {% if error %}<p class="badge warn" style="margin-top:1rem">{{ error }}</p>{% endif %}
+
+    {% if result %}
+        {% set ap = result.applicability %}
+        {% set apColor = ap == 'applicable' ? '#16a34a' : (ap == 'not_applicable' ? '#dc2626' : '#f59e0b') %}
+        <article class="card" style="margin-top:1.2rem">
+            <h2 style="margin-top:0">{{ result.publication.title }}</h2>
+            <p class="muted" style="font-size:.85rem">
+                {% if result.publication.year %}{{ result.publication.year }} · {% endif %}
+                {% if result.publication.doi %}<a href="https://doi.org/{{ result.publication.doi }}" target="_blank" rel="noopener">{{ result.publication.doi }}</a>{% endif %}
+            </p>
+
+            <p><span class="badge" style="background:{{ apColor }}22; color:{{ apColor }}; font-weight:700">{{ result.applicabilityLabel }}</span>
+               {% if result.studyDesign %}<span class="muted" style="margin-left:.5rem">design détecté : {{ result.studyDesign }}</span>{% endif %}</p>
+
+            {% if ap == 'not_applicable' %}
+                <p class="muted">AXIS n'a été validé que pour les études transversales : la grille n'est <strong>pas</strong> appliquée à ce design (aucun résultat trompeur).</p>
+            {% else %}
+                {% set band = result.reliabilityBand %}
+                {% set bandLabel = {'high':'élevée','moderate':'modérée','low':'faible','insufficient':'insuffisante (texte trop limité)'} %}
+                <p>Fiabilité indicative : <strong>{{ bandLabel[band] ?? band }}</strong>
+                   — {{ result.favorableCount }}/{{ result.assessableCount }} critères favorables
+                   <span class="muted">(source : {{ result.sourceScope == 'abstract+fulltext' ? 'résumé + texte intégral' : 'résumé seul' }})</span></p>
+
+                {% if result.summary %}<p>{{ result.summary }}</p>{% endif %}
+
+                <details style="margin-top:.8rem">
+                    <summary style="cursor:pointer; font-weight:600">Les 20 critères en détail</summary>
+                    <ul style="list-style:none; padding:0; margin:.6rem 0">
+                        {% for it in result.items %}
+                            {% set icon = it.favorable ? '✅' : (it.answer == 'unclear' ? '❔' : '⚠️') %}
+                            <li style="padding:.4rem 0; border-bottom:1px solid var(--line)">
+                                {{ icon }} <strong>{{ it.question }}</strong>
+                                <span class="muted">— {{ it.answerLabel }}</span>
+                                {% if it.quote %}<blockquote style="margin:.2rem 0 0 1.4rem; font-size:.85rem; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ it.quote }} »</blockquote>{% endif %}
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </details>
+            {% endif %}
+
+            <p class="muted" style="font-size:.78rem; margin-top:1rem; border-top:1px dashed var(--line); padding-top:.6rem">{{ result.disclaimer }}</p>
+        </article>
+    {% endif %}
+{% endblock %}

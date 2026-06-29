@@ -1,0 +1,24 @@
+{% extends 'base.html.twig' %}
+{% block title %}Espace enseignant — SciencesWiki{% endblock %}
+{% block body %}
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    <h1>Espace enseignant 👩‍🏫</h1>
+    <p class="muted">Bonjour {{ current_user.displayName }}. Vos outils pédagogiques.</p>
+
+    <div class="grid" style="margin-top:1rem">
+        <div class="card">
+            <h3 style="margin-top:0">🔬 Évaluation méthodologique (AXIS)</h3>
+            <p class="muted">Évaluez la qualité méthodologique d'une étude transversale, à la demande.</p>
+            <a class="btn" href="{{ path('axis_tool') }}">Ouvrir l'outil AXIS →</a>
+        </div>
+        <div class="card">
+            <h3 style="margin-top:0">💬 Assistant IA</h3>
+            <p class="muted">Chat sourcé sur le corpus scientifique.</p>
+            <a class="btn" href="{{ path('chat') }}">Ouvrir l'assistant →</a>
+        </div>
+        <div class="card">
+            <h3 style="margin-top:0">🎓 Ma classe</h3>
+            <p class="muted">Invitez vos élèves et reliez-les à votre classe. <em>(Bientôt disponible.)</em></p>
+        </div>
+    </div>
+{% endblock %}

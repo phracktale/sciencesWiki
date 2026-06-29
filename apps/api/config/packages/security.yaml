@@ -17,9 +17,12 @@ security:
         ROLE_AUTEUR:      [ROLE_USER]
         ROLE_RESEARCHER:  [ROLE_AUTEUR]
         ROLE_REDACTEUR:   [ROLE_AUTEUR]
+        # Espaces pédagogiques : élève (outils de base), enseignant (= élève + gestion de classe).
+        ROLE_STUDENT:     [ROLE_USER]
+        ROLE_TEACHER:     [ROLE_STUDENT]
         ROLE_COMITE:      [ROLE_REDACTEUR]
         ROLE_MODERATEUR:  [ROLE_REDACTEUR]
-        ROLE_ADMIN:       [ROLE_MODERATEUR, ROLE_COMITE, ROLE_RESEARCHER]
+        ROLE_ADMIN:       [ROLE_MODERATEUR, ROLE_COMITE, ROLE_RESEARCHER, ROLE_TEACHER]
 
     firewalls:
         dev:
@@ -56,6 +59,10 @@ security:
     # Lecture publique ; /api/me et écritures/admin exigent un rôle.
     access_control:
         - { path: ^/api/login_check, roles: PUBLIC_ACCESS }
+        - { path: ^/api/register, roles: PUBLIC_ACCESS }
+        - { path: ^/api/class/join, roles: PUBLIC_ACCESS }      # accepter une invitation (token)
+        # Outils réservés aux espaces recherche/pédagogie (déclenchement AXIS à la demande).
+        - { path: ^/api/me/axis, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
         - { path: ^/api/me, roles: ROLE_USER }
         - { path: ^/api/admin, roles: ROLE_ADMIN }
         - { path: ^/api/literature-reviews, roles: ROLE_RESEARCHER }

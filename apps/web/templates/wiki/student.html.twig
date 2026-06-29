@@ -1,0 +1,20 @@
+{% extends 'base.html.twig' %}
+{% block title %}Espace élève — SciencesWiki{% endblock %}
+{% block body %}
+    {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    <h1>Espace élève 🎒</h1>
+    <p class="muted">Bonjour {{ current_user.displayName }}. Tes outils pour analyser les études scientifiques.</p>
+
+    <div class="grid" style="margin-top:1rem">
+        <div class="card">
+            <h3 style="margin-top:0">🔬 Évaluation méthodologique (AXIS)</h3>
+            <p class="muted">Apprends à juger la solidité d'une étude transversale, à la demande.</p>
+            <a class="btn" href="{{ path('axis_tool') }}">Ouvrir l'outil AXIS →</a>
+        </div>
+        <div class="card">
+            <h3 style="margin-top:0">💬 Assistant IA</h3>
+            <p class="muted">Pose tes questions ; les réponses citent le corpus scientifique.</p>
+            <a class="btn" href="{{ path('chat') }}">Ouvrir l'assistant →</a>
+        </div>
+    </div>
+{% endblock %}

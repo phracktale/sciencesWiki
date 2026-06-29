@@ -24,11 +24,13 @@ final class UserApiClient
 
     /** Hiérarchie des rôles (miroir de security.yaml côté API). */
     private const HIERARCHY = [
-        'ROLE_ADMIN' => ['ROLE_MODERATEUR', 'ROLE_COMITE', 'ROLE_RESEARCHER'],
+        'ROLE_ADMIN' => ['ROLE_MODERATEUR', 'ROLE_COMITE', 'ROLE_RESEARCHER', 'ROLE_TEACHER'],
         'ROLE_MODERATEUR' => ['ROLE_REDACTEUR'],
         'ROLE_COMITE' => ['ROLE_REDACTEUR'],
         'ROLE_REDACTEUR' => ['ROLE_AUTEUR'],
         'ROLE_RESEARCHER' => ['ROLE_AUTEUR'],
+        'ROLE_TEACHER' => ['ROLE_STUDENT'],
+        'ROLE_STUDENT' => ['ROLE_USER'],
         'ROLE_AUTEUR' => ['ROLE_USER'],
     ];
 
@@ -64,6 +66,44 @@ final class UserApiClient
         $session->set(self::ME_KEY, $me);
 
         return true;
+    }
+
+    /**
+     * Inscription self-service (chercheur/enseignant/élève) + connexion immédiate
+     * (le JWT renvoyé par l'API est stocké en session, comme login()).
+     *
+     * @return array{ok:bool,error:?string}
+     */
+    public function register(string $email, string $password, string $realName, string $role): array
+    {
+        try {
+            $resp = $this->httpClient->request('POST', $this->baseUrl.'/api/register', [
+                'json' => ['email' => $email, 'password' => $password, 'realName' => $realName, 'role' => $role],
+                'timeout' => 15,
+            ]);
+            $data = $resp->toArray(false);
+            $status = $resp->getStatusCode();
+        } catch (\Throwable) {
+            return ['ok' => false, 'error' => 'Service indisponible, réessayez.'];
+        }
+        $token = $data['token'] ?? null;
+        if ($status >= 300 || !\is_string($token) || '' === $token) {
+            return ['ok' => false, 'error' => (string) ($data['error'] ?? 'Inscription refusée.')];
+        }
+
+        try {
+            $me = $this->httpClient->request('GET', $this->baseUrl.'/api/me', [
+                'headers' => ['Authorization' => 'Bearer '.$token],
+                'timeout' => 10,
+            ])->toArray(false);
+        } catch (\Throwable) {
+            $me = ['email' => $email, 'roles' => $data['roles'] ?? []];
+        }
+        $session = $this->session();
+        $session->set(self::TOKEN_KEY, $token);
+        $session->set(self::ME_KEY, $me);
+
+        return ['ok' => true, 'error' => null];
     }
 
     public function logout(): void
@@ -139,6 +179,18 @@ final class UserApiClient
     public function canResearch(): bool
     {
         return $this->hasRole('ROLE_RESEARCHER');
+    }
+
+    /** Accès à l'espace enseignant (gestion de classe). */
+    public function canTeach(): bool
+    {
+        return $this->hasRole('ROLE_TEACHER');
+    }
+
+    /** Peut déclencher l'évaluation AXIS à la demande (chercheur / enseignant / élève). */
+    public function canUseAxis(): bool
+    {
+        return $this->hasRole('ROLE_RESEARCHER') || $this->hasRole('ROLE_TEACHER') || $this->hasRole('ROLE_STUDENT');
     }
 
     /**

@@ -72,6 +72,76 @@ final class WikiController extends AbstractController
         return $this->render('wiki/literature_review.html.twig');
     }
 
+    /** Espace enseignant : gestion de classe + outils pédagogiques. */
+    #[Route('/{_locale}/enseignant', name: 'teacher_dashboard', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function teacher(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/enseignant']);
+        }
+        if (!$this->user->canTeach()) {
+            $this->addFlash('error', 'Espace réservé aux enseignants (ROLE_TEACHER).');
+
+            return $this->redirectToRoute('home');
+        }
+
+        return $this->render('wiki/teacher.html.twig');
+    }
+
+    /** Espace élève : sa classe + outils. */
+    #[Route('/{_locale}/eleve', name: 'student_dashboard', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function student(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/eleve']);
+        }
+        if (!$this->user->hasRole('ROLE_STUDENT')) {
+            $this->addFlash('error', 'Espace réservé aux élèves (ROLE_STUDENT).');
+
+            return $this->redirectToRoute('home');
+        }
+
+        return $this->render('wiki/student.html.twig');
+    }
+
+    /**
+     * Boîte à outils — évaluation méthodologique AXIS à la demande sur une étude
+     * (chercheur / enseignant / élève). Saisie de l'identifiant de l'étude →
+     * appel API → affichage du résultat (ou du verrou d'applicabilité).
+     */
+    #[Route('/{_locale}/outils/axis', name: 'axis_tool', requirements: ['_locale' => 'fr'], methods: ['GET', 'POST'])]
+    public function axisTool(Request $request): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/outils/axis']);
+        }
+        if (!$this->user->canUseAxis()) {
+            $this->addFlash('error', 'Outil réservé aux espaces recherche / pédagogie.');
+
+            return $this->redirectToRoute('home');
+        }
+
+        $result = null;
+        $error = null;
+        $pubId = (int) $request->request->get('publication_id', '0');
+        if ($request->isMethod('POST')) {
+            if (!$this->csrf->isValid($request)) {
+                $error = 'Jeton de sécurité invalide.';
+            } elseif ($pubId <= 0) {
+                $error = 'Indiquez l’identifiant numérique d’une étude.';
+            } else {
+                $res = $this->user->send('POST', '/api/me/axis/'.$pubId);
+                if ($res['ok']) {
+                    $result = $res['data'];
+                } else {
+                    $error = (string) ($res['data']['error'] ?? ('Échec (HTTP '.$res['status'].').'));
+                }
+            }
+        }
+
+        return $this->render('wiki/axis_tool.html.twig', ['result' => $result, 'error' => $error, 'pubId' => $pubId]);
+    }
+
     /** Export PDF d'une revue ad hoc (depuis la page de génération). */
     #[Route('/{_locale}/chercheur/revue-litterature/pdf', name: 'literature_review_pdf', requirements: ['_locale' => 'fr'], methods: ['POST'])]
     public function literatureReviewPdf(Request $request): Response
