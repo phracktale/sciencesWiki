@@ -159,6 +159,9 @@ final class WikiController extends AbstractController
     /** Déclenche l'évaluation AXIS d'une étude par DOI via l'API ; remplit $error si échec. */
     private function runAxis(string $doi, ?string &$error): ?array
     {
+        // L'appel LLM dure ~1 min : sans ça, le process PHP du conteneur web meurt
+        // à 30 s (MaxExecutionTimeError) avant la réponse de l'API.
+        @set_time_limit(0);
         $res = $this->user->send('POST', '/api/me/axis', ['doi' => $doi], 240); // appel LLM long
         if ($res['ok']) {
             return $res['data'];
