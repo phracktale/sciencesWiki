@@ -27,6 +27,8 @@ final class PublicArticlesController
         private readonly EntityManagerInterface $em,
         private readonly \App\Ai\Llm\LlmClient $llm,
         private readonly \App\Harvester\Ai\EmbeddingClientFactory $embeddings,
+        private readonly \App\Repository\AxisAppraisalRepository $axisAppraisals,
+        private readonly \App\Analysis\Axis\AxisSerializer $axisSerializer,
     ) {
     }
 
@@ -159,6 +161,14 @@ final class PublicArticlesController
         // Hiérarchie thématique : meilleur placement → fil d'Ariane (domaine→…→rubrique).
         $hierarchy = $this->hierarchy($id);
 
+        // Évaluation AXIS : exposée publiquement UNIQUEMENT après validation comité
+        // (Confirmed). Non décisionnelle, comme controverses et plagiat.
+        $pub = $this->publications->find($id);
+        $appraisal = null !== $pub ? $this->axisAppraisals->findForPublication($pub) : null;
+        $axis = (null !== $appraisal && \App\Enum\ReviewStatus::Confirmed === $appraisal->getStatus())
+            ? $this->axisSerializer->serialize($appraisal)
+            : null;
+
         return new JsonResponse([
             'id' => (int) $r['id'],
             'title' => $r['title'],
@@ -182,6 +192,7 @@ final class PublicArticlesController
             'retractionStatus' => $r['retraction_status'] ?? 'none',
             'fulltextAvailable' => (int) $r['chunks'] > 0,
             'hierarchy' => $hierarchy,
+            'axis' => $axis,
         ]);
     }
 

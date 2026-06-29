@@ -14,6 +14,7 @@ final class AnalysisResult
         public readonly int $claims,
         public readonly int $controversies,
         public readonly int $gaps = 0,
+        public readonly int $axisAppraisals = 0,
     ) {
     }
 }

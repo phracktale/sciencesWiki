@@ -29,6 +29,11 @@ final class StubLlmClient implements LlmClient
             return new LlmCompletion($this->stubClaims($lastUser), 'stub', null, null);
         }
 
+        // Évaluation AXIS (cf. spec axis §5) : grille déterministe d'étude transversale.
+        if (str_contains($system, 'AXIS')) {
+            return new LlmCompletion($this->stubAxis($lastUser), 'stub', null, null);
+        }
+
         $content = "[brouillon généré par le LLM factice — non destiné à la publication]\n\n"
             .mb_substr(trim($lastUser), 0, 280);
 
@@ -57,6 +62,29 @@ final class StubLlmClient implements LlmClient
                 'future_work' => [],
                 'quote' => $title,
             ]],
+        ], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
+    }
+
+    /**
+     * Évaluation AXIS factice et déterministe : étude transversale, 20 items
+     * répondus favorablement (les items inversés q13/q19 à « no »). Aucune réponse
+     * défavorable → pas de citation à ancrer (le pipeline tourne sans LLM réel).
+     */
+    private function stubAxis(string $userPrompt): string
+    {
+        $items = [];
+        for ($i = 1; $i <= 20; ++$i) {
+            $key = 'q'.$i;
+            // q13 (biais de non-réponse) et q19 (conflits d'intérêts) : « no » = favorable.
+            $answer = (13 === $i || 19 === $i) ? 'no' : 'yes';
+            $items[$key] = ['answer' => $answer, 'quote' => null];
+        }
+
+        return json_encode([
+            'study_design' => 'cross-sectional',
+            'applicable' => true,
+            'items' => $items,
+            'summary' => '[évaluation AXIS factice] Étude transversale ; méthodologie jugée solide par le LLM de test.',
         ], \JSON_THROW_ON_ERROR | \JSON_UNESCAPED_UNICODE);
     }
 

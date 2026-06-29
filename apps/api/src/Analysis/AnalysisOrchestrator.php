@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Analysis;
 
+use App\Analysis\Axis\AxisAppraiser;
 use App\Analysis\Claim\ClaimExtractor;
 use App\Analysis\Controversy\ControversyDetector;
 use App\Analysis\Gap\GapDetector;
@@ -32,6 +33,7 @@ final class AnalysisOrchestrator
         private readonly ClaimExtractor $extractor,
         private readonly ControversyDetector $controversyDetector,
         private readonly GapDetector $gapDetector,
+        private readonly AxisAppraiser $axisAppraiser,
         private readonly EntityManagerInterface $em,
         private readonly ManagerRegistry $registry,
         ?LoggerInterface $logger = null,
@@ -56,6 +58,12 @@ final class AnalysisOrchestrator
             $extraction = $this->extractor->extractForNode($node, $options->limit, $options->reextract);
             $this->logger->info('Claims extraits', $extraction);
 
+            // Évaluation critique AXIS des études transversales du nœud (par article,
+            // verrou d'applicabilité, cf. docs/spec-axis-articles.md). Idempotente comme
+            // l'extraction : incrémentale par défaut, complète si --reextract/force.
+            $axis = $this->axisAppraiser->appraiseForNode($node, $options->limit, $options->reextract);
+            $this->logger->info('Évaluations AXIS', $axis);
+
             // --- POINT D'EXTENSION Phase B : CooccurrenceBuilder::buildForNode($node) ---
 
             $controversies = $this->controversyDetector->detect($node, $options->theta);
@@ -74,6 +82,7 @@ final class AnalysisOrchestrator
                 claims: $extraction['claims'],
                 controversies: \count($controversies),
                 gaps: \count($gaps),
+                axisAppraisals: $axis['appraised'],
             );
         } catch (\Throwable $e) {
             // On journalise l'ERREUR RÉELLE (avec sa trace) AVANT toute autre
