@@ -40,7 +40,42 @@
                 </li>
             {% endfor %}
         </ul>
-        <p class="muted" style="font-size:.82rem">⏳ L'analyse IA prend <strong>jusqu'à ~1-2 min</strong> (résumé + texte intégral). Si la page expire, <strong>recliquez « Évaluer »</strong> : le résultat aura été calculé et s'affichera aussitôt.</p>
+        <p class="muted" style="font-size:.82rem">⏳ L'analyse IA (~1 min) se lance <strong>en arrière-plan</strong> et le résultat <strong>s'affiche automatiquement</strong> — pas besoin d'attendre sur la page.</p>
+    {% endif %}
+
+    {% if pending %}
+        <article class="card" id="axis-pending" data-doi="{{ pending.doi }}" data-status-url="{{ path('axis_status') }}" style="margin-top:1.2rem">
+            <h2 style="margin-top:0">⏳ Évaluation en cours…</h2>
+            {% if pending.publication %}<p><strong>{{ pending.publication.title }}</strong></p>{% endif %}
+            <p class="muted">L'IA applique la grille AXIS (résumé + texte intégral) sur un serveur dédié. Cela prend <strong>~1 minute</strong>. Cette page se met à jour <strong>automatiquement</strong> ; vous pouvez aussi fermer et revenir plus tard : le résultat sera conservé.</p>
+            <p class="muted" id="axis-pending-msg">🔄 Vérification automatique du résultat…</p>
+            <form method="post" action="{{ path('axis_tool') }}" id="axis-pending-form" style="margin-top:.4rem">
+                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                <input type="hidden" name="doi" value="{{ pending.doi }}">
+                <button type="submit">Rafraîchir maintenant</button>
+            </form>
+        </article>
+        <script nonce="{{ csp_nonce.value }}">
+        (function () {
+            var box = document.getElementById('axis-pending');
+            if (!box) { return; }
+            var url = box.getAttribute('data-status-url') + '?doi=' + encodeURIComponent(box.getAttribute('data-doi'));
+            var msg = document.getElementById('axis-pending-msg');
+            var form = document.getElementById('axis-pending-form');
+            var tries = 0;
+            var timer = setInterval(function () {
+                tries++;
+                fetch(url, { headers: { 'Accept': 'application/json' } })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if (d.status === 'ready') { clearInterval(timer); form.submit(); }
+                        else if (d.status === 'none') { clearInterval(timer); if (msg) { msg.textContent = '⚠️ Évaluation terminée sans résultat : cette étude n’est pas exploitable (ni résumé ni texte intégral accessible).'; } }
+                        else if (tries > 75) { clearInterval(timer); if (msg) { msg.textContent = 'L’évaluation prend plus de temps que prévu. Cliquez « Rafraîchir maintenant ».'; } }
+                    })
+                    .catch(function () {});
+            }, 4000);
+        })();
+        </script>
     {% endif %}
 
     <script nonce="{{ csp_nonce.value }}">

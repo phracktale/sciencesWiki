@@ -4,80 +4,142 @@ declare(strict_types=1);
 
 namespace App\Controller;
 
-use App\Analysis\Axis\AxisAppraiser;
 use App\Analysis\Axis\AxisSerializer;
+use App\Analysis\Message\AppraisePublicationMessage;
 use App\Entity\Publication;
+use App\Repository\AxisAppraisalRepository;
 use App\Repository\PublicationRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Messenger\MessageBusInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Déclenchement à la demande de l'évaluation méthodologique AXIS par un
  * utilisateur des espaces recherche/pédagogie (ROLE_RESEARCHER / TEACHER /
- * STUDENT — cf. access_control). L'outil dans la « boîte à outils » du chercheur :
- * il l'applique sur l'étude qu'il veut (par DOI ou identifiant) et reçoit
- * DIRECTEMENT le résultat (les garde-fous d'AxisAppraiser disent si l'étude n'est
- * pas évaluable). L'affichage PUBLIC reste, lui, gated comité.
+ * STUDENT — cf. access_control). ASYNCHRONE comme la moisson : l'appel LLM dure
+ * ~1 min → on dispatche un message (worker « analysis ») et on ne bloque NI la
+ * requête NI le proxy. L'outil web récupère le résultat par POLLING (GET status).
+ * Si l'évaluation existe déjà, on la renvoie immédiatement (cache).
+ * L'affichage PUBLIC reste, lui, gated comité.
  */
 final class MeAxisController
 {
     public function __construct(
         private readonly PublicationRepository $publications,
-        private readonly AxisAppraiser $appraiser,
+        private readonly AxisAppraisalRepository $appraisals,
         private readonly AxisSerializer $serializer,
         private readonly EntityManagerInterface $em,
+        private readonly MessageBusInterface $bus,
     ) {
     }
 
     #[Route('/api/me/axis/{id}', name: 'me_axis_appraise', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function byId(int $id): JsonResponse
     {
-        return $this->run($this->publications->find($id));
+        return $this->dispatch($this->publications->find($id));
     }
 
     /** Par DOI (le plus naturel : le chercheur a le DOI du papier). Body : {doi}. */
     #[Route('/api/me/axis', name: 'me_axis_appraise_doi', methods: ['POST'])]
     public function byDoi(Request $request): JsonResponse
     {
-        $data = json_decode($request->getContent() ?: '[]', true);
-        $doi = \is_array($data) ? trim((string) ($data['doi'] ?? '')) : '';
-        // Tolère un DOI collé sous forme d'URL (https://doi.org/10.xxxx).
-        $doi = (string) preg_replace('#^https?://(dx\.)?doi\.org/#i', '', $doi);
-        if ('' === $doi) {
-            return new JsonResponse(['error' => 'DOI manquant.'], 422);
-        }
-
-        return $this->run($this->publications->findOneByDoi($doi));
+        return $this->dispatch($this->resolveByDoi($request->getContent()));
     }
 
-    private function run(?Publication $publication): JsonResponse
+    /** Polling : l'outil interroge l'état jusqu'à ready (puis affiche le résultat). */
+    #[Route('/api/me/axis/status', name: 'me_axis_status', methods: ['GET'])]
+    public function status(Request $request): JsonResponse
+    {
+        $doi = (string) $request->query->get('doi', '');
+        $id = $request->query->getInt('id');
+        $publication = '' !== $doi
+            ? $this->publications->findOneByDoi($this->normalizeDoi($doi))
+            : ($id > 0 ? $this->publications->find($id) : null);
+
+        return $this->state($publication);
+    }
+
+    /** POST : renvoie le résultat s'il existe (cache), sinon met en file et renvoie « pending ». */
+    private function dispatch(?Publication $publication): JsonResponse
     {
         if (null === $publication) {
-            return new JsonResponse(['error' => 'Étude introuvable dans le corpus.'], 404);
+            return new JsonResponse(['status' => 'not_found', 'error' => 'Étude introuvable dans le corpus.'], 404);
         }
-        // L'évaluation d'une étude APPLICABLE (grille complète sur résumé + texte
-        // intégral) dépasse la limite PHP par défaut (30 s) : on la lève pour ce job.
-        @set_time_limit(0);
 
-        // reappraise = false : on RÉUTILISE une évaluation existante (instantané). Robustesse
-        // clé : si un 1er clic a expiré au proxy (étude lente, ~1 min), l'évaluation a quand
-        // même été persistée côté API → un 2e clic renvoie le résultat immédiatement.
-        $appraisal = $this->appraiser->appraiseForPublication($publication, null, false);
-        if (null === $appraisal) {
-            return new JsonResponse(['error' => 'Étude non évaluable : ni résumé ni texte intégral exploitable.'], 422);
+        // Déjà évaluée → résultat immédiat (cache).
+        $existing = $this->appraisals->findForPublication($publication);
+        if (null !== $existing) {
+            return new JsonResponse($this->ready($publication, $existing));
         }
-        $this->em->flush(); // appraiseForPublication persiste sans flusher.
 
+        // Pas encore en file → on pose le marqueur et on dispatche (idempotent : un
+        // seul job à la fois par publication, protège du double-clic).
+        if (null === $publication->getAxisAppraisingAt()) {
+            $publication->setAxisAppraisingAt(new \DateTimeImmutable());
+            $this->em->flush();
+            $this->bus->dispatch(new AppraisePublicationMessage((int) $publication->getId()));
+        }
+
+        return new JsonResponse([
+            'status' => 'pending',
+            'publication' => $this->pubInfo($publication),
+            'message' => 'Évaluation lancée. Le résultat apparaîtra dans environ une minute.',
+        ], 202);
+    }
+
+    /** GET status : ready (résultat) / pending (en cours) / none (jamais lancée ou non évaluable). */
+    private function state(?Publication $publication): JsonResponse
+    {
+        if (null === $publication) {
+            return new JsonResponse(['status' => 'not_found'], 404);
+        }
+        $existing = $this->appraisals->findForPublication($publication);
+        if (null !== $existing) {
+            return new JsonResponse($this->ready($publication, $existing));
+        }
+        if (null !== $publication->getAxisAppraisingAt()) {
+            return new JsonResponse(['status' => 'pending', 'publication' => $this->pubInfo($publication)], 202);
+        }
+
+        // Ni résultat ni job en cours : jamais demandée, ou terminée sans résultat
+        // (étude non évaluable : ni résumé ni texte intégral exploitable).
+        return new JsonResponse(['status' => 'none', 'publication' => $this->pubInfo($publication)]);
+    }
+
+    /** @return array<string,mixed> */
+    private function ready(Publication $publication, object $appraisal): array
+    {
         $data = $this->serializer->serialize($appraisal);
-        $data['publication'] = [
+        $data['status'] = 'ready';
+        $data['publication'] = $this->pubInfo($publication);
+
+        return $data;
+    }
+
+    /** @return array<string,mixed> */
+    private function pubInfo(Publication $publication): array
+    {
+        return [
             'id' => $publication->getId(),
             'title' => $publication->getTitle(),
             'year' => $publication->getPublicationDate()?->format('Y'),
             'doi' => $publication->getDoi(),
         ];
+    }
 
-        return new JsonResponse($data);
+    private function resolveByDoi(string $body): ?Publication
+    {
+        $data = json_decode($body ?: '[]', true);
+        $doi = \is_array($data) ? $this->normalizeDoi((string) ($data['doi'] ?? '')) : '';
+
+        return '' !== $doi ? $this->publications->findOneByDoi($doi) : null;
+    }
+
+    /** Tolère un DOI collé sous forme d'URL (https://doi.org/10.xxxx). */
+    private function normalizeDoi(string $doi): string
+    {
+        return (string) preg_replace('#^https?://(dx\.)?doi\.org/#i', '', trim($doi));
     }
 }

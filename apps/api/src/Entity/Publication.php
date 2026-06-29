@@ -68,6 +68,10 @@ class Publication
     #[Groups(['publication:read'])]
     private ?string $parentDoi = null;
 
+    /** Début de l'évaluation AXIS à la demande (non-null = en file/en cours) ; pour le loader/polling de l'outil. */
+    #[ORM\Column(name: 'axis_appraising_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $axisAppraisingAt = null;
+
     /** FK locale vers l'article parent, si présent en base. */
     #[ORM\Column(name: 'parent_publication_id', type: Types::INTEGER, nullable: true)]
     #[Groups(['publication:read'])]
@@ -200,6 +204,18 @@ class Publication
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getAxisAppraisingAt(): ?\DateTimeImmutable
+    {
+        return $this->axisAppraisingAt;
+    }
+
+    public function setAxisAppraisingAt(?\DateTimeImmutable $at): self
+    {
+        $this->axisAppraisingAt = $at;
+
+        return $this;
     }
 
     public function getDoi(): ?string

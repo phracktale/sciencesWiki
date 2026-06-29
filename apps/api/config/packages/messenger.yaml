@@ -48,6 +48,9 @@ framework:
             # (Re)génération d'article wiki à la demande (bouton admin du wiki public) :
             # tâche LLM longue au niveau nœud → même file isolée que l'analyse.
             App\Harvester\Message\GenerateNodeArticle: analysis
+            # Évaluation AXIS d'une publication à la demande (outil recherche/pédagogie) :
+            # appel LLM ~1 min → asynchrone sur la même file isolée.
+            App\Analysis\Message\AppraisePublicationMessage: analysis
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism

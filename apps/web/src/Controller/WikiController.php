@@ -122,6 +122,7 @@ final class WikiController extends AbstractController
         }
 
         $result = null;
+        $pending = null;
         $error = null;
         $candidates = null;
         $query = trim((string) $request->request->get('query', ''));
@@ -131,12 +132,12 @@ final class WikiController extends AbstractController
             if (!$this->csrf->isValid($request)) {
                 $error = 'Jeton de sécurité invalide.';
             } elseif ('' !== $doi) {
-                // Clic sur un résultat (ou DOI fourni) → évaluation directe.
-                $result = $this->runAxis($doi, $error);
+                // Clic sur un résultat (ou DOI fourni) → mise en file / résultat caché.
+                $this->triggerAxis($doi, $result, $pending, $error);
             } elseif ('' !== $query) {
                 if (1 === preg_match('#10\.\d{4,9}/\S+#', $query, $m)) {
                     // L'utilisateur a collé un DOI : on évalue directement.
-                    $result = $this->runAxis($m[0], $error);
+                    $this->triggerAxis($m[0], $result, $pending, $error);
                 } else {
                     // Recherche par titre / mots-clés → liste de candidats à évaluer
                     // (sémantique : meilleur rappel que le lexical sur des mots-clés).
@@ -152,23 +153,47 @@ final class WikiController extends AbstractController
         }
 
         return $this->render('wiki/axis_tool.html.twig', [
-            'result' => $result, 'error' => $error, 'candidates' => $candidates, 'query' => $query,
+            'result' => $result, 'pending' => $pending, 'error' => $error, 'candidates' => $candidates, 'query' => $query,
         ]);
     }
 
-    /** Déclenche l'évaluation AXIS d'une étude par DOI via l'API ; remplit $error si échec. */
-    private function runAxis(string $doi, ?string &$error): ?array
+    /**
+     * Met en file l'évaluation AXIS (asynchrone, worker) ou renvoie le résultat déjà
+     * calculé (cache). L'appel API est court (simple dispatch) ; l'outil poll ensuite.
+     *
+     * @param array<string,mixed>|null $result
+     * @param array<string,mixed>|null $pending
+     */
+    private function triggerAxis(string $doi, ?array &$result, ?array &$pending, ?string &$error): void
     {
-        // L'appel LLM dure ~1 min : sans ça, le process PHP du conteneur web meurt
-        // à 30 s (MaxExecutionTimeError) avant la réponse de l'API.
-        @set_time_limit(0);
-        $res = $this->user->send('POST', '/api/me/axis', ['doi' => $doi], 240); // appel LLM long
-        if ($res['ok']) {
-            return $res['data'];
+        $res = $this->user->send('POST', '/api/me/axis', ['doi' => $doi]);
+        $data = $res['data'];
+        switch ($data['status'] ?? null) {
+            case 'ready':
+                $result = $data;
+                break;
+            case 'pending':
+                $pending = ['doi' => $doi, 'publication' => $data['publication'] ?? null];
+                break;
+            case 'not_found':
+                $error = 'Cette étude (DOI '.$doi.') n’est pas présente dans le corpus.';
+                break;
+            default:
+                $error = (string) ($data['error'] ?? ('Échec (HTTP '.$res['status'].').'));
         }
-        $error = (string) ($res['data']['error'] ?? ('Échec (HTTP '.$res['status'].').'));
+    }
 
-        return null;
+    /** Polling de l'état de l'évaluation AXIS (JSON léger), interrogé par l'outil. */
+    #[Route('/{_locale}/outils/axis/statut', name: 'axis_status', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function axisStatus(Request $request): JsonResponse
+    {
+        if (!$this->user->isLogged() || !$this->user->canUseAxis()) {
+            return new JsonResponse(['status' => 'denied'], 403);
+        }
+        $doi = (string) $request->query->get('doi', '');
+        $res = $this->user->send('GET', '/api/me/axis/status?doi='.rawurlencode($doi));
+
+        return new JsonResponse(['status' => (string) ($res['data']['status'] ?? 'unknown')]);
     }
 
     /** Export PDF d'une revue ad hoc (depuis la page de génération). */
