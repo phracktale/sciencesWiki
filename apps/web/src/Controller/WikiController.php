@@ -138,8 +138,9 @@ final class WikiController extends AbstractController
                     // L'utilisateur a collé un DOI : on évalue directement.
                     $result = $this->runAxis($m[0], $error);
                 } else {
-                    // Recherche par titre / mots-clés → liste de candidats à évaluer.
-                    $res = $this->user->send('GET', '/api/search?type=publications&mode=text&limit=15&q='.rawurlencode($query));
+                    // Recherche par titre / mots-clés → liste de candidats à évaluer
+                    // (sémantique : meilleur rappel que le lexical sur des mots-clés).
+                    $res = $this->user->send('GET', '/api/search?type=publications&limit=15&q='.rawurlencode($query));
                     $candidates = $res['ok'] ? ($res['data']['results'] ?? []) : [];
                     if ([] === $candidates) {
                         $error = 'Aucune étude trouvée pour « '.$query.' ».';
@@ -158,7 +159,7 @@ final class WikiController extends AbstractController
     /** Déclenche l'évaluation AXIS d'une étude par DOI via l'API ; remplit $error si échec. */
     private function runAxis(string $doi, ?string &$error): ?array
     {
-        $res = $this->user->send('POST', '/api/me/axis', ['doi' => $doi]);
+        $res = $this->user->send('POST', '/api/me/axis', ['doi' => $doi], 240); // appel LLM long
         if ($res['ok']) {
             return $res['data'];
         }

@@ -200,13 +200,13 @@ final class UserApiClient
      *
      * @return array{ok:bool,status:int,data:array<string,mixed>}
      */
-    public function send(string $method, string $path, ?array $body = null): array
+    public function send(string $method, string $path, ?array $body = null, int $timeout = 30): array
     {
         $token = $this->session()->get(self::TOKEN_KEY);
         if (!\is_string($token)) {
             return ['ok' => false, 'status' => 401, 'data' => ['error' => 'Non authentifié.']];
         }
-        $options = ['headers' => ['Authorization' => 'Bearer '.$token], 'timeout' => 30];
+        $options = ['headers' => ['Authorization' => 'Bearer '.$token], 'timeout' => $timeout];
         if (null !== $body) {
             $options['json'] = $body;
         }

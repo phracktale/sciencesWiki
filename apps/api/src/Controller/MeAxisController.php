@@ -57,6 +57,9 @@ final class MeAxisController
         if (null === $publication) {
             return new JsonResponse(['error' => 'Étude introuvable dans le corpus.'], 404);
         }
+        // L'évaluation d'une étude APPLICABLE (grille complète sur résumé + texte
+        // intégral) dépasse la limite PHP par défaut (30 s) : on la lève pour ce job.
+        @set_time_limit(0);
 
         // reappraise = true : l'utilisateur peut relancer (le texte a pu être enrichi).
         $appraisal = $this->appraiser->appraiseForPublication($publication, null, true);
