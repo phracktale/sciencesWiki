@@ -13,6 +13,8 @@ enum UserRole: string
     case User = 'ROLE_USER';
     case Auteur = 'ROLE_AUTEUR';
     case Researcher = 'ROLE_RESEARCHER';
+    case Teacher = 'ROLE_TEACHER';
+    case Student = 'ROLE_STUDENT';
     case Redacteur = 'ROLE_REDACTEUR';
     case Comite = 'ROLE_COMITE';
     case Moderateur = 'ROLE_MODERATEUR';
