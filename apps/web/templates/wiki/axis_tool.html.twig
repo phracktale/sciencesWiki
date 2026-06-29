@@ -29,7 +29,7 @@
                         </div>
                     </div>
                     {% if c.doi %}
-                        <form method="post" action="{{ path('axis_tool') }}" style="margin:0">
+                        <form method="post" action="{{ path('axis_tool') }}" style="margin:0" class="js-axis-run">
                             <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                             <input type="hidden" name="doi" value="{{ c.doi }}">
                             <button type="submit">Évaluer (AXIS)</button>
@@ -40,8 +40,19 @@
                 </li>
             {% endfor %}
         </ul>
-        <p class="muted" style="font-size:.82rem">L'évaluation prend quelques secondes (analyse IA du résumé / texte intégral).</p>
+        <p class="muted" style="font-size:.82rem">⏳ L'analyse IA prend <strong>jusqu'à ~1-2 min</strong> (résumé + texte intégral). Si la page expire, <strong>recliquez « Évaluer »</strong> : le résultat aura été calculé et s'affichera aussitôt.</p>
     {% endif %}
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        document.querySelectorAll('form.js-axis-run').forEach(function (f) {
+            f.addEventListener('submit', function () {
+                var b = f.querySelector('button');
+                if (b) { b.disabled = true; b.textContent = '⏳ Analyse en cours…'; }
+            });
+        });
+    })();
+    </script>
 
     {% if result %}
         {% set ap = result.applicability %}

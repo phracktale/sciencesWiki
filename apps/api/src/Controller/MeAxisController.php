@@ -61,8 +61,10 @@ final class MeAxisController
         // intégral) dépasse la limite PHP par défaut (30 s) : on la lève pour ce job.
         @set_time_limit(0);
 
-        // reappraise = true : l'utilisateur peut relancer (le texte a pu être enrichi).
-        $appraisal = $this->appraiser->appraiseForPublication($publication, null, true);
+        // reappraise = false : on RÉUTILISE une évaluation existante (instantané). Robustesse
+        // clé : si un 1er clic a expiré au proxy (étude lente, ~1 min), l'évaluation a quand
+        // même été persistée côté API → un 2e clic renvoie le résultat immédiatement.
+        $appraisal = $this->appraiser->appraiseForPublication($publication, null, false);
         if (null === $appraisal) {
             return new JsonResponse(['error' => 'Étude non évaluable : ni résumé ni texte intégral exploitable.'], 422);
         }
