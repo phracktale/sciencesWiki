@@ -2,18 +2,46 @@
 {% block title %}Outil AXIS — SciencesWiki{% endblock %}
 {% block body %}
     <h1>Évaluation méthodologique AXIS 🔬</h1>
-    <p class="muted">Grille de lecture critique des <strong>études transversales</strong> (Downes et al., BMJ Open 2016). Saisissez l'identifiant d'une étude : l'IA applique les 20 critères et signale si l'étude n'est pas évaluable. <strong>Ce n'est pas une note</strong> — un signal pour vous aider à juger, jamais un verdict.</p>
+    <p class="muted">Grille de lecture critique des <strong>études transversales</strong> (Downes et al., BMJ Open 2016). Cherchez une étude par <strong>titre, mots-clés ou DOI</strong> : l'IA applique les 20 critères et signale si l'étude n'est pas évaluable. <strong>Ce n'est pas une note</strong> — un signal pour vous aider à juger, jamais un verdict.</p>
 
-    <form class="ask" method="post" action="{{ path('axis_tool') }}" style="max-width:420px; display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap">
+    <form class="ask" method="post" action="{{ path('axis_tool') }}" style="max-width:560px; display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap">
         <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-        <div style="flex:1; min-width:200px">
-            <label for="a-id">Identifiant de l'étude</label>
-            <input type="number" id="a-id" name="publication_id" min="1" required value="{{ pubId > 0 ? pubId : '' }}">
+        <div style="flex:1; min-width:280px">
+            <label for="a-q">Titre, mots-clés ou DOI de l'étude</label>
+            <input type="text" id="a-q" name="query" required value="{{ query }}" placeholder="ex. : prévalence anxiété étudiants, ou 10.1136/bmjopen-…">
         </div>
-        <button type="submit">Évaluer</button>
+        <button type="submit">Rechercher</button>
     </form>
 
     {% if error %}<p class="badge warn" style="margin-top:1rem">{{ error }}</p>{% endif %}
+
+    {% if candidates is not empty and candidates is not null %}
+        <h2 style="margin-top:1.4rem">Choisissez l'étude à évaluer</h2>
+        <ul style="list-style:none; padding:0">
+            {% for c in candidates %}
+                <li class="card" style="margin:.5rem 0; display:flex; justify-content:space-between; gap:1rem; align-items:center; flex-wrap:wrap">
+                    <div style="flex:1; min-width:260px">
+                        <strong>{{ c.title }}</strong>
+                        <div class="muted" style="font-size:.85rem">
+                            {% if c.leadAuthor %}{{ c.leadAuthor }}{% if c.authors|length > 1 %} et al.{% endif %} · {% endif %}
+                            {% if c.year %}{{ c.year }} · {% endif %}{{ c.venue }}
+                            {% if c.citedByCount %} · 📈 {{ c.citedByCount }} cit.{% endif %}
+                        </div>
+                    </div>
+                    {% if c.doi %}
+                        <form method="post" action="{{ path('axis_tool') }}" style="margin:0">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="doi" value="{{ c.doi }}">
+                            <button type="submit">Évaluer (AXIS)</button>
+                        </form>
+                    {% else %}
+                        <span class="muted" style="font-size:.8rem">DOI manquant — non évaluable</span>
+                    {% endif %}
+                </li>
+            {% endfor %}
+        </ul>
+        <p class="muted" style="font-size:.82rem">L'évaluation prend quelques secondes (analyse IA du résumé / texte intégral).</p>
+    {% endif %}
 
     {% if result %}
         {% set ap = result.applicability %}

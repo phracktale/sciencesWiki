@@ -123,23 +123,48 @@ final class WikiController extends AbstractController
 
         $result = null;
         $error = null;
-        $pubId = (int) $request->request->get('publication_id', '0');
+        $candidates = null;
+        $query = trim((string) $request->request->get('query', ''));
+        $doi = trim((string) $request->request->get('doi', ''));
+
         if ($request->isMethod('POST')) {
             if (!$this->csrf->isValid($request)) {
                 $error = 'Jeton de sécurité invalide.';
-            } elseif ($pubId <= 0) {
-                $error = 'Indiquez l’identifiant numérique d’une étude.';
-            } else {
-                $res = $this->user->send('POST', '/api/me/axis/'.$pubId);
-                if ($res['ok']) {
-                    $result = $res['data'];
+            } elseif ('' !== $doi) {
+                // Clic sur un résultat (ou DOI fourni) → évaluation directe.
+                $result = $this->runAxis($doi, $error);
+            } elseif ('' !== $query) {
+                if (1 === preg_match('#10\.\d{4,9}/\S+#', $query, $m)) {
+                    // L'utilisateur a collé un DOI : on évalue directement.
+                    $result = $this->runAxis($m[0], $error);
                 } else {
-                    $error = (string) ($res['data']['error'] ?? ('Échec (HTTP '.$res['status'].').'));
+                    // Recherche par titre / mots-clés → liste de candidats à évaluer.
+                    $res = $this->user->send('GET', '/api/search?type=publications&mode=text&limit=15&q='.rawurlencode($query));
+                    $candidates = $res['ok'] ? ($res['data']['results'] ?? []) : [];
+                    if ([] === $candidates) {
+                        $error = 'Aucune étude trouvée pour « '.$query.' ».';
+                    }
                 }
+            } else {
+                $error = 'Saisissez un titre, des mots-clés ou un DOI.';
             }
         }
 
-        return $this->render('wiki/axis_tool.html.twig', ['result' => $result, 'error' => $error, 'pubId' => $pubId]);
+        return $this->render('wiki/axis_tool.html.twig', [
+            'result' => $result, 'error' => $error, 'candidates' => $candidates, 'query' => $query,
+        ]);
+    }
+
+    /** Déclenche l'évaluation AXIS d'une étude par DOI via l'API ; remplit $error si échec. */
+    private function runAxis(string $doi, ?string &$error): ?array
+    {
+        $res = $this->user->send('POST', '/api/me/axis', ['doi' => $doi]);
+        if ($res['ok']) {
+            return $res['data'];
+        }
+        $error = (string) ($res['data']['error'] ?? ('Échec (HTTP '.$res['status'].').'));
+
+        return null;
     }
 
     /** Export PDF d'une revue ad hoc (depuis la page de génération). */
