@@ -54,6 +54,8 @@ framework:
             # Détection du devis d'une étude (→ outils d'évaluation applicables) : appel
             # LLM léger, asynchrone, pour préparer les boutons d'outils à la recherche.
             App\Analysis\Message\ClassifyStudyMessage: analysis
+            # Évaluation RoB 2 (risque de biais d'un essai randomisé) à la demande.
+            App\Analysis\Message\AppraiseRob2Message: analysis
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism

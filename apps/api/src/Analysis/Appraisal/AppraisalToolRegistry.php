@@ -39,7 +39,7 @@ final class AppraisalToolRegistry
      */
     public const TOOLS = [
         'axis' => ['name' => 'AXIS', 'designs' => ['cross_sectional'], 'implemented' => true],
-        'rob2' => ['name' => 'Cochrane RoB 2', 'designs' => ['rct'], 'implemented' => false],
+        'rob2' => ['name' => 'Cochrane RoB 2', 'designs' => ['rct'], 'implemented' => true],
         'robins_i' => ['name' => 'ROBINS-I', 'designs' => ['non_randomized_trial'], 'implemented' => false],
         'newcastle_ottawa' => ['name' => 'Newcastle-Ottawa', 'designs' => ['cohort', 'case_control'], 'implemented' => false],
         'quadas2' => ['name' => 'QUADAS-2', 'designs' => ['diagnostic_accuracy'], 'implemented' => false],

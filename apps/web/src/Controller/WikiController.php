@@ -202,16 +202,19 @@ final class WikiController extends AbstractController
         $query = trim((string) $request->request->get('query', ''));
         $doi = trim((string) $request->request->get('doi', ''));
 
+        $tool = $request->request->get('tool', 'axis');
+        $tool = \in_array($tool, ['axis', 'rob2'], true) ? $tool : 'axis';
+
         if ($request->isMethod('POST')) {
             if (!$this->csrf->isValid($request)) {
                 $error = 'Jeton de sécurité invalide.';
             } elseif ('' !== $doi) {
                 // Clic sur un résultat (ou DOI fourni) → mise en file / résultat caché.
-                $this->triggerAxis($doi, $result, $pending, $error);
+                $this->triggerAppraisal($doi, $tool, $result, $pending, $error);
             } elseif ('' !== $query) {
                 if (1 === preg_match('#10\.\d{4,9}/\S+#', $query, $m)) {
                     // L'utilisateur a collé un DOI : on évalue directement.
-                    $this->triggerAxis($m[0], $result, $pending, $error);
+                    $this->triggerAppraisal($m[0], $tool, $result, $pending, $error);
                 } else {
                     // Recherche par titre / mots-clés → liste de candidats à évaluer
                     // (sémantique : meilleur rappel que le lexical sur des mots-clés).
@@ -239,22 +242,23 @@ final class WikiController extends AbstractController
     }
 
     /**
-     * Met en file l'évaluation AXIS (asynchrone, worker) ou renvoie le résultat déjà
-     * calculé (cache). L'appel API est court (simple dispatch) ; l'outil poll ensuite.
+     * Met en file l'évaluation d'un OUTIL (axis | rob2) en asynchrone, ou renvoie le
+     * résultat déjà calculé (cache). L'appel API est court (dispatch) ; l'outil poll ensuite.
      *
      * @param array<string,mixed>|null $result
      * @param array<string,mixed>|null $pending
      */
-    private function triggerAxis(string $doi, ?array &$result, ?array &$pending, ?string &$error): void
+    private function triggerAppraisal(string $doi, string $tool, ?array &$result, ?array &$pending, ?string &$error): void
     {
-        $res = $this->user->send('POST', '/api/me/axis', ['doi' => $doi]);
+        $path = 'rob2' === $tool ? '/api/me/rob2' : '/api/me/axis';
+        $res = $this->user->send('POST', $path, ['doi' => $doi]);
         $data = $res['data'];
         switch ($data['status'] ?? null) {
             case 'ready':
-                $result = $data;
+                $result = ['tool' => $tool] + $data; // (axis ne pose pas 'tool' ; rob2 oui)
                 break;
             case 'pending':
-                $pending = ['doi' => $doi, 'publication' => $data['publication'] ?? null];
+                $pending = ['doi' => $doi, 'tool' => $tool, 'publication' => $data['publication'] ?? null];
                 break;
             case 'not_found':
                 $error = 'Cette étude (DOI '.$doi.') n’est pas présente dans le corpus.';
@@ -264,15 +268,17 @@ final class WikiController extends AbstractController
         }
     }
 
-    /** Polling de l'état de l'évaluation AXIS (JSON léger), interrogé par l'outil. */
+    /** Polling de l'état d'une évaluation (axis | rob2), interrogé par l'outil. */
     #[Route('/{_locale}/outils/axis/statut', name: 'axis_status', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function axisStatus(Request $request): JsonResponse
     {
         if (!$this->user->isLogged() || !$this->user->canUseAxis()) {
             return new JsonResponse(['status' => 'denied'], 403);
         }
+        $tool = $request->query->get('tool', 'axis');
+        $tool = \in_array($tool, ['axis', 'rob2'], true) ? $tool : 'axis';
         $doi = (string) $request->query->get('doi', '');
-        $res = $this->user->send('GET', '/api/me/axis/status?doi='.rawurlencode($doi));
+        $res = $this->user->send('GET', '/api/me/'.$tool.'/status?doi='.rawurlencode($doi));
 
         return new JsonResponse(['status' => (string) ($res['data']['status'] ?? 'unknown')]);
     }

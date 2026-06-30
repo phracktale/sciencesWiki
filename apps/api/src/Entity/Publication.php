@@ -72,6 +72,10 @@ class Publication
     #[ORM\Column(name: 'axis_appraising_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $axisAppraisingAt = null;
 
+    /** Idem pour l'évaluation RoB 2 à la demande. */
+    #[ORM\Column(name: 'rob2_appraising_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $rob2AppraisingAt = null;
+
     /** Devis détecté (cross_sectional, rct, cohort, systematic_review, non_empirical…) ; null = non classée. */
     #[ORM\Column(name: 'study_design', length: 40, nullable: true)]
     #[Groups(['publication:read'])]
@@ -227,6 +231,18 @@ class Publication
     public function setAxisAppraisingAt(?\DateTimeImmutable $at): self
     {
         $this->axisAppraisingAt = $at;
+
+        return $this;
+    }
+
+    public function getRob2AppraisingAt(): ?\DateTimeImmutable
+    {
+        return $this->rob2AppraisingAt;
+    }
+
+    public function setRob2AppraisingAt(?\DateTimeImmutable $at): self
+    {
+        $this->rob2AppraisingAt = $at;
 
         return $this;
     }

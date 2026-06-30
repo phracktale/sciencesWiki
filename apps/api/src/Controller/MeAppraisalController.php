@@ -68,6 +68,7 @@ final class MeAppraisalController
             'design' => $design,
             'designLabel' => $this->registry->designLabel($design),
             'axisApplicable' => \in_array('axis', $toolKeys, true),
+            'rob2Applicable' => \in_array('rob2', $toolKeys, true),
             'tools' => $this->registry->toolsMeta($toolKeys),
         ];
     }
