@@ -319,14 +319,10 @@
             }
             poll();
             var t = setInterval(poll, 5000);
-            // Temps réel via Mercure : un « tick » (job moisson/texte intégral) déclenche
-            // un re-fetch immédiat (débattu). Le polling 5 s reste le filet si le hub tombe.
-            var es = null, deb = null;
-            try {
-                es = new EventSource('/.well-known/mercure?topic=' + encodeURIComponent('sciences/harvest'));
-                es.onmessage = function () { clearTimeout(deb); deb = setTimeout(poll, 800); };
-            } catch (e) {}
-            document.addEventListener('turbo:before-cache', function () { clearInterval(t); if (es) es.close(); }, { once: true });
+            // (Pas de Mercure ici : le hub est hébergé par l'API, pas sur l'origine
+            // web → un EventSource('/.well-known/mercure') faisait un 404 systématique
+            // — la barre est de toute façon rafraîchie par le polling 5 s ci-dessus.)
+            document.addEventListener('turbo:before-cache', function () { clearInterval(t); }, { once: true });
         })();
         </script>
     {% endif %}
