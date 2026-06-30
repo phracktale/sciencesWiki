@@ -195,11 +195,70 @@
             fetch('/api/articles/' + id).then(function (r) { return r.json(); }).then(renderDetail);
         }
 
+        // Rôles « outils » (chercheur/enseignant/élève) : ils voient LEURS analyses
+        // déjà calculées, même non validées comité (avec marqueur). Le public, lui, ne
+        // voit que les analyses validées (exposées par /api/articles).
+        var XP_CAN_APPRAISE = {{ current_user.canUseAxis ? 'true' : 'false' }};
+        function apprStatusNote(d) {
+            if (!d.status) return '';
+            return d.status === 'confirmed'
+                ? ' <span class="muted" style="font-size:.72rem">· validé par le comité ✓</span>'
+                : ' <span class="muted" style="font-size:.72rem">· analyse IA, non encore validée par le comité</span>';
+        }
+        function rob2Html(d) {
+            var cols = { low: '#16a34a', some_concerns: '#f59e0b', high: '#dc2626', insufficient: '#64748b' };
+            var h = '<hr class="sep"><div class="meta"><b>Risque de biais (RoB 2)</b>' + apprStatusNote(d) + '<br>';
+            if (d.applicability === 'not_applicable') {
+                h += '<span class="muted">' + esc(d.applicabilityLabel) + '</span><div class="axis-note">' + esc(d.disclaimer) + '</div></div>';
+                return h;
+            }
+            var oc = cols[d.overall] || '#f59e0b';
+            h += '<span class="axis-band" style="background:' + oc + '22; color:' + oc + '">' + esc(d.overallLabel) + '</span>';
+            if (d.summary) h += '<div style="margin-top:.4rem">' + esc(d.summary) + '</div>';
+            if (d.domains && d.domains.length) {
+                h += '<details style="margin-top:.4rem"><summary class="muted" style="cursor:pointer; font-size:.82rem">Voir les 5 domaines</summary><ul class="axis-items">';
+                d.domains.forEach(function (dm) {
+                    var c = cols[dm.judgement] || '#f59e0b';
+                    h += '<li><span style="color:' + c + '; font-weight:600">' + esc(dm.judgementLabel) + '</span> — ' + esc(dm.title);
+                    if (dm.quote) h += '<br><span class="muted" style="font-size:.76rem">« ' + esc(dm.quote) + ' »</span>';
+                    h += '</li>';
+                });
+                h += '</ul></details>';
+            }
+            h += '<div class="axis-note">' + esc(d.disclaimer) + '</div></div>';
+            return h;
+        }
+        function amstar2Html(d) {
+            var cols = { high: '#16a34a', moderate: '#f59e0b', low: '#f59e0b', critically_low: '#dc2626', insufficient: '#64748b' };
+            var ic = { yes: ['✓', 'ax-yes'], partial_yes: ['~', 'ax-unclear'], no: ['✗', 'ax-no'] };
+            var h = '<hr class="sep"><div class="meta"><b>Confiance dans la revue (AMSTAR-2)</b>' + apprStatusNote(d) + '<br>';
+            if (d.applicability === 'not_applicable') {
+                h += '<span class="muted">' + esc(d.applicabilityLabel) + '</span><div class="axis-note">' + esc(d.disclaimer) + '</div></div>';
+                return h;
+            }
+            var oc = cols[d.overall] || '#f59e0b';
+            h += '<span class="axis-band" style="background:' + oc + '22; color:' + oc + '">' + esc(d.overallLabel) + '</span>';
+            if (d.overall !== 'insufficient') h += ' <span class="muted" style="font-size:.78rem">' + d.criticalFlaws + ' défaut(s) critique(s)</span>';
+            if (d.summary) h += '<div style="margin-top:.4rem">' + esc(d.summary) + '</div>';
+            if (d.items && d.items.length) {
+                h += '<details style="margin-top:.4rem"><summary class="muted" style="cursor:pointer; font-size:.82rem">Voir les 16 items</summary><ul class="axis-items">';
+                d.items.forEach(function (it) {
+                    var i = ic[it.answer] || ic.partial_yes;
+                    h += '<li><span class="ax-ic ' + i[1] + '">' + i[0] + '</span><span>' + (it.critical ? '★ ' : '') + esc(it.question);
+                    if (it.quote) h += '<br><span class="muted" style="font-size:.76rem">« ' + esc(it.quote) + ' »</span>';
+                    h += '</span></li>';
+                });
+                h += '</ul></details>';
+            }
+            h += '<div class="axis-note">' + esc(d.disclaimer) + '</div></div>';
+            return h;
+        }
+
         // Panneau « Évaluation méthodologique (AXIS) » de la fiche article.
         function axisHtml(ax) {
             var bands = { high: 'Fiabilité élevée', moderate: 'Fiabilité modérée', low: 'Fiabilité faible', insufficient: 'Information insuffisante' };
             var icons = { yes: ['✓', 'ax-yes'], no: ['✗', 'ax-no'], unclear: ['?', 'ax-unclear'] };
-            var h = '<hr class="sep"><div class="meta"><b>Évaluation méthodologique (AXIS)</b><br>';
+            var h = '<hr class="sep"><div class="meta"><b>Évaluation méthodologique (AXIS)</b>' + apprStatusNote(ax) + '<br>';
             // Verrou d'applicabilité : pour un design non transversal, AXIS est hors-sujet.
             if (ax.applicability === 'not_applicable') {
                 h += '<span class="muted">' + esc(ax.applicabilityLabel) +
@@ -272,8 +331,20 @@
                      a.hierarchy.map(function (h) { return '<a href="/{{ app.request.locale }}/' + esc(h.slug) + '">' + esc(h.label) + '</a>'; }).join(' › ') +
                      '</div>';
             }
-            if (a.axis) m += axisHtml(a.axis);
+            // Public : AXIS validé comité (depuis /api/articles). Rôles outils : on
+            // récupère ci-dessous TOUTES leurs analyses (AXIS/RoB 2/AMSTAR-2, tous statuts).
+            if (a.axis && !XP_CAN_APPRAISE) m += axisHtml(a.axis);
             detail.innerHTML = m;
+            if (XP_CAN_APPRAISE) {
+                fetch('/{{ app.request.locale }}/etude/' + a.id + '/analyses')
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        var ap = d.appraisals || {};
+                        var html = (ap.axis ? axisHtml(ap.axis) : '') + (ap.rob2 ? rob2Html(ap.rob2) : '') + (ap.amstar2 ? amstar2Html(ap.amstar2) : '');
+                        if (html) { var box = document.createElement('div'); box.innerHTML = html; detail.appendChild(box); }
+                    })
+                    .catch(function () {});
+            }
             var trBtn = detail.querySelector('.xp-tr');
             if (trBtn) {
                 trBtn.addEventListener('click', function () {

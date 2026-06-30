@@ -232,6 +232,23 @@ final class UserApiClient
         return $res['ok'] ? $res['data'] : ['results' => []];
     }
 
+    /**
+     * Analyses méthodologiques DÉJÀ calculées pour une étude (par id), tous statuts
+     * confondus — réservé aux rôles outils (vue déclencheur). @return array<string,mixed>
+     */
+    public function existingAppraisals(int $id): array
+    {
+        $out = [];
+        foreach (['axis', 'rob2', 'amstar2'] as $tool) {
+            $res = $this->send('GET', '/api/me/'.$tool.'/status?id='.$id);
+            if (($res['data']['status'] ?? null) === 'ready') {
+                $out[$tool] = $res['data'];
+            }
+        }
+
+        return $out;
+    }
+
     // --------------------------- Espace pédagogique ---------------------------
 
     /** Classes de l'enseignant connecté (effectif + invitations en attente). @return array<string,mixed> */

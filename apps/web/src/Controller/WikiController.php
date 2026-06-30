@@ -283,6 +283,21 @@ final class WikiController extends AbstractController
         return new JsonResponse(['status' => (string) ($res['data']['status'] ?? 'unknown')]);
     }
 
+    /**
+     * Analyses méthodologiques déjà calculées pour une étude (par id) — affichées dans
+     * le panneau de détail (explorer & co.). RÉSERVÉ aux rôles outils : un public
+     * anonyme ne voit que les analyses validées comité (exposées par /api/articles).
+     */
+    #[Route('/{_locale}/etude/{id}/analyses', name: 'study_appraisals', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['GET'])]
+    public function studyAppraisals(int $id): JsonResponse
+    {
+        if (!$this->user->isLogged() || !$this->user->canUseAxis()) {
+            return new JsonResponse(['appraisals' => new \stdClass(), 'role' => false]);
+        }
+
+        return new JsonResponse(['appraisals' => $this->user->existingAppraisals($id) ?: new \stdClass(), 'role' => true]);
+    }
+
     /** Export PDF d'une revue ad hoc (depuis la page de génération). */
     #[Route('/{_locale}/chercheur/revue-litterature/pdf', name: 'literature_review_pdf', requirements: ['_locale' => 'fr'], methods: ['POST'])]
     public function literatureReviewPdf(Request $request): Response
