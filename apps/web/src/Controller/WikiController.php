@@ -203,7 +203,7 @@ final class WikiController extends AbstractController
         $doi = trim((string) $request->request->get('doi', ''));
 
         $tool = $request->request->get('tool', 'axis');
-        $tool = \in_array($tool, ['axis', 'rob2'], true) ? $tool : 'axis';
+        $tool = \in_array($tool, ['axis', 'rob2', 'amstar2'], true) ? $tool : 'axis';
 
         if ($request->isMethod('POST')) {
             if (!$this->csrf->isValid($request)) {
@@ -250,7 +250,7 @@ final class WikiController extends AbstractController
      */
     private function triggerAppraisal(string $doi, string $tool, ?array &$result, ?array &$pending, ?string &$error): void
     {
-        $path = 'rob2' === $tool ? '/api/me/rob2' : '/api/me/axis';
+        $path = \in_array($tool, ['rob2', 'amstar2'], true) ? '/api/me/'.$tool : '/api/me/axis';
         $res = $this->user->send('POST', $path, ['doi' => $doi]);
         $data = $res['data'];
         switch ($data['status'] ?? null) {
@@ -276,7 +276,7 @@ final class WikiController extends AbstractController
             return new JsonResponse(['status' => 'denied'], 403);
         }
         $tool = $request->query->get('tool', 'axis');
-        $tool = \in_array($tool, ['axis', 'rob2'], true) ? $tool : 'axis';
+        $tool = \in_array($tool, ['axis', 'rob2', 'amstar2'], true) ? $tool : 'axis';
         $doi = (string) $request->query->get('doi', '');
         $res = $this->user->send('GET', '/api/me/'.$tool.'/status?doi='.rawurlencode($doi));
 

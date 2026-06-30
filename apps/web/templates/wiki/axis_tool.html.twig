@@ -2,7 +2,7 @@
 {% block title %}Évaluation critique — SciencesWiki{% endblock %}
 {% block body %}
     <h1>Évaluation critique des études 🔬</h1>
-    <p class="muted">Cherchez une étude par <strong>titre, mots-clés ou DOI</strong>. Selon le devis détecté, l'IA propose l'outil adapté : <strong>AXIS</strong> (études transversales) ou <strong>RoB 2</strong> (essais randomisés). <strong>Ce ne sont pas des notes</strong> — des signaux pour vous aider à juger, jamais un verdict.</p>
+    <p class="muted">Cherchez une étude par <strong>titre, mots-clés ou DOI</strong>. Selon le devis détecté, l'IA propose l'outil adapté : <strong>AXIS</strong> (études transversales), <strong>RoB 2</strong> (essais randomisés) ou <strong>AMSTAR-2</strong> (revues systématiques). <strong>Ce ne sont pas des notes</strong> — des signaux pour vous aider à juger, jamais un verdict.</p>
 
     <form class="ask" method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="max-width:560px; display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap">
         <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
@@ -34,6 +34,7 @@
                         {% set st = toolStates[c.doi]|default(null) %}
                         {% set recoAxis = st and st.classified and st.axisApplicable %}
                         {% set recoRob2 = st and st.classified and st.rob2Applicable %}
+                        {% set recoAmstar2 = st and st.classified and st.amstar2Applicable %}
                         <div style="text-align:right; min-width:220px">
                             {% if st is null or not st.classified %}
                                 <div class="muted" style="font-size:.74rem; margin-bottom:.3rem">🔎 détection du type d'étude…</div>
@@ -53,6 +54,12 @@
                                     <input type="hidden" name="doi" value="{{ c.doi }}">
                                     <input type="hidden" name="tool" value="rob2">
                                     <button type="submit"{% if not recoRob2 %} style="background:#e2e8f0; color:#475569"{% endif %}>RoB 2{% if recoRob2 %} ✓{% endif %}</button>
+                                </form>
+                                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
+                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                    <input type="hidden" name="doi" value="{{ c.doi }}">
+                                    <input type="hidden" name="tool" value="amstar2">
+                                    <button type="submit"{% if not recoAmstar2 %} style="background:#e2e8f0; color:#475569"{% endif %}>AMSTAR-2{% if recoAmstar2 %} ✓{% endif %}</button>
                                 </form>
                             </div>
                         </div>
@@ -145,6 +152,32 @@
                         {% endfor %}
                     </ul>
                 {% endif %}
+            {% else %}{% if result.tool == 'amstar2' %}
+                {% set apColor = result.applicability == 'applicable' ? '#16a34a' : (result.applicability == 'not_applicable' ? '#dc2626' : '#f59e0b') %}
+                <p><span class="badge" style="background:#1e293b22; color:#1e293b; font-weight:700">AMSTAR-2</span>
+                   <span class="badge" style="background:{{ apColor }}22; color:{{ apColor }}; font-weight:700; margin-left:.3rem">{{ result.applicabilityLabel }}</span>
+                   {% if result.studyDesign %}<span class="muted" style="margin-left:.5rem">design détecté : {{ result.studyDesign }}</span>{% endif %}</p>
+                {% if result.applicability == 'not_applicable' %}
+                    <p class="muted">AMSTAR-2 ne s'applique qu'aux revues systématiques : la grille n'est <strong>pas</strong> appliquée à ce design.</p>
+                {% else %}
+                    {% set ovColor = result.overall == 'high' ? '#16a34a' : (result.overall == 'critically_low' ? '#dc2626' : '#f59e0b') %}
+                    <p>Niveau de confiance : <span class="badge" style="background:{{ ovColor }}22; color:{{ ovColor }}; font-weight:700">{{ result.overallLabel }}</span>
+                       <span class="muted" style="margin-left:.4rem">{{ result.criticalFlaws }} défaut(s) critique(s), {{ result.weaknesses }} réserve(s) · source : {{ result.sourceScope == 'abstract+fulltext' ? 'résumé + texte intégral' : 'résumé seul' }}</span></p>
+                    {% if result.summary %}<p>{{ result.summary }}</p>{% endif %}
+                    <details style="margin-top:.8rem">
+                        <summary style="cursor:pointer; font-weight:600">Les 16 items en détail (★ = domaine critique)</summary>
+                        <ul style="list-style:none; padding:0; margin:.6rem 0">
+                            {% for it in result.items %}
+                                {% set icon = it.answer == 'yes' ? '✅' : (it.answer == 'partial_yes' ? '🟡' : '⚠️') %}
+                                <li style="padding:.4rem 0; border-bottom:1px solid var(--line)">
+                                    {{ icon }} {% if it.critical %}<span style="color:#dc2626" title="domaine critique">★</span> {% endif %}<strong>{{ it.question }}</strong>
+                                    <span class="muted">— {{ it.answerLabel }}</span>
+                                    {% if it.quote %}<blockquote style="margin:.2rem 0 0 1.4rem; font-size:.85rem; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ it.quote }} »</blockquote>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </details>
+                {% endif %}
             {% else %}
                 {% set ap = result.applicability %}
                 {% set apColor = ap == 'applicable' ? '#16a34a' : (ap == 'not_applicable' ? '#dc2626' : '#f59e0b') %}
@@ -177,7 +210,7 @@
                         </ul>
                     </details>
                 {% endif %}
-            {% endif %}
+            {% endif %}{% endif %}
 
             <p class="muted" style="font-size:.78rem; margin-top:1rem; border-top:1px dashed var(--line); padding-top:.6rem">{{ result.disclaimer }}</p>
         </article>

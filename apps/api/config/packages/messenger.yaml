@@ -56,6 +56,8 @@ framework:
             App\Analysis\Message\ClassifyStudyMessage: analysis
             # Évaluation RoB 2 (risque de biais d'un essai randomisé) à la demande.
             App\Analysis\Message\AppraiseRob2Message: analysis
+            # Évaluation AMSTAR-2 (confiance dans une revue systématique) à la demande.
+            App\Analysis\Message\AppraiseAmstar2Message: analysis
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism

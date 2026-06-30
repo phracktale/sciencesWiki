@@ -43,7 +43,7 @@ final class AppraisalToolRegistry
         'robins_i' => ['name' => 'ROBINS-I', 'designs' => ['non_randomized_trial'], 'implemented' => false],
         'newcastle_ottawa' => ['name' => 'Newcastle-Ottawa', 'designs' => ['cohort', 'case_control'], 'implemented' => false],
         'quadas2' => ['name' => 'QUADAS-2', 'designs' => ['diagnostic_accuracy'], 'implemented' => false],
-        'amstar2' => ['name' => 'AMSTAR-2', 'designs' => ['systematic_review'], 'implemented' => false],
+        'amstar2' => ['name' => 'AMSTAR-2', 'designs' => ['systematic_review'], 'implemented' => true],
         'robis' => ['name' => 'ROBIS', 'designs' => ['systematic_review'], 'implemented' => false],
         'casp_qualitative' => ['name' => 'CASP Qualitative', 'designs' => ['qualitative'], 'implemented' => false],
         'mmat' => ['name' => 'MMAT', 'designs' => ['mixed_methods', 'rct', 'non_randomized_trial', 'cohort', 'qualitative'], 'implemented' => false],
