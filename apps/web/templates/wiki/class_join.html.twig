@@ -4,8 +4,9 @@
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
     <h1>Rejoindre une classe 🎓</h1>
 
-    {% if preview is null or (preview.valid is not defined) or (preview.valid == false and preview.expired is not defined) %}
-        <div class="card"><p class="muted">Cette invitation est introuvable. Vérifiez le lien reçu par e-mail, ou demandez-en un nouveau à votre enseignant.</p></div>
+    {% set found = preview is not null and preview.className is defined %}
+    {% if not found %}
+        <div class="card"><p class="muted">Cette invitation est introuvable. Vérifiez le lien reçu par e-mail, ou demandez-en un nouveau à votre enseignant·e.</p></div>
     {% elif preview.expired %}
         <div class="card"><p class="muted">⌛ Cette invitation a expiré. Demandez un nouveau lien à votre enseignant·e.</p></div>
     {% elif preview.accepted %}
