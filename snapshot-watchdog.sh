@@ -5,7 +5,7 @@
 # la relance automatiquement depuis le bon point, tant qu'elle n'est pas terminée.
 #
 # LIVENESS = FRAÎCHEUR DU SETTING (vérité terrain), PAS /proc : l'ingestion écrit
-# sa progression (updated_at) à chaque fichier. Si updated_at < 25 min → vivante.
+# un battement de cœur (updated_at) toutes les ~30 s. Si updated_at < 6 min → vivante.
 # (Le check /proc était piégé : son propre grep "ingest-snapshot" se détectait
 # lui-même → le watchdog croyait toujours que ça tournait.)
 cd ~/scienceswiki/infra || exit 1
@@ -21,7 +21,7 @@ echo "$VAL" | grep -q '"finished":true' && exit 0        # terminée
 UPD=$(echo "$VAL" | grep -oE '"updated_at":"[^"]+"' | sed -E 's/.*:"([^"]+)"/\1/')
 TS=$(date -u -d "$UPD" +%s 2>/dev/null || echo 0)
 AGE=$(( $(date -u +%s) - TS ))
-[ "$TS" -gt 0 ] && [ "$AGE" -lt 1500 ] && exit 0          # < 25 min sans MAJ = vivante
+[ "$TS" -gt 0 ] && [ "$AGE" -lt 360 ] && exit 0           # < 6 min sans MAJ = vivante (heartbeat 30 s)
 
 # STALE → tuer un éventuel process php d'ingestion résiduel (comm=php pour ne PAS
 # matcher le grep du watchdog lui-même), puis relancer depuis done_files-1.

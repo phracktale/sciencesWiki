@@ -378,6 +378,14 @@ final class AdminApiClient
         return $res['ok'] ? $res['data'] : ['active' => false, 'progress' => null, 'derived' => null, 'samples' => []];
     }
 
+    /** @return array<string,mixed> relance manuelle de l'ingestion du snapshot OpenAlex */
+    public function snapshotRelaunch(): array
+    {
+        $res = $this->send('POST', '/api/admin/harvest/snapshot/relaunch', []);
+
+        return $res['ok'] ? $res['data'] : ['ok' => false, 'message' => (string) ($res['data']['message'] ?? 'Échec de la relance.')];
+    }
+
     /** @return array<string,mixed> indicateurs des drains (embeddings, placement, plein texte) */
     public function enrichmentStatus(): array
     {

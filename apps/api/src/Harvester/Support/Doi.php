@@ -34,6 +34,14 @@ final class Doi
             return null;
         }
 
+        // Un « DOI » de plus de 255 caractères est aberrant (les vrais DOI font
+        // < 100 car.) ET dépasse la colonne publication.doi (varchar 255) : on le
+        // rejette plutôt que de faire planter le flush (overflow → toute la passe
+        // d'ingestion mourait, et le watchdog relançait le même fichier en boucle).
+        if (mb_strlen($doi) > 255) {
+            return null;
+        }
+
         return $doi;
     }
 }

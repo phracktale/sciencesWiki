@@ -6,6 +6,7 @@ namespace App\Controller\Admin;
 
 use App\Harvester\Command\OpenAlexSnapshotIngestCommand;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 
@@ -17,8 +18,56 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class AdminSnapshotController
 {
-    public function __construct(private readonly EntityManagerInterface $em)
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        #[Autowire('%kernel.project_dir%')]
+        private readonly string $projectDir,
+    ) {
+    }
+
+    /**
+     * Relance MANUELLE de l'ingestion du snapshot (bouton du back-office), depuis le
+     * dernier fichier traité. Tue un éventuel process résiduel puis relance DÉTACHÉ
+     * (setsid+nohup : survit à la requête HTTP et tourne pour des jours), exactement
+     * comme le watchdog. Idempotent : si l'ingestion est déjà vivante (battement de
+     * cœur récent), ne dédouble pas.
+     */
+    #[Route('/api/admin/harvest/snapshot/relaunch', name: 'admin_snapshot_relaunch', methods: ['POST'])]
+    public function relaunch(): JsonResponse
     {
+        $conn = $this->em->getConnection();
+        $raw = $conn->fetchOne('SELECT value FROM setting WHERE name = :n', ['n' => OpenAlexSnapshotIngestCommand::PROGRESS_KEY]);
+        $progress = \is_string($raw) && '' !== $raw ? json_decode($raw, true) : null;
+
+        if (\is_array($progress) && ($progress['finished'] ?? false)) {
+            return new JsonResponse(['ok' => false, 'message' => 'Ingestion déjà terminée — rien à relancer.'], 409);
+        }
+
+        // Déjà vivante (battement de cœur < 90 s) → ne pas la dédoubler.
+        $updated = \is_array($progress) ? strtotime((string) ($progress['updated_at'] ?? '')) : false;
+        if (false !== $updated && (time() - $updated) < 90) {
+            return new JsonResponse(['ok' => true, 'running' => true, 'message' => 'Ingestion déjà active.']);
+        }
+
+        $done = \is_array($progress) ? (int) ($progress['done_files'] ?? 0) : 0;
+        $skip = max(0, $done - 1);
+
+        // Le snapshot est monté à /openalexSnapshot dans le conteneur api (cf. watchdog).
+        $console = $this->projectDir.'/bin/console';
+        $inner = 'for p in /proc/[0-9]*; do [ "$(cat "$p/comm" 2>/dev/null)" = php ] || continue; '
+            .'tr "\0" " " < "$p/cmdline" 2>/dev/null | grep -q ingest-snapshot && kill -9 "$(basename "$p")" 2>/dev/null; done; '
+            .\sprintf(
+                'setsid nohup php %s app:openalex:ingest-snapshot --dir=/openalexSnapshot --since=2015 --min-citations=5 --langs=en,fr --skip-files=%d >> /tmp/ingest-snapshot.log 2>&1 < /dev/null &',
+                escapeshellarg($console), $skip,
+            );
+        exec('sh -c '.escapeshellarg($inner));
+
+        return new JsonResponse([
+            'ok' => true,
+            'relaunched' => true,
+            'skip_files' => $skip,
+            'message' => \sprintf('Ingestion relancée à partir du fichier %d. La progression reprendra dans quelques secondes.', $skip),
+        ]);
     }
 
     #[Route('/api/admin/harvest/snapshot-status', name: 'admin_snapshot_status', methods: ['GET'])]
@@ -127,7 +176,12 @@ final class AdminSnapshotController
             'projected_selected' => ($scanned > 0 && $total > 0)
                 ? (int) round($selected / max(1, $done) * $total) : null,
             'finished' => $finished,
-            'stale' => $sinceUpdate > 1800,              // >30 min sans MAJ = suspect
+            // La commande écrit un battement de cœur toutes les ~30 s tant qu'elle vit
+            // → au-delà de 5 min sans MAJ, le run est réellement ARRÊTÉ (fiable, sans
+            // faux positif sur un gros fichier). En-deçà : il TOURNE.
+            'running' => !$finished && $sinceUpdate <= 300,
+            'stopped' => !$finished && $sinceUpdate > 300,
+            'stale' => $sinceUpdate > 300,
         ];
     }
 

@@ -656,6 +656,24 @@ final class AdminController extends AbstractController
         return new JsonResponse($this->admin->snapshotStatus());
     }
 
+    /** Relance manuelle de l'ingestion du snapshot (bouton de l'onglet dédié). */
+    #[Route('/admin/harvest/snapshot-relaunch', name: 'admin_snapshot_relaunch_submit', methods: ['POST'])]
+    public function snapshotRelaunch(Request $request): Response
+    {
+        if (!$this->admin->isLogged()) {
+            return $this->redirectToRoute('admin_login');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('admin_harvest');
+        }
+        $res = $this->admin->snapshotRelaunch();
+        $this->addFlash(($res['ok'] ?? false) ? 'success' : 'error', (string) ($res['message'] ?? 'Relance demandée.'));
+
+        return $this->redirectToRoute('admin_harvest');
+    }
+
     /** Polling AJAX des indicateurs d'enrichissement (embeddings, placement, plein texte). */
     #[Route('/admin/harvest/enrichment-status.json', name: 'admin_enrichment_status', methods: ['GET'])]
     public function enrichmentStatus(): JsonResponse

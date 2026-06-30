@@ -146,6 +146,7 @@ final class OpenAlexSnapshotIngestCommand extends Command
             ]);
         };
         $writeProgress($skipFiles, '', false);
+        $lastProgressAt = time();
 
         foreach ($files as $i => $file) {
             $fp = gzopen($file, 'rb');
@@ -153,8 +154,17 @@ final class OpenAlexSnapshotIngestCommand extends Command
                 $io->warning('Fichier illisible : '.$file);
                 continue;
             }
+            $partition = basename(\dirname($file));
             while (false !== ($line = gzgets($fp))) {
                 ++$scanned;
+                // Battement de cœur : MAJ de la progression toutes les ~30 s même AU
+                // MILIEU d'un gros fichier (~8 min) → updated_at reste frais tant que
+                // le process vit, ce qui rend la détection d'arrêt (UI + watchdog)
+                // fiable avec un seuil court (5 min) sans faux positifs.
+                if (time() - $lastProgressAt >= 30) {
+                    $writeProgress($skipFiles + $i, $partition, false);
+                    $lastProgressAt = time();
+                }
                 $work = json_decode($line, true);
                 if (!\is_array($work) || !$this->keep($work, $since, $minCit, $typeSet, $langSet, $requireAbstract, $concepts)) {
                     continue;
@@ -183,10 +193,10 @@ final class OpenAlexSnapshotIngestCommand extends Command
                 }
             }
             gzclose($fp);
-            $partition = basename(\dirname($file));
             $io->writeln(\sprintf('  [%d/%d] %s — scannées=%d · retenues=%d (dont %d nouvelles)',
                 $skipFiles + $i + 1, $totalFiles, $partition.'/'.basename($file), $scanned, $selected, $created));
             $writeProgress($skipFiles + $i + 1, $partition, false);
+            $lastProgressAt = time();
             if ($stop) {
                 break;
             }

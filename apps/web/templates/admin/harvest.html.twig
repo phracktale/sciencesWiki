@@ -102,7 +102,13 @@
             </div>
             <div style="margin:.6rem 0 .2rem; display:flex; justify-content:space-between; font-size:.85rem; color:#475569">
                 <span><strong id="snap-pct">0%</strong> · fichier <span id="snap-files">0 / 0</span> <span id="snap-part" class="muted"></span></span>
-                <span id="snap-stale" class="badge warn" hidden>⚠️ aucune mise à jour depuis &gt;30 min — run peut-être arrêté</span>
+                <span style="display:flex; gap:.6rem; align-items:center">
+                    <span id="snap-stale" class="badge warn" hidden>⛔ ingestion arrêtée (aucune mise à jour depuis &gt;5 min)</span>
+                    <form method="post" action="{{ path('admin_snapshot_relaunch_submit') }}" data-turbo="false" style="margin:0">
+                        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                        <button type="submit" style="font-size:.78rem; padding:.25rem .6rem; cursor:pointer">↻ Relancer l'ingestion</button>
+                    </form>
+                </span>
             </div>
             <div style="height:14px; background:var(--line); border-radius:7px; overflow:hidden">
                 <div id="snap-bar" style="height:100%; width:0%; background:var(--accent); transition:width .5s"></div>
@@ -408,10 +414,11 @@
             }
             empty.hidden = true; body.hidden = false;
             var d = data.derived;
-            // Un gros fichier peut prendre >30 min : on ne crie « arrêté » qu'au-delà
-            // de 90 min sans mise à jour (sinon faux positif pendant un fichier lent).
-            var isStale = !d.finished && (d.since_update_sec || 0) > 5400;
-            st.textContent = d.finished ? 'terminé' : (isStale ? 'arrêté ?' : 'en cours');
+            // La commande écrit un battement de cœur toutes les ~30 s : l'API tranche
+            // (d.stopped = >5 min sans MAJ). Fiable, sans faux positif sur un gros
+            // fichier, et l'indicateur DISPARAÎT dès que l'ingestion repart.
+            var isStale = !!d.stopped;
+            st.textContent = d.finished ? 'terminé' : (isStale ? 'arrêté' : 'en cours');
             st.style.background = d.finished ? '#dcfce7' : (isStale ? '#fee2e2' : '#dbeafe');
 
             document.getElementById('snap-pct').textContent = d.percent + '%';

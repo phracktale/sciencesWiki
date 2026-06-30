@@ -51,10 +51,10 @@ final class OpenAlexMapper
             externalIds: self::externalIds($work, $openAlexId),
             abstract: AbstractReconstructor::reconstruct($work['abstract_inverted_index'] ?? null),
             publicationDate: self::parseDate($work['publication_date'] ?? null),
-            language: isset($work['language']) ? (string) $work['language'] : null,
+            language: isset($work['language']) ? self::clip((string) $work['language'], 16) : null,
             venue: self::venue($primaryLocation),
-            type: isset($work['type']) ? (string) $work['type'] : null,
-            license: $primaryLocation['license'] ?? ($bestOaLocation['license'] ?? null),
+            type: isset($work['type']) ? self::clip((string) $work['type'], 64) : null,
+            license: self::clipN($primaryLocation['license'] ?? ($bestOaLocation['license'] ?? null), 128),
             oaStatus: OaStatus::fromApi($openAccess['oa_status'] ?? null),
             oaUrl: null !== $oaUrl ? (string) $oaUrl : null,
             landingPageUrl: null !== $landingPageUrl ? (string) $landingPageUrl : null,
@@ -174,6 +174,12 @@ final class OpenAlexMapper
     private static function clip(string $value, int $max): string
     {
         return mb_strlen($value) > $max ? mb_substr($value, 0, $max) : $value;
+    }
+
+    /** Comme {@see clip} mais tolère null (valeur absente). */
+    private static function clipN(mixed $value, int $max): ?string
+    {
+        return null === $value ? null : self::clip((string) $value, $max);
     }
 
     private static function parseDate(mixed $value): ?\DateTimeImmutable
