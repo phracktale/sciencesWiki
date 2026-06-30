@@ -161,11 +161,19 @@ final class WikiController extends AbstractController
             return $res['ok'] ? $this->redirectToRoute('student_dashboard') : $this->redirect($self);
         }
 
+        // On normalise en booléens simples (le template évite ainsi les tests Twig
+        // « is defined » sur des clés potentiellement absentes).
+        $preview = $this->user->classInvitationPreview($token);
+        $found = \is_array($preview) && isset($preview['className']);
+
         return $this->render('wiki/class_join.html.twig', [
-            'token' => $token,
-            'preview' => $this->user->classInvitationPreview($token),
-            'self' => $self,
+            'joinUrl' => $self,
             'logged' => $this->user->isLogged(),
+            'found' => $found,
+            'expired' => $found && ($preview['expired'] ?? false),
+            'accepted' => $found && ($preview['accepted'] ?? false),
+            'className' => $found ? (string) $preview['className'] : '',
+            'teacher' => $found ? (string) ($preview['teacher'] ?? '') : '',
         ]);
     }
 

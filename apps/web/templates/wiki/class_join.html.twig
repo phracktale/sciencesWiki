@@ -4,29 +4,28 @@
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
     <h1>Rejoindre une classe 🎓</h1>
 
-    {% set found = preview is not null and preview.className is defined %}
     {% if not found %}
         <div class="card"><p class="muted">Cette invitation est introuvable. Vérifiez le lien reçu par e-mail, ou demandez-en un nouveau à votre enseignant·e.</p></div>
-    {% elif preview.expired %}
+    {% elif expired %}
         <div class="card"><p class="muted">⌛ Cette invitation a expiré. Demandez un nouveau lien à votre enseignant·e.</p></div>
-    {% elif preview.accepted %}
+    {% elif accepted %}
         <div class="card">
             <p class="muted">Cette invitation a déjà été utilisée.</p>
             {% if logged %}<a class="btn" href="{{ path('student_dashboard') }}">Voir mes classes →</a>{% endif %}
         </div>
     {% else %}
         <article class="card">
-            <p><strong>{{ preview.teacher }}</strong> vous invite à rejoindre la classe <strong>« {{ preview.className }} »</strong>.</p>
+            <p><strong>{{ teacher }}</strong> vous invite à rejoindre la classe <strong>« {{ className }} »</strong>.</p>
             {% if logged %}
-                <form method="post" action="{{ self }}" data-turbo="false" style="margin-top:.6rem">
+                <form method="post" action="{{ joinUrl }}" data-turbo="false" style="margin-top:.6rem">
                     <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                     <button type="submit">Rejoindre la classe</button>
                 </form>
             {% else %}
                 <p class="muted">Connectez-vous ou créez un compte élève pour rejoindre cette classe :</p>
                 <p style="display:flex; gap:.6rem; flex-wrap:wrap">
-                    <a class="btn" href="{{ path('login', {back: self}) }}">Se connecter</a>
-                    <a class="btn" href="{{ path('register', {back: self}) }}">Créer un compte élève</a>
+                    <a class="btn" href="{{ path('login', {back: joinUrl}) }}">Se connecter</a>
+                    <a class="btn" href="{{ path('register', {back: joinUrl}) }}">Créer un compte élève</a>
                 </p>
             {% endif %}
         </article>
