@@ -2,8 +2,9 @@
 {% block title %}Espace enseignant — SciencesWiki{% endblock %}
 {% block body %}
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
     <h1>Espace enseignant 👩‍🏫</h1>
-    <p class="muted">Bonjour {{ current_user.displayName }}. Vos outils pédagogiques.</p>
+    <p class="muted">Bonjour {{ current_user.displayName }}. Vos outils pédagogiques et vos classes.</p>
 
     <div class="grid" style="margin-top:1rem">
         <div class="card">
@@ -16,9 +17,51 @@
             <p class="muted">Chat sourcé sur le corpus scientifique.</p>
             <a class="btn" href="{{ path('chat') }}">Ouvrir l'assistant →</a>
         </div>
-        <div class="card">
-            <h3 style="margin-top:0">🎓 Ma classe</h3>
-            <p class="muted">Invitez vos élèves et reliez-les à votre classe. <em>(Bientôt disponible.)</em></p>
-        </div>
     </div>
+
+    <h2 style="margin-top:1.8rem">🎓 Mes classes</h2>
+
+    <form method="post" action="{{ path('teacher_class_create') }}" data-turbo="false" class="card" style="display:flex; gap:.6rem; align-items:flex-end; flex-wrap:wrap">
+        <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+        <div style="flex:1; min-width:240px">
+            <label for="cl-name">Créer une classe</label>
+            <input type="text" id="cl-name" name="name" required maxlength="160" placeholder="ex. : Terminale S — SVT 2025">
+        </div>
+        <button type="submit">Créer la classe</button>
+    </form>
+
+    {% if classes is empty %}
+        <p class="muted" style="margin-top:1rem">Vous n'avez pas encore de classe. Créez-en une ci-dessus, puis invitez vos élèves par e-mail.</p>
+    {% else %}
+        {% for c in classes %}
+            <article class="card" style="margin-top:1rem">
+                <h3 style="margin-top:0">{{ c.name }}
+                    <span class="muted" style="font-size:.8rem; font-weight:400">· {{ c.students|length }} élève(s){% if c.pending|length %} · {{ c.pending|length }} en attente{% endif %}</span>
+                </h3>
+
+                {% if c.students is not empty %}
+                    <ul style="list-style:none; padding:0; margin:.4rem 0">
+                        {% for s in c.students %}
+                            <li style="padding:.3rem 0; border-bottom:1px solid var(--line)">✅ <strong>{{ s.name }}</strong> <span class="muted">· {{ s.email }}</span></li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="muted" style="font-size:.85rem">Aucun élève n'a encore rejoint cette classe.</p>
+                {% endif %}
+
+                {% if c.pending is not empty %}
+                    <p class="muted" style="font-size:.85rem; margin:.2rem 0">⏳ Invitations en attente : {% for p in c.pending %}{{ p.email }}{% if not loop.last %}, {% endif %}{% endfor %}</p>
+                {% endif %}
+
+                <form method="post" action="{{ path('teacher_class_invite', {id: c.id}) }}" data-turbo="false" style="display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap; margin-top:.6rem">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <div style="flex:1; min-width:240px">
+                        <label for="inv-{{ c.id }}">Inviter un élève (e-mail)</label>
+                        <input type="email" id="inv-{{ c.id }}" name="email" required placeholder="eleve@exemple.fr">
+                    </div>
+                    <button type="submit">Envoyer l'invitation</button>
+                </form>
+            </article>
+        {% endfor %}
+    {% endif %}
 {% endblock %}

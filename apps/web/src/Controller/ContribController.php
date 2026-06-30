@@ -58,8 +58,11 @@ final class ContribController extends AbstractController
     #[Route('/{_locale}/inscription', name: 'register', requirements: ['_locale' => 'fr'], methods: ['GET', 'POST'])]
     public function register(Request $request): Response
     {
+        // « back » : destination après inscription (ex. revenir à une page de jonction
+        // de classe). Local-safe géré par postLoginTarget.
+        $back = (string) $request->get('back', '');
         if ($request->isMethod('GET') && $this->user->isLogged()) {
-            return $this->redirect($this->postLoginTarget(''));
+            return $this->redirect($this->postLoginTarget($back));
         }
         if ($request->isMethod('POST')) {
             if (!$this->csrf->isValid($request)) {
@@ -76,12 +79,12 @@ final class ContribController extends AbstractController
             if ($res['ok']) {
                 $this->addFlash('success', 'Bienvenue '.$this->user->displayName().' ! Votre espace est prêt.');
 
-                return $this->redirect($this->postLoginTarget(''));
+                return $this->redirect($this->postLoginTarget($back));
             }
             $this->addFlash('error', $res['error'] ?? 'Inscription refusée.');
         }
 
-        return $this->render('wiki/register.html.twig');
+        return $this->render('wiki/register.html.twig', ['back' => $back]);
     }
 
     /**

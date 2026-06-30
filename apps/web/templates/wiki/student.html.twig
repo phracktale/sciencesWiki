@@ -2,8 +2,22 @@
 {% block title %}Espace élève — SciencesWiki{% endblock %}
 {% block body %}
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
     <h1>Espace élève 🎒</h1>
     <p class="muted">Bonjour {{ current_user.displayName }}. Tes outils pour analyser les études scientifiques.</p>
+
+    <div class="card" style="margin-top:1rem">
+        <h3 style="margin-top:0">🎓 Mes classes</h3>
+        {% if classes is empty %}
+            <p class="muted">Tu ne fais partie d'aucune classe pour l'instant. Si ton enseignant t'a envoyé un lien d'invitation par e-mail, ouvre-le pour rejoindre sa classe.</p>
+        {% else %}
+            <ul style="list-style:none; padding:0; margin:0">
+                {% for c in classes %}
+                    <li style="padding:.3rem 0; border-bottom:1px solid var(--line)">📘 <strong>{{ c.name }}</strong> <span class="muted">· enseignant·e : {{ c.teacher }}</span></li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
 
     <div class="grid" style="margin-top:1rem">
         <div class="card">

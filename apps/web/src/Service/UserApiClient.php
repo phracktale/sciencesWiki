@@ -221,6 +221,52 @@ final class UserApiClient
         return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'data' => $data];
     }
 
+    // --------------------------- Espace pédagogique ---------------------------
+
+    /** Classes de l'enseignant connecté (effectif + invitations en attente). @return array<string,mixed> */
+    public function myClasses(): array
+    {
+        $res = $this->send('GET', '/api/me/classes');
+
+        return $res['ok'] ? $res['data'] : ['classes' => []];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function createClass(string $name): array
+    {
+        return $this->send('POST', '/api/me/classes', ['name' => $name]);
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function inviteStudent(int $classId, string $email): array
+    {
+        return $this->send('POST', '/api/me/classes/'.$classId.'/invite', ['email' => $email]);
+    }
+
+    /** Classes rejointes par l'élève connecté. @return array<string,mixed> */
+    public function joinedClasses(): array
+    {
+        $res = $this->send('GET', '/api/me/class/joined');
+
+        return $res['ok'] ? $res['data'] : ['classes' => []];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function joinClass(string $token): array
+    {
+        return $this->send('POST', '/api/me/class/join', ['token' => $token]);
+    }
+
+    /** Aperçu PUBLIC d'une invitation (sans connexion). @return array<string,mixed>|null */
+    public function classInvitationPreview(string $token): ?array
+    {
+        try {
+            return $this->httpClient->request('GET', $this->baseUrl.'/api/class/join/'.rawurlencode($token), ['timeout' => 10])->toArray(false);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     private function session(): \Symfony\Component\HttpFoundation\Session\SessionInterface
     {
         return $this->requestStack->getSession();

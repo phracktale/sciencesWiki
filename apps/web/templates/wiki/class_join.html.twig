@@ -1,0 +1,33 @@
+{% extends 'base.html.twig' %}
+{% block title %}Rejoindre une classe — SciencesWiki{% endblock %}
+{% block body %}
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+    <h1>Rejoindre une classe 🎓</h1>
+
+    {% if preview is null or (preview.valid is not defined) or (preview.valid == false and preview.expired is not defined) %}
+        <div class="card"><p class="muted">Cette invitation est introuvable. Vérifiez le lien reçu par e-mail, ou demandez-en un nouveau à votre enseignant.</p></div>
+    {% elif preview.expired %}
+        <div class="card"><p class="muted">⌛ Cette invitation a expiré. Demandez un nouveau lien à votre enseignant·e.</p></div>
+    {% elif preview.accepted %}
+        <div class="card">
+            <p class="muted">Cette invitation a déjà été utilisée.</p>
+            {% if logged %}<a class="btn" href="{{ path('student_dashboard') }}">Voir mes classes →</a>{% endif %}
+        </div>
+    {% else %}
+        <article class="card">
+            <p><strong>{{ preview.teacher }}</strong> vous invite à rejoindre la classe <strong>« {{ preview.className }} »</strong>.</p>
+            {% if logged %}
+                <form method="post" action="{{ self }}" data-turbo="false" style="margin-top:.6rem">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <button type="submit">Rejoindre la classe</button>
+                </form>
+            {% else %}
+                <p class="muted">Connectez-vous ou créez un compte élève pour rejoindre cette classe :</p>
+                <p style="display:flex; gap:.6rem; flex-wrap:wrap">
+                    <a class="btn" href="{{ path('login', {back: self}) }}">Se connecter</a>
+                    <a class="btn" href="{{ path('register', {back: self}) }}">Créer un compte élève</a>
+                </p>
+            {% endif %}
+        </article>
+    {% endif %}
+{% endblock %}

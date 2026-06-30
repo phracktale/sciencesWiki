@@ -85,10 +85,46 @@ final class WikiController extends AbstractController
             return $this->redirectToRoute('home');
         }
 
-        return $this->render('wiki/teacher.html.twig');
+        return $this->render('wiki/teacher.html.twig', ['classes' => $this->user->myClasses()['classes'] ?? []]);
     }
 
-    /** Espace élève : sa classe + outils. */
+    /** Crée une classe (depuis l'espace enseignant). */
+    #[Route('/{_locale}/enseignant/classe', name: 'teacher_class_create', requirements: ['_locale' => 'fr'], methods: ['POST'])]
+    public function createClass(Request $request): Response
+    {
+        if (!$this->user->isLogged() || !$this->user->canTeach()) {
+            return $this->redirectToRoute('teacher_dashboard');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+        } else {
+            $res = $this->user->createClass(trim((string) $request->request->get('name', '')));
+            $this->addFlash($res['ok'] ? 'success' : 'error', $res['ok']
+                ? 'Classe « '.($res['data']['name'] ?? '').' » créée.'
+                : (string) ($res['data']['error'] ?? 'Échec de la création.'));
+        }
+
+        return $this->redirectToRoute('teacher_dashboard');
+    }
+
+    /** Invite un élève dans une classe (par e-mail). */
+    #[Route('/{_locale}/enseignant/classe/{id}/inviter', name: 'teacher_class_invite', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['POST'])]
+    public function inviteStudent(int $id, Request $request): Response
+    {
+        if (!$this->user->isLogged() || !$this->user->canTeach()) {
+            return $this->redirectToRoute('teacher_dashboard');
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+        } else {
+            $res = $this->user->inviteStudent($id, trim((string) $request->request->get('email', '')));
+            $this->addFlash($res['ok'] ? 'success' : 'error', (string) ($res['data']['message'] ?? $res['data']['error'] ?? 'Échec de l’invitation.'));
+        }
+
+        return $this->redirectToRoute('teacher_dashboard');
+    }
+
+    /** Espace élève : ses classes + outils. */
     #[Route('/{_locale}/eleve', name: 'student_dashboard', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function student(): Response
     {
@@ -101,7 +137,36 @@ final class WikiController extends AbstractController
             return $this->redirectToRoute('home');
         }
 
-        return $this->render('wiki/student.html.twig');
+        return $this->render('wiki/student.html.twig', ['classes' => $this->user->joinedClasses()['classes'] ?? []]);
+    }
+
+    /** Page de jonction d'une classe via un lien d'invitation (token). Accessible non connecté. */
+    #[Route('/{_locale}/classe/rejoindre/{token}', name: 'class_join', requirements: ['_locale' => 'fr', 'token' => '[a-f0-9]{16,}'], methods: ['GET', 'POST'])]
+    public function classJoin(string $token, Request $request): Response
+    {
+        $self = '/fr/classe/rejoindre/'.$token;
+
+        if ($request->isMethod('POST')) {
+            if (!$this->user->isLogged()) {
+                return $this->redirectToRoute('login', ['back' => $self]);
+            }
+            if (!$this->csrf->isValid($request)) {
+                $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+                return $this->redirect($self);
+            }
+            $res = $this->user->joinClass($token);
+            $this->addFlash($res['ok'] ? 'success' : 'error', (string) ($res['data']['message'] ?? $res['data']['error'] ?? 'Échec.'));
+
+            return $res['ok'] ? $this->redirectToRoute('student_dashboard') : $this->redirect($self);
+        }
+
+        return $this->render('wiki/class_join.html.twig', [
+            'token' => $token,
+            'preview' => $this->user->classInvitationPreview($token),
+            'self' => $self,
+            'logged' => $this->user->isLogged(),
+        ]);
     }
 
     /**

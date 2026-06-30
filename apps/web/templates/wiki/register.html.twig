@@ -5,14 +5,16 @@
     <p class="muted">Espaces <strong>recherche</strong> et <strong>pédagogie</strong> : déclenchez vous-même les outils (évaluation méthodologique AXIS…), et pour les enseignants, gérez une classe. Ces comptes donnent accès aux <em>outils</em> — l'édition du contenu public reste réservée au comité.</p>
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
 
-    <form class="ask" method="post" action="{{ path('register') }}" style="max-width:460px">
+    {% set joining = back is defined and back and 'classe/rejoindre' in back %}
+    <form class="ask" method="post" action="{{ path('register') }}" data-turbo="false" style="max-width:460px">
         <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+        {% if back is defined and back %}<input type="hidden" name="back" value="{{ back }}">{% endif %}
 
         <label for="r-role">Je suis…</label>
         <select id="r-role" name="role" required>
             <option value="researcher">Chercheur·e</option>
             <option value="teacher">Enseignant·e</option>
-            <option value="student">Élève / Étudiant·e</option>
+            <option value="student"{% if joining %} selected{% endif %}>Élève / Étudiant·e</option>
         </select>
 
         <label for="r-name">Nom (réel ou pseudo)</label>
