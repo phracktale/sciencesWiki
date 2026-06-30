@@ -73,6 +73,12 @@ final class StudyDesignClassifier
               article de méthode — AUCUNE donnée empirique sur des sujets.
             - other = si vraiment indéterminé.
 
+            Juge d'après la MÉTHODE réellement décrite, PAS seulement les mots du titre :
+            « case study » / « studi kasus » / « étude de cas » désigne souvent une simple
+            enquête (souvent transversale), pas un vrai rapport de cas clinique. En cas de
+            doute entre deux devis empiriques proches, choisis le plus probable au vu des
+            méthodes (échantillon, mesures, temporalité).
+
             Réponds UNIQUEMENT par un JSON strict : {"design": "<clé>"}. Aucun autre texte.
             TXT;
 
