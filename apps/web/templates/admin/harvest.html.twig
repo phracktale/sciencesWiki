@@ -12,10 +12,19 @@
             padding:.6rem 1rem; font:inherit; font-weight:600; color:#6b7280; cursor:pointer; text-decoration:none; border-radius:8px 8px 0 0 }
         .tabs .tab-btn[aria-selected="true"] { color:var(--accent); border-bottom-color:var(--accent) }
         .tabpane[hidden] { display:none }
-        /* Cartes/aperçus = fond clair → on FORCE un texte sombre (sinon illisible
-           sous le thème CRT dont la couleur par défaut est claire). */
-        #pane-snapshot, #pane-enrichment { color:#1e293b }
+        /* Panneaux Snapshot/Enrichissement = ÎLOTS CLAIRS (fond blanc, texte sombre),
+           lisibles QUEL QUE SOIT le thème — y compris CRT (qui s'applique aussi en
+           back-office) : on neutralise le phosphore et le glow à l'intérieur. */
+        #pane-snapshot, #pane-enrichment { background:#fff; color:#1e293b; border:1px solid var(--line); border-radius:12px; padding:1.1rem 1.2rem }
         #pane-snapshot h2, #pane-snapshot h3, #pane-enrichment h2, #pane-enrichment h3 { color:#0f172a }
+        body.theme-crt #pane-snapshot, body.theme-crt #pane-enrichment { background:#fff; color:#1e293b }
+        body.theme-crt #pane-snapshot *, body.theme-crt #pane-enrichment * { text-shadow:none !important }
+        body.theme-crt #pane-snapshot h2, body.theme-crt #pane-snapshot h3,
+        body.theme-crt #pane-enrichment h2, body.theme-crt #pane-enrichment h3 { color:#0f172a }
+        body.theme-crt #pane-snapshot .muted, body.theme-crt #pane-enrichment .muted { color:#64748b }
+        body.theme-crt #pane-snapshot strong, body.theme-crt #pane-snapshot b,
+        body.theme-crt #pane-enrichment strong, body.theme-crt #pane-enrichment b { color:#0f172a }
+        body.theme-crt #pane-snapshot a, body.theme-crt #pane-enrichment a { color:#1d4ed8 }
         .enr-bar-track { height:12px; background:var(--line); border-radius:6px; overflow:hidden; margin:.3rem 0 }
         .enr-trend-down { color:#16a34a; font-weight:700 }
         .enr-trend-up { color:#dc2626; font-weight:700 }
@@ -97,7 +106,7 @@
         <div id="snap-body" hidden>
             <div style="display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap; margin:.2rem 0 1rem; padding:.6rem .9rem; border:1px solid var(--line); border-radius:10px; background:#f5f8ff">
                 <span style="font-size:.85rem; color:#475569">📚 Corpus total :</span>
-                <strong id="snap-corpus" style="font-size:1.7rem; color:#0f172a">—</strong>
+                <strong id="snap-corpus" style="font-size:1.7rem; color:#1e293b">—</strong>
                 <span class="muted" style="font-size:.8rem">publications en base (toutes sources confondues · ≈ estimation rapide). Le détail ci-dessous ne concerne que <strong>la passe d'ingestion en cours</strong>.</span>
             </div>
             <div style="margin:.6rem 0 .2rem; display:flex; justify-content:space-between; font-size:.85rem; color:#475569">
