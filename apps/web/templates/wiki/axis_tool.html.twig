@@ -160,9 +160,13 @@
                 {% if result.applicability == 'not_applicable' %}
                     <p class="muted">AMSTAR-2 ne s'applique qu'aux revues systématiques : la grille n'est <strong>pas</strong> appliquée à ce design.</p>
                 {% else %}
-                    {% set ovColor = result.overall == 'high' ? '#16a34a' : (result.overall == 'critically_low' ? '#dc2626' : '#f59e0b') %}
-                    <p>Niveau de confiance : <span class="badge" style="background:{{ ovColor }}22; color:{{ ovColor }}; font-weight:700">{{ result.overallLabel }}</span>
-                       <span class="muted" style="margin-left:.4rem">{{ result.criticalFlaws }} défaut(s) critique(s), {{ result.weaknesses }} réserve(s) · source : {{ result.sourceScope == 'abstract+fulltext' ? 'résumé + texte intégral' : 'résumé seul' }}</span></p>
+                    {% set ovColor = result.overall == 'high' ? '#16a34a' : (result.overall == 'critically_low' ? '#dc2626' : (result.overall == 'insufficient' ? '#64748b' : '#f59e0b')) %}
+                    <p>Niveau de confiance : <span class="badge" style="background:{{ ovColor }}22; color:{{ ovColor }}; font-weight:700">{{ result.overallLabel }}</span></p>
+                    {% if result.overall == 'insufficient' %}
+                        <p class="muted">AMSTAR-2 nécessite le <strong>texte intégral</strong> pour une évaluation fiable ; ici, seul le <strong>résumé</strong> est disponible. Les 16 items ci-dessous sont donc <strong>indicatifs</strong> (un élément non mentionné dans le résumé apparaît comme « non »).</p>
+                    {% else %}
+                        <p class="muted">{{ result.criticalFlaws }} défaut(s) critique(s), {{ result.weaknesses }} réserve(s) · source : résumé + texte intégral.</p>
+                    {% endif %}
                     {% if result.summary %}<p>{{ result.summary }}</p>{% endif %}
                     <details style="margin-top:.8rem">
                         <summary style="cursor:pointer; font-weight:600">Les 16 items en détail (★ = domaine critique)</summary>

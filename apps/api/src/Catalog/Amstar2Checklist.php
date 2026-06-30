@@ -58,6 +58,7 @@ final class Amstar2Checklist
         'moderate' => 'Confiance modérée',
         'low' => 'Confiance faible',
         'critically_low' => 'Confiance très faible',
+        'insufficient' => 'Indéterminée (texte intégral requis)',
     ];
 
     /** Clés ordonnées q1…q16. @return list<string> */

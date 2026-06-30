@@ -73,10 +73,18 @@ final class Amstar2Appraiser
         [$answers, $justifications] = $this->applyGuardrail($parsed, $sourceText);
         [$criticalFlaws, $weaknesses] = $this->countFlaws($answers);
 
+        // AMSTAR-2 exige le texte intégral : sur résumé seul, les méthodes (protocole,
+        // recherche exhaustive, liste des exclus, RoB…) sont quasi toujours « non
+        // rapportées » → notation systématiquement « très faible », trompeuse. On rend
+        // donc une confiance INDÉTERMINÉE plutôt qu'un faux verdict accablant.
+        $overall = 'abstract' === $scope
+            ? 'insufficient'
+            : Amstar2Checklist::overall($criticalFlaws, $weaknesses);
+
         $appraisal
             ->setAnswers($answers)
             ->setJustifications($justifications)
-            ->setScoring($criticalFlaws, $weaknesses, Amstar2Checklist::overall($criticalFlaws, $weaknesses));
+            ->setScoring($criticalFlaws, $weaknesses, $overall);
 
         $this->em->persist($appraisal);
 
