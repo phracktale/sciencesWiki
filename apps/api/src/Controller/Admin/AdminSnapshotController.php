@@ -43,12 +43,10 @@ final class AdminSnapshotController
             return new JsonResponse(['ok' => false, 'message' => 'Ingestion déjà terminée — rien à relancer.'], 409);
         }
 
-        // Déjà vivante (battement de cœur < 90 s) → ne pas la dédoubler.
-        $updated = \is_array($progress) ? strtotime((string) ($progress['updated_at'] ?? '')) : false;
-        if (false !== $updated && (time() - $updated) < 90) {
-            return new JsonResponse(['ok' => true, 'running' => true, 'message' => 'Ingestion déjà active.']);
-        }
-
+        // Clic = FORCER la relance : on tue tout process d'ingestion résiduel (évite
+        // les doublons, et débloque un process figé/zombie) puis on relance. Plus
+        // fiable que de se fier à la fraîcheur de l'horodatage (un process peut être
+        // mort alors que son dernier battement de cœur date de < 90 s).
         $done = \is_array($progress) ? (int) ($progress['done_files'] ?? 0) : 0;
         $skip = max(0, $done - 1);
 
