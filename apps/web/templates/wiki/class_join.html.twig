@@ -2,32 +2,36 @@
 {% block title %}Rejoindre une classe — SciencesWiki{% endblock %}
 {% block body %}
     {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
-    <h1>Rejoindre une classe 🎓</h1>
+    <h1>Rejoindre une classe</h1>
 
     {% if not found %}
-        <div class="card"><p class="muted">Cette invitation est introuvable. Vérifiez le lien reçu par e-mail, ou demandez-en un nouveau à votre enseignant·e.</p></div>
-    {% elif expired %}
-        <div class="card"><p class="muted">⌛ Cette invitation a expiré. Demandez un nouveau lien à votre enseignant·e.</p></div>
-    {% elif accepted %}
-        <div class="card">
-            <p class="muted">Cette invitation a déjà été utilisée.</p>
-            {% if logged %}<a class="btn" href="{{ path('student_dashboard') }}">Voir mes classes →</a>{% endif %}
-        </div>
+        <div class="card"><p class="muted">Cette invitation est introuvable. Verifiez le lien recu par e-mail, ou demandez-en un nouveau a votre enseignant.</p></div>
     {% else %}
-        <article class="card">
-            <p><strong>{{ teacher }}</strong> vous invite à rejoindre la classe <strong>« {{ className }} »</strong>.</p>
-            {% if logged %}
-                <form method="post" action="{{ joinUrl }}" data-turbo="false" style="margin-top:.6rem">
-                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-                    <button type="submit">Rejoindre la classe</button>
-                </form>
+        {% if expired %}
+            <div class="card"><p class="muted">Cette invitation a expire. Demandez un nouveau lien a votre enseignant.</p></div>
+        {% else %}
+            {% if accepted %}
+                <div class="card">
+                    <p class="muted">Cette invitation a deja ete utilisee.</p>
+                    {% if logged %}<a class="btn" href="{{ path('student_dashboard') }}">Voir mes classes</a>{% endif %}
+                </div>
             {% else %}
-                <p class="muted">Connectez-vous ou créez un compte élève pour rejoindre cette classe :</p>
-                <p style="display:flex; gap:.6rem; flex-wrap:wrap">
-                    <a class="btn" href="{{ path('login', {back: joinUrl}) }}">Se connecter</a>
-                    <a class="btn" href="{{ path('register', {back: joinUrl}) }}">Créer un compte élève</a>
-                </p>
+                <article class="card">
+                    <p><strong>{{ teacher }}</strong> vous invite a rejoindre la classe <strong>{{ className }}</strong>.</p>
+                    {% if logged %}
+                        <form method="post" action="{{ joinUrl }}" data-turbo="false" style="margin-top:.6rem">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <button type="submit">Rejoindre la classe</button>
+                        </form>
+                    {% else %}
+                        <p class="muted">Connectez-vous ou creez un compte eleve pour rejoindre cette classe :</p>
+                        <p style="display:flex; gap:.6rem; flex-wrap:wrap">
+                            <a class="btn" href="{{ path('login', {back: joinUrl}) }}">Se connecter</a>
+                            <a class="btn" href="{{ path('register', {back: joinUrl}) }}">Creer un compte eleve</a>
+                        </p>
+                    {% endif %}
+                </article>
             {% endif %}
-        </article>
+        {% endif %}
     {% endif %}
 {% endblock %}
