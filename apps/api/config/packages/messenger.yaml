@@ -51,6 +51,9 @@ framework:
             # Évaluation AXIS d'une publication à la demande (outil recherche/pédagogie) :
             # appel LLM ~1 min → asynchrone sur la même file isolée.
             App\Analysis\Message\AppraisePublicationMessage: analysis
+            # Détection du devis d'une étude (→ outils d'évaluation applicables) : appel
+            # LLM léger, asynchrone, pour préparer les boutons d'outils à la recherche.
+            App\Analysis\Message\ClassifyStudyMessage: analysis
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism

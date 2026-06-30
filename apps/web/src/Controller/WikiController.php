@@ -198,6 +198,7 @@ final class WikiController extends AbstractController
         $pending = null;
         $error = null;
         $candidates = null;
+        $toolStates = [];
         $query = trim((string) $request->request->get('query', ''));
         $doi = trim((string) $request->request->get('doi', ''));
 
@@ -218,6 +219,12 @@ final class WikiController extends AbstractController
                     $candidates = $res['ok'] ? ($res['data']['results'] ?? []) : [];
                     if ([] === $candidates) {
                         $error = 'Aucune étude trouvée pour « '.$query.' ».';
+                    } else {
+                        // Outils d'évaluation applicables par étude (classe en asynchrone si besoin).
+                        $dois = array_values(array_filter(array_map(static fn (array $c): ?string => $c['doi'] ?? null, $candidates)));
+                        if ([] !== $dois) {
+                            $toolStates = $this->user->appraisalTools($dois)['results'] ?? [];
+                        }
                     }
                 }
             } else {
@@ -226,7 +233,8 @@ final class WikiController extends AbstractController
         }
 
         return $this->render('wiki/axis_tool.html.twig', [
-            'result' => $result, 'pending' => $pending, 'error' => $error, 'candidates' => $candidates, 'query' => $query,
+            'result' => $result, 'pending' => $pending, 'error' => $error,
+            'candidates' => $candidates, 'toolStates' => $toolStates, 'query' => $query,
         ]);
     }
 

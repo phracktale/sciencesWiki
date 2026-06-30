@@ -28,14 +28,39 @@
                             {% if c.citedByCount %} · 📈 {{ c.citedByCount }} cit.{% endif %}
                         </div>
                     </div>
-                    {% if c.doi %}
-                        <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
-                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-                            <input type="hidden" name="doi" value="{{ c.doi }}">
-                            <button type="submit">Évaluer (AXIS)</button>
-                        </form>
-                    {% else %}
+                    {% if not c.doi %}
                         <span class="muted" style="font-size:.8rem">DOI manquant — non évaluable</span>
+                    {% else %}
+                        {% set st = toolStates[c.doi]|default(null) %}
+                        {% if st is null or not st.classified %}
+                            <div style="text-align:right">
+                                <div class="muted" style="font-size:.76rem; margin-bottom:.3rem">🔎 détection du type d'étude…</div>
+                                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
+                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                    <input type="hidden" name="doi" value="{{ c.doi }}">
+                                    <button type="submit">Évaluer (AXIS)</button>
+                                </form>
+                            </div>
+                        {% else %}
+                            <div style="text-align:right; min-width:210px">
+                                <div class="muted" style="font-size:.76rem">Devis : <strong>{{ st.designLabel }}</strong></div>
+                                <div style="margin-top:.3rem; display:flex; gap:.3rem; flex-wrap:wrap; justify-content:flex-end; align-items:center">
+                                    {% if st.axisApplicable %}
+                                        <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
+                                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                            <input type="hidden" name="doi" value="{{ c.doi }}">
+                                            <button type="submit">Évaluer (AXIS)</button>
+                                        </form>
+                                    {% endif %}
+                                    {% for t in st.tools %}
+                                        {% if not (t.key == 'axis' and st.axisApplicable) %}
+                                            <span class="badge" style="font-size:.72rem; background:#eef2ff; color:#3730a3">{{ t.name }}{% if not t.implemented %} · à venir{% endif %}</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                    {% if st.tools is empty %}<span class="muted" style="font-size:.76rem">Aucun outil standard pour ce devis.</span>{% endif %}
+                                </div>
+                            </div>
+                        {% endif %}
                     {% endif %}
                 </li>
             {% endfor %}

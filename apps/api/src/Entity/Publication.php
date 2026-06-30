@@ -72,6 +72,19 @@ class Publication
     #[ORM\Column(name: 'axis_appraising_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $axisAppraisingAt = null;
 
+    /** Devis détecté (cross_sectional, rct, cohort, systematic_review, non_empirical…) ; null = non classée. */
+    #[ORM\Column(name: 'study_design', length: 40, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?string $studyDesign = null;
+
+    /** Clés des outils d'évaluation critique applicables (déduits du devis). @var list<string>|null */
+    #[ORM\Column(name: 'appraisal_tools', type: Types::JSON, nullable: true)]
+    #[Groups(['publication:read'])]
+    private ?array $appraisalTools = null;
+
+    #[ORM\Column(name: 'classified_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $classifiedAt = null;
+
     /** FK locale vers l'article parent, si présent en base. */
     #[ORM\Column(name: 'parent_publication_id', type: Types::INTEGER, nullable: true)]
     #[Groups(['publication:read'])]
@@ -214,6 +227,44 @@ class Publication
     public function setAxisAppraisingAt(?\DateTimeImmutable $at): self
     {
         $this->axisAppraisingAt = $at;
+
+        return $this;
+    }
+
+    public function getStudyDesign(): ?string
+    {
+        return $this->studyDesign;
+    }
+
+    public function setStudyDesign(?string $design): self
+    {
+        $this->studyDesign = $design;
+
+        return $this;
+    }
+
+    /** @return list<string>|null */
+    public function getAppraisalTools(): ?array
+    {
+        return $this->appraisalTools;
+    }
+
+    /** @param list<string>|null $tools */
+    public function setAppraisalTools(?array $tools): self
+    {
+        $this->appraisalTools = $tools;
+
+        return $this;
+    }
+
+    public function getClassifiedAt(): ?\DateTimeImmutable
+    {
+        return $this->classifiedAt;
+    }
+
+    public function setClassifiedAt(?\DateTimeImmutable $at): self
+    {
+        $this->classifiedAt = $at;
 
         return $this;
     }

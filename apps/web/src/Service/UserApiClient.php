@@ -221,6 +221,17 @@ final class UserApiClient
         return ['ok' => $status >= 200 && $status < 300, 'status' => $status, 'data' => $data];
     }
 
+    /**
+     * Outils d'évaluation critique applicables, par étude (DOI). Classe en asynchrone
+     * les études pas encore détectées. @param list<string> $dois @return array<string,mixed>
+     */
+    public function appraisalTools(array $dois): array
+    {
+        $res = $this->send('POST', '/api/me/appraisal/tools', ['dois' => $dois]);
+
+        return $res['ok'] ? $res['data'] : ['results' => []];
+    }
+
     // --------------------------- Espace pédagogique ---------------------------
 
     /** Classes de l'enseignant connecté (effectif + invitations en attente). @return array<string,mixed> */
