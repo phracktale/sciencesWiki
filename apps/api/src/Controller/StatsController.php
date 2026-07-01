@@ -92,26 +92,34 @@ final class StatsController
     #[Route('/api/tree_nodes/{slug}/corpus', name: 'api_node_corpus', methods: ['GET'])]
     public function nodeCorpus(string $slug): JsonResponse
     {
-        // Indicateur : count(DISTINCT) sur placement_suggestion (~10⁶ pubs pour un gros
-        // domaine → ~1 s). On met en cache (TTL 1 h) — le volume change lentement.
-        $count = $this->cache->get('node_corpus_v1_'.md5($slug), function (ItemInterface $item) use ($slug): int {
-            $item->expiresAfter(3600);
+        $conn = $this->em->getConnection();
 
-            // Nombre de publications rattachées au nœud ET à ses descendants (DAG),
-            // dédoublonnées par publication.
-            $sql = 'WITH RECURSIVE sub AS (
-                        SELECT id FROM tree_node WHERE slug = :slug
-                        UNION
-                        SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
-                    )
-                    SELECT count(DISTINCT ps.publication_id)
-                    FROM placement_suggestion ps
-                    WHERE ps.tree_node_id IN (SELECT id FROM sub)';
+        // Lecture INSTANTANÉE depuis la vue matérialisée node_subtree_counts (comptes
+        // pré-agrégés par nœud, rafraîchis par cron). Un count(DISTINCT) live sur
+        // placement_suggestion coûterait ~1 s pour un gros domaine.
+        try {
+            $v = $conn->executeQuery(
+                'SELECT nsc.publications FROM node_subtree_counts nsc
+                 JOIN tree_node tn ON tn.id = nsc.node_id WHERE tn.slug = :slug',
+                ['slug' => $slug],
+            )->fetchOne();
+            if (false !== $v) {
+                return new JsonResponse(['slug' => $slug, 'publications' => (int) $v]);
+            }
+        } catch (\Throwable) {
+            // Vue absente (env neuf / avant 1er refresh) → repli live ci-dessous.
+        }
 
-            return (int) $this->em->getConnection()->executeQuery($sql, ['slug' => $slug])->fetchOne();
-        });
+        $sql = 'WITH RECURSIVE sub AS (
+                    SELECT id FROM tree_node WHERE slug = :slug
+                    UNION
+                    SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
+                )
+                SELECT count(DISTINCT ps.publication_id)
+                FROM placement_suggestion ps
+                WHERE ps.tree_node_id IN (SELECT id FROM sub)';
 
-        return new JsonResponse(['slug' => $slug, 'publications' => $count]);
+        return new JsonResponse(['slug' => $slug, 'publications' => (int) $conn->executeQuery($sql, ['slug' => $slug])->fetchOne()]);
     }
 
     /**
@@ -122,14 +130,32 @@ final class StatsController
     #[Route('/api/tree_nodes/{slug}/children-stats', name: 'api_node_children_stats', methods: ['GET'])]
     public function childrenStats(string $slug): JsonResponse
     {
-        // Pastilles de comptage par sous-rubrique : count(DISTINCT) sur des sous-arbres
-        // via placement_suggestion (~3 s pour un gros domaine). Mise en cache (TTL 1 h) —
-        // ces indicateurs changent lentement.
-        $stats = $this->cache->get('node_children_v1_'.md5($slug), function (ItemInterface $item) use ($slug): array {
-            $item->expiresAfter(3600);
+        // Pastilles par sous-rubrique : lues INSTANTANÉMENT depuis la vue matérialisée
+        // node_subtree_counts (sinon count(DISTINCT) sur des sous-arbres ~3 s). Repli
+        // live si la vue n'existe pas encore.
+        try {
+            $rows = $this->em->getConnection()->executeQuery(
+                'SELECT tn.slug AS slug,
+                        COALESCE(nsc.publications, 0) AS publications,
+                        COALESCE(nsc.questions, 0) AS questions
+                 FROM tree_node pp
+                 JOIN tree_edge pe ON pe.parent_id = pp.id
+                 JOIN tree_node tn ON tn.id = pe.child_id
+                 LEFT JOIN node_subtree_counts nsc ON nsc.node_id = tn.id
+                 WHERE pp.slug = :slug',
+                ['slug' => $slug],
+            )->fetchAllAssociative();
+        } catch (\Throwable) {
+            return new JsonResponse(['slug' => $slug, 'children' => $this->computeChildrenStats($slug)]);
+        }
 
-            return $this->computeChildrenStats($slug);
-        });
+        $stats = [];
+        foreach ($rows as $row) {
+            $stats[(string) $row['slug']] = [
+                'publications' => (int) $row['publications'],
+                'questions' => (int) $row['questions'],
+            ];
+        }
 
         return new JsonResponse(['slug' => $slug, 'children' => $stats]);
     }

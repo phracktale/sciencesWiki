@@ -21,7 +21,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 #[AsCommand(name: 'app:stats:refresh', description: 'Rafraîchit les vues matérialisées des stats (dashboard).')]
 final class RefreshStatsCommand extends Command
 {
-    private const VIEWS = ['dashboard_stats', 'dashboard_type_breakdown', 'dashboard_domain_stats'];
+    private const VIEWS = ['dashboard_stats', 'dashboard_type_breakdown', 'dashboard_domain_stats', 'node_subtree_counts'];
 
     public function __construct(private readonly EntityManagerInterface $em)
     {
