@@ -217,7 +217,10 @@ final class FulltextIngester
                 'max_redirects' => 8,
                 'headers' => [
                     'Accept' => 'application/pdf,*/*',
-                    'User-Agent' => 'SciencesWikiBot/1.0 (+https://scienceswiki.eu; mailto:contact@scienceswiki.org)',
+                    // UA navigateur : de nombreux hôtes OA (Europe PMC getPdf, éditeurs)
+                    // renvoient 403 aux UA contenant « bot ». Un UA navigateur passe et
+                    // améliore nettement le taux de récupération du texte intégral.
+                    'User-Agent' => 'Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0',
                 ],
             ]);
             if (200 !== $response->getStatusCode()) {
