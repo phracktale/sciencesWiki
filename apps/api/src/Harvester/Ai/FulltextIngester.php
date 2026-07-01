@@ -57,42 +57,53 @@ final class FulltextIngester
         if (null === $id) {
             return 0;
         }
-        $url = $publication->getOaUrl();
-        // Repli : pas d'URL OA directe mais un DOI → on cherche un PDF OA LÉGAL
-        // (CORE, puis Europe PMC) avant d'abandonner.
-        if ((null === $url || '' === $url) && null !== $publication->getDoi()) {
-            $url = $this->resolveOaUrl($publication);
-        }
 
-        // On marque la tentative tout de suite (avec ou sans URL) pour ne pas réessayer en boucle.
+        // URLs candidates dans l'ordre : oa_url direct, sinon PDF OA résolus (Europe
+        // PMC, CORE) via le DOI. On les essaie une à une jusqu'à ce qu'un téléchargement
+        // produise des fragments (une URL de résolveur peut échouer → on tente la suivante).
+        $urls = $this->candidateUrls($publication);
+
+        // On marque la tentative tout de suite pour ne pas réessayer en boucle.
         $this->conn->executeStatement('UPDATE publication SET fulltext_fetched_at = now() WHERE id = :id', ['id' => $id]);
 
-        if (null === $url || '' === $url) {
-            return 0;
+        foreach ($urls as $url) {
+            try {
+                $pdf = $this->download($url);
+                if (null === $pdf) {
+                    continue;
+                }
+                [$chunks, $source] = $this->pdfToChunks($pdf);
+                @unlink($pdf);
+                if ([] === $chunks) {
+                    continue;
+                }
+
+                return $this->storeChunks($id, $chunks, $source);
+            } catch (\Throwable $e) {
+                $this->logger->info('Texte intégral non ingéré : '.$e->getMessage(), ['publication' => $id, 'url' => $url]);
+            }
         }
 
-        try {
-            $pdf = $this->download($url);
-            if (null === $pdf) {
-                return 0;
-            }
-            [$chunks, $source] = $this->pdfToChunks($pdf);
-            @unlink($pdf);
-            if ([] === $chunks) {
-                return 0;
-            }
-
-            return $this->storeChunks($id, $chunks, $source);
-        } catch (\Throwable $e) {
-            $this->logger->info('Texte intégral non ingéré : '.$e->getMessage(), ['publication' => $id, 'url' => $url]);
-
-            return 0;
-        }
+        return 0;
     }
 
-    /** Cherche un PDF OA via les résolveurs (CORE, Europe PMC) ; premier trouvé gagne. */
-    private function resolveOaUrl(Publication $publication): ?string
+    /**
+     * URLs candidates de PDF, par préférence : oa_url direct ; sinon les résolveurs OA
+     * (CORE, Europe PMC) via le DOI.
+     *
+     * @return list<string>
+     */
+    private function candidateUrls(Publication $publication): array
     {
+        $oa = $publication->getOaUrl();
+        if (null !== $oa && '' !== $oa) {
+            return [$oa];
+        }
+        if (null === $publication->getDoi()) {
+            return [];
+        }
+
+        $urls = [];
         foreach ($this->resolvers as $resolver) {
             try {
                 $url = $resolver->resolvePdfUrl($publication);
@@ -102,12 +113,11 @@ final class FulltextIngester
             }
             if (null !== $url && '' !== $url) {
                 $this->logger->info('PDF OA résolu', ['publication' => $publication->getId(), 'source' => $resolver->source()]);
-
-                return $url;
+                $urls[] = $url;
             }
         }
 
-        return null;
+        return $urls;
     }
 
     /**

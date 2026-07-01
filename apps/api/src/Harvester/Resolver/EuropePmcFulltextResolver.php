@@ -18,7 +18,9 @@ final class EuropePmcFulltextResolver implements FulltextResolver
 {
     private const ENDPOINT = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search';
     private const TIMEOUT = 20;
-    private const OA = ['Open access', 'Free'];
+    // « Open access » strict = sous-ensemble OA d'Europe PMC (PDF de rendu fiable).
+    // On EXCLUT « Free » : ces articles hors sous-ensemble OA renvoient un PDF cassé (500).
+    private const OA = ['Open access'];
 
     public function __construct(
         private readonly HttpClientInterface $httpClient,
