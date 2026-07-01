@@ -32,8 +32,10 @@ final class StatsController
     #[Route('/api/stats', name: 'api_stats', methods: ['GET'])]
     public function global(): JsonResponse
     {
+        // TTL 30 min, aligné sur le rafraîchissement des vues matérialisées (cron) d'où
+        // proviennent l'essentiel des chiffres : moins de recalculs = moins de pics.
         $payload = $this->cache->get('stats.global.v1', function (ItemInterface $item): array {
-            $item->expiresAfter(600);
+            $item->expiresAfter(1800);
 
             return $this->computeGlobal();
         });
@@ -46,29 +48,45 @@ final class StatsController
     {
         $conn = $this->em->getConnection();
 
-        // Total publications : on lit la MÊME source que le tableau de bord admin (vue
-        // matérialisée dashboard_stats, rafraîchie par cron) pour que les deux pages
-        // affichent le même chiffre. Replis successifs : estimation reltuples (instantané)
-        // puis count(*) exact si la table n'a jamais été analysée.
-        $total = 0;
+        // TOUS les agrégats proviennent de la vue matérialisée dashboard_stats (même
+        // source que le tableau de bord admin, rafraîchie par cron) : cohérence entre
+        // pages ET aucun count(DISTINCT) live — ceux sur publication_chunk /
+        // placement_suggestion coûtaient plusieurs secondes (pics d'accueil, aggravés
+        // par la moisson qui écrit dans publication_chunk).
+        $mv = null;
         try {
-            $total = (int) ($conn->executeQuery('SELECT publications FROM dashboard_stats LIMIT 1')->fetchOne() ?: 0);
+            $mv = $conn->executeQuery(
+                'SELECT publications, pdf_consultables, placed_publications, last_update,
+                        answers_validated, answers_ai, questions_ai, questions_human
+                 FROM dashboard_stats LIMIT 1',
+            )->fetchAssociative() ?: null;
         } catch (\Throwable) {
-            $total = 0;
+            $mv = null;
         }
-        if ($total <= 0) {
-            $total = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE oid = 'publication'::regclass")->fetchOne();
-        }
-        if ($total <= 0) {
-            $total = (int) $conn->executeQuery('SELECT count(*) FROM publication')->fetchOne();
-        }
-        $placed = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM placement_suggestion')->fetchOne();
-        $answers = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status IN ('valide','non_relu')")->fetchOne();
-        $validated = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'valide'")->fetchOne();
-        $questions = (int) $conn->executeQuery('SELECT count(*) FROM question')->fetchOne();
-        $fulltext = (int) ($conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne() ?: 0);
-        $lastUpdate = $conn->executeQuery('SELECT max(updated_at) FROM publication')->fetchOne();
 
+        if (null !== $mv) {
+            $total = (int) $mv['publications'];
+            $fulltext = (int) $mv['pdf_consultables'];
+            $placed = (int) $mv['placed_publications'];
+            $validated = (int) $mv['answers_validated'];
+            $answers = $validated + (int) $mv['answers_ai'];
+            $questions = (int) $mv['questions_ai'] + (int) $mv['questions_human'];
+            $lastUpdate = $mv['last_update'];
+        } else {
+            // Repli live (vue absente / avant 1er refresh).
+            $total = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE oid = 'publication'::regclass")->fetchOne();
+            if ($total <= 0) {
+                $total = (int) $conn->executeQuery('SELECT count(*) FROM publication')->fetchOne();
+            }
+            $fulltext = (int) ($conn->executeQuery('SELECT count(DISTINCT publication_id) FROM publication_chunk')->fetchOne() ?: 0);
+            $placed = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM placement_suggestion')->fetchOne();
+            $validated = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'valide'")->fetchOne();
+            $answers = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status IN ('valide','non_relu')")->fetchOne();
+            $questions = (int) $conn->executeQuery('SELECT count(*) FROM question')->fetchOne();
+            $lastUpdate = $conn->executeQuery('SELECT max(updated_at) FROM publication')->fetchOne();
+        }
+
+        // Derniers papiers moissonnés : rapide via idx_pub_created (created_at DESC).
         $recent = $conn->executeQuery(
             'SELECT title, doi, publication_date FROM publication ORDER BY created_at DESC LIMIT 5'
         )->fetchAllAssociative();
