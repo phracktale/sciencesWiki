@@ -255,12 +255,12 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                 "WITH abs AS (
                     SELECT id, embedding <=> CAST(:vec AS vector) AS distance
                     FROM publication
-                    ORDER BY embedding <=> CAST(:vec AS vector)
+                    ORDER BY embedding <=> CAST(:vec AS vector), id
                     LIMIT %1\$d
                  ), chk AS (
                     SELECT publication_id AS id, embedding <=> CAST(:vec AS halfvec) AS distance
                     FROM publication_chunk
-                    ORDER BY embedding <=> CAST(:vec AS halfvec)
+                    ORDER BY embedding <=> CAST(:vec AS halfvec), publication_id
                     LIMIT %1\$d
                  ), merged AS (
                     SELECT id, MIN(distance) AS distance
@@ -271,7 +271,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                  FROM merged m
                  JOIN publication p ON p.id = m.id
                  WHERE p.retraction_status = 'none' AND p.".\App\Catalog\PublicationType::notSatelliteSql().$typeClause."
-                 ORDER BY m.distance ASC
+                 ORDER BY m.distance ASC, m.id ASC
                  LIMIT %2\$d",
                 $perSide,
                 $limit,
