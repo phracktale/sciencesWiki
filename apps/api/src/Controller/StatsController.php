@@ -92,20 +92,24 @@ final class StatsController
     #[Route('/api/tree_nodes/{slug}/corpus', name: 'api_node_corpus', methods: ['GET'])]
     public function nodeCorpus(string $slug): JsonResponse
     {
-        $conn = $this->em->getConnection();
+        // Indicateur : count(DISTINCT) sur placement_suggestion (~10⁶ pubs pour un gros
+        // domaine → ~1 s). On met en cache (TTL 1 h) — le volume change lentement.
+        $count = $this->cache->get('node_corpus_v1_'.md5($slug), function (ItemInterface $item) use ($slug): int {
+            $item->expiresAfter(3600);
 
-        // Nombre de publications rattachées au nœud ET à ses descendants (DAG),
-        // dédoublonnées par publication.
-        $sql = 'WITH RECURSIVE sub AS (
-                    SELECT id FROM tree_node WHERE slug = :slug
-                    UNION
-                    SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
-                )
-                SELECT count(DISTINCT ps.publication_id)
-                FROM placement_suggestion ps
-                WHERE ps.tree_node_id IN (SELECT id FROM sub)';
+            // Nombre de publications rattachées au nœud ET à ses descendants (DAG),
+            // dédoublonnées par publication.
+            $sql = 'WITH RECURSIVE sub AS (
+                        SELECT id FROM tree_node WHERE slug = :slug
+                        UNION
+                        SELECT e.child_id FROM tree_edge e JOIN sub ON e.parent_id = sub.id
+                    )
+                    SELECT count(DISTINCT ps.publication_id)
+                    FROM placement_suggestion ps
+                    WHERE ps.tree_node_id IN (SELECT id FROM sub)';
 
-        $count = (int) $conn->executeQuery($sql, ['slug' => $slug])->fetchOne();
+            return (int) $this->em->getConnection()->executeQuery($sql, ['slug' => $slug])->fetchOne();
+        });
 
         return new JsonResponse(['slug' => $slug, 'publications' => $count]);
     }
@@ -117,6 +121,21 @@ final class StatsController
      */
     #[Route('/api/tree_nodes/{slug}/children-stats', name: 'api_node_children_stats', methods: ['GET'])]
     public function childrenStats(string $slug): JsonResponse
+    {
+        // Pastilles de comptage par sous-rubrique : count(DISTINCT) sur des sous-arbres
+        // via placement_suggestion (~3 s pour un gros domaine). Mise en cache (TTL 1 h) —
+        // ces indicateurs changent lentement.
+        $stats = $this->cache->get('node_children_v1_'.md5($slug), function (ItemInterface $item) use ($slug): array {
+            $item->expiresAfter(3600);
+
+            return $this->computeChildrenStats($slug);
+        });
+
+        return new JsonResponse(['slug' => $slug, 'children' => $stats]);
+    }
+
+    /** @return array<string,array{publications:int,questions:int}> */
+    private function computeChildrenStats(string $slug): array
     {
         $conn = $this->em->getConnection();
 
@@ -155,6 +174,6 @@ final class StatsController
             ];
         }
 
-        return new JsonResponse(['slug' => $slug, 'children' => $stats]);
+        return $stats;
     }
 }
