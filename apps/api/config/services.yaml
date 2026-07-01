@@ -11,6 +11,12 @@ parameters:
     # (secret OPENALEX_API_KEY). Placé ici plutôt que dans .env pour ne pas être
     # figé par `composer dump-env` (qui masquerait le coffre).
     env(OPENALEX_API_KEY): ''
+    # Défaut vide : le résolveur CORE est inactif tant que la clé n'est pas fournie
+    # (dans .env.prod sur le serveur). Évite un crash au boot si la variable manque.
+    env(CORE_API_KEY): ''
+    # Filet : les résolveurs (et OpenAlexConnector) lisent HARVESTER_CONTACT_EMAIL ;
+    # défaut vide pour ne pas planter au boot d'un conteneur qui ne le définit pas.
+    env(HARVESTER_CONTACT_EMAIL): ''
 
 services:
     # default configuration for services in *this* file
@@ -22,6 +28,9 @@ services:
     _instanceof:
         App\Harvester\Connector\SourceConnector:
             tags: ['app.source_connector']
+        # Résolveurs de texte intégral OA (repli quand pas d'oa_url) : CORE, Europe PMC.
+        App\Harvester\Resolver\FulltextResolver:
+            tags: ['app.fulltext_resolver']
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name

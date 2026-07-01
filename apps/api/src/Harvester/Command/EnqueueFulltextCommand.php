@@ -52,9 +52,15 @@ final class EnqueueFulltextCommand extends Command
             return Command::SUCCESS;
         }
 
+        // On enfile : (a) les publications avec une URL OA directe (voie rapide), et
+        // (b) celles SANS oa_url mais avec un DOI et BIEN CITÉES (≥20) → tentative de
+        // résolution du plein texte via CORE / Europe PMC (repli, cf. FulltextIngester).
+        // Le seuil de citations borne le volume d'appels API et cible la haute valeur.
         $ids = $this->conn->executeQuery(
             "SELECT id FROM publication
-              WHERE fulltext_fetched_at IS NULL AND oa_url IS NOT NULL AND oa_url <> ''
+              WHERE fulltext_fetched_at IS NULL
+                AND ( (oa_url IS NOT NULL AND oa_url <> '')
+                      OR (doi IS NOT NULL AND cited_by_count >= 20) )
               ORDER BY has_grobid_xml DESC, cited_by_count DESC, id DESC
               LIMIT :n",
             ['n' => $limit],

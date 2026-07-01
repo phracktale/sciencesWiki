@@ -61,6 +61,7 @@ services:
       EMBEDDING_DRIVER: http
       ML_EMBED_URL: ${ML_EMBED_URL}
       GROBID_URL: ${GROBID_URL:-}
+      CORE_API_KEY: ${CORE_API_KEY:-}
       LLM_DRIVER: ${LLM_DRIVER}
       LLM_BASE_URL: ${LLM_BASE_URL}
       LLM_MODEL: ${LLM_MODEL}
@@ -108,6 +109,7 @@ services:
       EMBEDDING_DRIVER: http
       ML_EMBED_URL: ${ML_EMBED_URL}
       GROBID_URL: ${GROBID_URL:-}
+      CORE_API_KEY: ${CORE_API_KEY:-}
       LLM_DRIVER: ${LLM_DRIVER}
       LLM_BASE_URL: ${LLM_BASE_URL}
       LLM_MODEL: ${LLM_MODEL}
@@ -156,6 +158,7 @@ services:
       EMBEDDING_DRIVER: http
       ML_EMBED_URL: ${ML_EMBED_URL}
       GROBID_URL: ${GROBID_URL:-}
+      CORE_API_KEY: ${CORE_API_KEY:-}
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
@@ -190,6 +193,7 @@ services:
       EMBEDDING_DRIVER: http
       ML_EMBED_URL: ${ML_EMBED_URL}
       GROBID_URL: ${GROBID_URL:-}
+      CORE_API_KEY: ${CORE_API_KEY:-}
       LLM_DRIVER: ${LLM_DRIVER}
       LLM_BASE_URL: ${LLM_BASE_URL}
       LLM_MODEL: ${LLM_MODEL}

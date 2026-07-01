@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Harvester\Ai;
 
 use App\Entity\Publication;
+use App\Harvester\Resolver\FulltextResolver;
 use Doctrine\DBAL\Connection;
 use Pgvector\Vector;
 use Psr\Log\LoggerInterface;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 use Symfony\Component\HttpClient\NoPrivateNetworkHttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
@@ -29,12 +31,17 @@ final class FulltextIngester
 
     private readonly EmbeddingClient $embedder;
 
+    /**
+     * @param iterable<FulltextResolver> $resolvers repli OA (CORE, Europe PMC) si pas d'oa_url
+     */
     public function __construct(
         EmbeddingClientFactory $factory,
         private readonly HttpClientInterface $httpClient,
         private readonly Connection $conn,
         private readonly LoggerInterface $logger,
         private readonly GrobidExtractor $grobid,
+        #[AutowireIterator('app.fulltext_resolver')]
+        private readonly iterable $resolvers = [],
     ) {
         $this->embedder = $factory->create();
     }
@@ -47,13 +54,22 @@ final class FulltextIngester
     public function ingest(Publication $publication): int
     {
         $id = $publication->getId();
-        $url = $publication->getOaUrl();
-        if (null === $id || null === $url || '' === $url) {
+        if (null === $id) {
             return 0;
         }
+        $url = $publication->getOaUrl();
+        // Repli : pas d'URL OA directe mais un DOI → on cherche un PDF OA LÉGAL
+        // (CORE, puis Europe PMC) avant d'abandonner.
+        if ((null === $url || '' === $url) && null !== $publication->getDoi()) {
+            $url = $this->resolveOaUrl($publication);
+        }
 
-        // On marque la tentative tout de suite pour ne pas réessayer en boucle.
+        // On marque la tentative tout de suite (avec ou sans URL) pour ne pas réessayer en boucle.
         $this->conn->executeStatement('UPDATE publication SET fulltext_fetched_at = now() WHERE id = :id', ['id' => $id]);
+
+        if (null === $url || '' === $url) {
+            return 0;
+        }
 
         try {
             $pdf = $this->download($url);
@@ -72,6 +88,26 @@ final class FulltextIngester
 
             return 0;
         }
+    }
+
+    /** Cherche un PDF OA via les résolveurs (CORE, Europe PMC) ; premier trouvé gagne. */
+    private function resolveOaUrl(Publication $publication): ?string
+    {
+        foreach ($this->resolvers as $resolver) {
+            try {
+                $url = $resolver->resolvePdfUrl($publication);
+            } catch (\Throwable $e) {
+                $this->logger->info('Résolveur '.$resolver->source().' en échec', ['publication' => $publication->getId(), 'error' => $e->getMessage()]);
+                continue;
+            }
+            if (null !== $url && '' !== $url) {
+                $this->logger->info('PDF OA résolu', ['publication' => $publication->getId(), 'source' => $resolver->source()]);
+
+                return $url;
+            }
+        }
+
+        return null;
     }
 
     /**
