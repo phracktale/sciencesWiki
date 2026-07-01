@@ -7,6 +7,8 @@ namespace App\Controller;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
 
 /**
  * Statistiques publiques du corpus : volume global, dernière mise à jour,
@@ -14,16 +16,42 @@ use Symfony\Component\Routing\Attribute\Route;
  */
 final class StatsController
 {
-    public function __construct(private readonly EntityManagerInterface $em)
-    {
+    public function __construct(
+        private readonly EntityManagerInterface $em,
+        private readonly CacheInterface $cache,
+    ) {
     }
 
+    /**
+     * Volume public du corpus. Ces chiffres changent lentement et impliquent des
+     * comptages coûteux sur de très grosses tables (publication, publication_chunk,
+     * placement_suggestion) : on met le résultat en cache (TTL 10 min) pour garder la
+     * page d'accueil instantanée, et on estime le total de publications via reltuples
+     * (catalogue, immédiat) plutôt qu'un count(*) qui scanne toute la table.
+     */
     #[Route('/api/stats', name: 'api_stats', methods: ['GET'])]
     public function global(): JsonResponse
     {
+        $payload = $this->cache->get('stats.global.v1', function (ItemInterface $item): array {
+            $item->expiresAfter(600);
+
+            return $this->computeGlobal();
+        });
+
+        return new JsonResponse($payload);
+    }
+
+    /** @return array<string,mixed> */
+    private function computeGlobal(): array
+    {
         $conn = $this->em->getConnection();
 
-        $total = (int) $conn->executeQuery('SELECT count(*) FROM publication')->fetchOne();
+        // Estimation instantanée (statistiques du planificateur) ; repli sur un count
+        // exact si la table n'a jamais été analysée (reltuples < 0).
+        $total = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE oid = 'publication'::regclass")->fetchOne();
+        if ($total <= 0) {
+            $total = (int) $conn->executeQuery('SELECT count(*) FROM publication')->fetchOne();
+        }
         $placed = (int) $conn->executeQuery('SELECT count(DISTINCT publication_id) FROM placement_suggestion')->fetchOne();
         $answers = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status IN ('valide','non_relu')")->fetchOne();
         $validated = (int) $conn->executeQuery("SELECT count(*) FROM answer WHERE validation_status = 'valide'")->fetchOne();
@@ -35,7 +63,7 @@ final class StatsController
             'SELECT title, doi, publication_date FROM publication ORDER BY created_at DESC LIMIT 5'
         )->fetchAllAssociative();
 
-        return new JsonResponse([
+        return [
             'publications' => $total,
             'placedPublications' => $placed,
             'publishedAnswers' => $answers,
@@ -48,7 +76,7 @@ final class StatsController
                 'doi' => $r['doi'],
                 'date' => $r['publication_date'],
             ], $recent),
-        ]);
+        ];
     }
 
     #[Route('/api/tree_nodes/{slug}/corpus', name: 'api_node_corpus', methods: ['GET'])]
