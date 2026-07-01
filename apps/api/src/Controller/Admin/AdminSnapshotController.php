@@ -51,11 +51,14 @@ final class AdminSnapshotController
         $skip = max(0, $done - 1);
 
         // Le snapshot est monté à /openalexSnapshot dans le conteneur api (cf. watchdog).
+        // memory_limit=1024M : les partitions récentes très DENSES (jusqu'à ~16k retenues/
+        // fichier) faisaient exploser la limite PHP par défaut (128M) au flush Doctrine
+        // (OOM). --flush=250 : lots plus petits → empreinte mémoire bornée.
         $console = $this->projectDir.'/bin/console';
         $inner = 'for p in /proc/[0-9]*; do [ "$(cat "$p/comm" 2>/dev/null)" = php ] || continue; '
             .'tr "\0" " " < "$p/cmdline" 2>/dev/null | grep -q ingest-snapshot && kill -9 "$(basename "$p")" 2>/dev/null; done; '
             .\sprintf(
-                'setsid nohup php %s app:openalex:ingest-snapshot --dir=/openalexSnapshot --since=2015 --min-citations=5 --langs=en,fr --skip-files=%d >> /tmp/ingest-snapshot.log 2>&1 < /dev/null &',
+                'setsid nohup php -d memory_limit=1024M %s app:openalex:ingest-snapshot --dir=/openalexSnapshot --since=2015 --min-citations=5 --langs=en,fr --flush=250 --skip-files=%d >> /tmp/ingest-snapshot.log 2>&1 < /dev/null &',
                 escapeshellarg($console), $skip,
             );
         exec('sh -c '.escapeshellarg($inner));

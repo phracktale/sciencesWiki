@@ -31,5 +31,7 @@ D=$(echo "$VAL" | grep -oE '"done_files":[0-9]+' | grep -oE '[0-9]+' | head -1)
 case "$D" in ''|*[!0-9]*) D=1 ;; esac                     # valide: entier
 SKIP=$((D - 1)); [ "$SKIP" -lt 0 ] && SKIP=0
 
-$DC exec -d api sh -c "php bin/console app:openalex:ingest-snapshot --dir=/openalexSnapshot --since=2015 --min-citations=5 --langs=en,fr --skip-files=$SKIP >> /tmp/ingest-snapshot.log 2>&1"
+# memory_limit=1024M : les partitions récentes denses (~16k retenues/fichier) faisaient
+# exploser la limite PHP par défaut (128M) au flush Doctrine (OOM). --flush=250 = lots plus petits.
+$DC exec -d api sh -c "php -d memory_limit=1024M bin/console app:openalex:ingest-snapshot --dir=/openalexSnapshot --since=2015 --min-citations=5 --langs=en,fr --flush=250 --skip-files=$SKIP >> /tmp/ingest-snapshot.log 2>&1"
 echo "$(date '+%Y-%m-%d %H:%M:%S') watchdog: stale (${AGE}s) → relance skip=$SKIP" >> "$LOG"
