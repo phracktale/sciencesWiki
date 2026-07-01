@@ -46,9 +46,19 @@ final class StatsController
     {
         $conn = $this->em->getConnection();
 
-        // Estimation instantanée (statistiques du planificateur) ; repli sur un count
-        // exact si la table n'a jamais été analysée (reltuples < 0).
-        $total = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE oid = 'publication'::regclass")->fetchOne();
+        // Total publications : on lit la MÊME source que le tableau de bord admin (vue
+        // matérialisée dashboard_stats, rafraîchie par cron) pour que les deux pages
+        // affichent le même chiffre. Replis successifs : estimation reltuples (instantané)
+        // puis count(*) exact si la table n'a jamais été analysée.
+        $total = 0;
+        try {
+            $total = (int) ($conn->executeQuery('SELECT publications FROM dashboard_stats LIMIT 1')->fetchOne() ?: 0);
+        } catch (\Throwable) {
+            $total = 0;
+        }
+        if ($total <= 0) {
+            $total = (int) $conn->executeQuery("SELECT reltuples::bigint FROM pg_class WHERE oid = 'publication'::regclass")->fetchOne();
+        }
         if ($total <= 0) {
             $total = (int) $conn->executeQuery('SELECT count(*) FROM publication')->fetchOne();
         }
