@@ -169,9 +169,11 @@ services:
       disable: true
     restart: unless-stopped
     deploy:
-      # Poussée moisson texte intégral (10). GROBID + embeddings + DB partagent Marvin :
-      # surveiller la charge/réactivité du site ; revenir à 4-6 si saturation.
-      replicas: 10
+      # 6 workers : le débit du texte intégral est borné par GROBID/embeddings (côté
+      # Marvin), PAS par le nombre de workers (10 ne gagnait ~rien vs 6). On reste à 6
+      # pour ne pas surcharger Marvin (qui héberge aussi la DB). Pour aller plus vite :
+      # scaler GROBID (threads/instances), pas les workers.
+      replicas: 6
 
   # Worker DÉDIÉ à l'analyse « controverses & pistes » d'un nœud. Isolé du pool de
   # moisson : un run d'analyse (long, borné par le LLM) ne doit pas réduire le
