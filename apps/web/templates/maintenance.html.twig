@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex">
+    <title>SYSTÈME EN MAINTENANCE — SciencesWiki</title>
+    <style>
+        :root { --green: #00ff41; --dim: #0a3f16; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { height: 100%; background: #000; overflow: hidden; }
+        body {
+            font-family: "Courier New", ui-monospace, monospace;
+            color: var(--green);
+            text-shadow: 0 0 6px rgba(0,255,65,.75), 0 0 12px rgba(0,255,65,.35);
+        }
+        #matrix { position: fixed; inset: 0; z-index: 1; display: block; }
+        /* Overlay CRT : lignes de balayage + vignette + scintillement. */
+        .crt {
+            position: fixed; inset: 0; z-index: 3; pointer-events: none;
+            background:
+                radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,.85) 100%),
+                repeating-linear-gradient(0deg, rgba(0,0,0,.28) 0, rgba(0,0,0,.28) 1px, transparent 2px, transparent 3px);
+            animation: flicker 3.6s infinite steps(60);
+        }
+        @keyframes flicker { 0%,97%{opacity:1} 98%{opacity:.72} 99%{opacity:.9} 100%{opacity:1} }
+        main {
+            position: fixed; inset: 0; z-index: 2;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            text-align: center; padding: 1.5rem;
+        }
+        .glyph { font-size: clamp(2.4rem, 9vw, 5rem); letter-spacing: .35rem; opacity: .92; animation: pulse 2.4s ease-in-out infinite; }
+        @keyframes pulse { 0%,100%{opacity:.55; text-shadow:0 0 6px rgba(0,255,65,.5)} 50%{opacity:1; text-shadow:0 0 18px rgba(0,255,65,.9)} }
+        h1 {
+            margin-top: .8rem; font-size: clamp(1.1rem, 4.2vw, 2rem); font-weight: 700;
+            letter-spacing: .28rem; text-transform: uppercase;
+        }
+        .type {
+            margin-top: 1.6rem; min-height: 1.6em; font-size: clamp(1rem, 3.6vw, 1.7rem);
+            letter-spacing: .06rem;
+        }
+        .cursor { display: inline-block; width: .62ch; background: var(--green); color: #000; animation: blink 1s steps(1) infinite; }
+        @keyframes blink { 50% { opacity: 0; } }
+        .sub { margin-top: 2rem; max-width: 34rem; color: #33d861; opacity: .82; font-size: clamp(.82rem, 2.6vw, 1rem); line-height: 1.5; }
+        .code { margin-top: 1.4rem; font-size: .74rem; letter-spacing: .2rem; color: var(--dim); }
+        .code b { color: #12a83a; }
+    </style>
+</head>
+<body>
+    <canvas id="matrix"></canvas>
+    <div class="crt"></div>
+    <main>
+        <div class="glyph">⟁ ▚ ⟒</div>
+        <h1>Système en maintenance</h1>
+        <p class="type"><span id="line"></span><span class="cursor">&nbsp;</span></p>
+        <p class="sub">La réalité se recompile. Le corpus est temporairement suspendu&nbsp;; SciencesWiki se reconnecte dans un instant.</p>
+        <p class="code">ERR&nbsp;<b>503</b>&nbsp;·&nbsp;REALITY_TEMPORARILY_UNAVAILABLE&nbsp;·&nbsp;FOLLOW_THE_WHITE_RABBIT</p>
+    </main>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        // ---- Pluie de glyphes « Matrix » ----
+        var canvas = document.getElementById('matrix');
+        var ctx = canvas.getContext('2d');
+        var glyphs = 'アカサタナハマヤラワ0123456789ﾊﾐﾋｰｳｼﾅﾓﾆｻﾜﾂｵﾘﾎﾏｴｷﾑｹABCDEFGHIJKLMNOPQRSTUVWXYZ<>*/\\|=+'.split('');
+        var fontSize = 16, cols = 0, drops = [];
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            cols = Math.floor(canvas.width / fontSize);
+            drops = [];
+            for (var i = 0; i < cols; i++) { drops[i] = Math.floor(Math.random() * -50); }
+        }
+        function draw() {
+            ctx.fillStyle = 'rgba(0,0,0,0.06)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.font = fontSize + 'px monospace';
+            for (var i = 0; i < drops.length; i++) {
+                var ch = glyphs[Math.floor(Math.random() * glyphs.length)];
+                var x = i * fontSize, y = drops[i] * fontSize;
+                ctx.fillStyle = Math.random() < 0.02 ? '#c8ffd4' : '#00ff41';
+                ctx.fillText(ch, x, y);
+                if (y > canvas.height && Math.random() > 0.975) { drops[i] = 0; }
+                drops[i]++;
+            }
+        }
+        resize();
+        window.addEventListener('resize', resize);
+        setInterval(draw, 55);
+
+        // ---- Texte machine à écrire (phrases mystiques) ----
+        var phrases = [
+            'Où est la matrice ?',
+            'Quelle est la réalité ?',
+            'Réveille-toi, Neo…',
+            'Suis le lapin blanc.',
+            'Il n’y a pas de cuillère.',
+            'Toc, toc, Neo.',
+            'La matrice nous entoure.',
+            'Libère ton esprit.',
+            'Le monde a été placé devant tes yeux pour te cacher la vérité.',
+            'La réalité se recompile…'
+        ];
+        var line = document.getElementById('line');
+        var p = 0, c = 0, deleting = false;
+        function tick() {
+            var txt = phrases[p];
+            if (!deleting) {
+                c++;
+                line.textContent = txt.slice(0, c);
+                if (c >= txt.length) { deleting = true; return setTimeout(tick, 1900); }
+                return setTimeout(tick, 55 + Math.random() * 45);
+            }
+            c--;
+            line.textContent = txt.slice(0, c);
+            if (c <= 0) { deleting = false; p = (p + 1) % phrases.length; return setTimeout(tick, 380); }
+            return setTimeout(tick, 26);
+        }
+        tick();
+    })();
+    </script>
+</body>
+</html>
