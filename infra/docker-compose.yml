@@ -169,7 +169,9 @@ services:
       disable: true
     restart: unless-stopped
     deploy:
-      replicas: 4
+      # Poussée moisson texte intégral (10). GROBID + embeddings + DB partagent Marvin :
+      # surveiller la charge/réactivité du site ; revenir à 4-6 si saturation.
+      replicas: 10
 
   # Worker DÉDIÉ à l'analyse « controverses & pistes » d'un nœud. Isolé du pool de
   # moisson : un run d'analyse (long, borné par le LLM) ne doit pas réduire le
