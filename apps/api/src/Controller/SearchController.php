@@ -164,6 +164,7 @@ final class SearchController
         $date = $p->getPublicationDate();
 
         return [
+            'id' => $p->getId(),
             'doi' => $p->getDoi(),
             'title' => $p->getTitle(),
             'venue' => $p->getVenue(),

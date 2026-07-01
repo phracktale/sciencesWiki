@@ -27,6 +27,12 @@
                             {% if c.year %}{{ c.year }} · {% endif %}{{ c.venue }}
                             {% if c.citedByCount %} · 📈 {{ c.citedByCount }} cit.{% endif %}
                         </div>
+                        {% if c.id %}
+                            <div style="margin-top:.2rem">
+                                <button type="button" class="js-abs-toggle" data-id="{{ c.id }}" style="background:none; border:0; color:var(--accent); cursor:pointer; font-size:.78rem; padding:0">▸ Résumé</button>
+                                <div class="abs-detail" hidden style="margin-top:.3rem; font-size:.85rem; max-width:640px"></div>
+                            </div>
+                        {% endif %}
                     </div>
                     {% if not c.doi %}
                         <span class="muted" style="font-size:.8rem">DOI manquant — non évaluable</span>
@@ -113,6 +119,51 @@
             f.addEventListener('submit', function () {
                 var b = f.querySelector('button');
                 if (b) { b.disabled = true; b.textContent = '⏳…'; }
+            });
+        });
+    })();
+    </script>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : s); return d.innerHTML; }
+        function absHtml(a) {
+            if (!a || a.error) { return '<span class="muted">Détail indisponible.</span>'; }
+            var h = '';
+            if (a.retractionStatus && a.retractionStatus !== 'none') {
+                h += '<div style="color:#b91c1c; font-weight:600; margin:.1rem 0">⚠️ Article rétracté</div>';
+            }
+            var links = [];
+            if (a.oaUrl) { links.push('<a href="' + esc(a.oaUrl) + '" target="_blank" rel="noopener">PDF / accès libre ↗</a>'); }
+            if (a.landingPageUrl) { links.push('<a href="' + esc(a.landingPageUrl) + '" target="_blank" rel="noopener">Page éditeur ↗</a>'); }
+            if (a.doiUrl) { links.push('<a href="' + esc(a.doiUrl) + '" target="_blank" rel="noopener">DOI ↗</a>'); }
+            if (links.length) { h += '<div style="margin:.1rem 0">' + links.join(' · ') + '</div>'; }
+            var meta = [];
+            if (a.type) { meta.push(esc(a.type)); }
+            meta.push(a.openAccess ? ('Open Access' + (a.oaStatus ? ' (' + esc(a.oaStatus) + ')' : '')) : 'Accès fermé');
+            if (a.fulltextAvailable) { meta.push('texte intégral indexé'); }
+            h += '<div class="muted" style="font-size:.78rem">' + meta.join(' · ') + '</div>';
+            var abstract = a.abstractFr || a.abstract;
+            h += abstract
+                ? '<p style="margin:.3rem 0 0">' + esc(abstract) + '</p>'
+                : '<p class="muted" style="margin:.3rem 0 0">(pas de résumé disponible)</p>';
+            return h;
+        }
+        document.querySelectorAll('.js-abs-toggle').forEach(function (btn) {
+            var box = btn.nextElementSibling;
+            if (!box) { return; }
+            btn.addEventListener('click', function () {
+                if (!box.dataset.loaded) {
+                    box.dataset.loaded = '1';
+                    box.hidden = false; box.innerHTML = '<span class="muted">Chargement…</span>'; btn.textContent = '▾ Résumé';
+                    fetch('/api/articles/' + encodeURIComponent(btn.dataset.id))
+                        .then(function (r) { return r.json(); })
+                        .then(function (a) { box.innerHTML = absHtml(a); })
+                        .catch(function () { box.innerHTML = '<span class="muted">Détail indisponible.</span>'; });
+                } else {
+                    box.hidden = !box.hidden;
+                    btn.textContent = (box.hidden ? '▸' : '▾') + ' Résumé';
+                }
             });
         });
     })();
