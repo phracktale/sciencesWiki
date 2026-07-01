@@ -515,20 +515,27 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             default => $order,
         };
 
+        // On PART du sous-arbre (placement_suggestion, très sélectif : ~10²-10³ pubs)
+        // puis on filtre/range ces candidats. Scanner d'abord `publication` (~10⁷ lignes)
+        // et tester le placement en EXISTS ferait un seq scan complet (type et FTS non
+        // sélectifs à cette échelle → timeout 30 s).
+        $cte = 'WITH sub_pubs AS (
+                    SELECT DISTINCT ps.publication_id AS id
+                    FROM placement_suggestion ps
+                    WHERE ps.tree_node_id IN (:nodes)
+                )';
         $base = "FROM publication p
+            JOIN sub_pubs s ON s.id = p.id
             LEFT JOIN journal j ON j.id = p.journal_id
             WHERE p.retraction_status = 'none'
               AND p.type IN (:ptypes)
-              AND EXISTS (
-                SELECT 1 FROM placement_suggestion ps
-                 WHERE ps.publication_id = p.id AND ps.tree_node_id IN (:nodes)
-              )
               $ftsWhere";
 
-        $total = (int) $conn->executeQuery("SELECT count(*) $base", $params, $paramTypes)->fetchOne();
+        $total = (int) $conn->executeQuery("$cte SELECT count(*) $base", $params, $paramTypes)->fetchOne();
 
         $rows = $conn->executeQuery(
-            "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
+            "$cte
+             SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
                     j.name AS journal_name,
                     to_char(p.publication_date, 'YYYY') AS year,
                     (SELECT count(*) FROM publication_chunk pc WHERE pc.publication_id = p.id) AS chunks,
@@ -576,20 +583,26 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             'nodes' => \Doctrine\DBAL\ArrayParameterType::INTEGER,
             'ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING,
         ];
-        // Périmètre commun : non rétracté, types demandés, placé dans le sous-arbre.
-        $subtree = "p.retraction_status = 'none' AND p.type IN (:ptypes)
-            AND EXISTS (SELECT 1 FROM placement_suggestion ps
-                        WHERE ps.publication_id = p.id AND ps.tree_node_id IN (:nodes))";
+        // On PART du sous-arbre (petit ensemble) : le kNN et le FTS s'exécutent alors sur
+        // ~10²-10³ candidats (tri des distances/rangs trivial), au lieu d'un scan de la
+        // table entière filtré ensuite (cf. searchInSubtree). L'index HNSW devient inutile.
+        $cte = 'WITH sub_pubs AS (
+                    SELECT DISTINCT ps.publication_id AS id
+                    FROM placement_suggestion ps
+                    WHERE ps.tree_node_id IN (:nodes)
+                )';
+        $scope = "JOIN sub_pubs s ON s.id = p.id
+                  WHERE p.retraction_status = 'none' AND p.type IN (:ptypes)";
 
-        // Côté vectoriel (kNN filtré au sous-arbre).
-        $conn->executeStatement('SET hnsw.ef_search = '.max(40, $cand));
+        // Côté vectoriel (distances exactes sur le sous-arbre).
         $vecIds = $conn->executeQuery(
             \sprintf(
-                "SELECT p.id FROM publication p
-                 WHERE %s AND p.embedding IS NOT NULL
+                "%s SELECT p.id FROM publication p
+                 %s AND p.embedding IS NOT NULL
                  ORDER BY p.embedding <=> CAST(:vec AS vector)
                  LIMIT %d",
-                $subtree,
+                $cte,
+                $scope,
                 $cand,
             ),
             $params + ['vec' => (string) new Vector($embedding)],
@@ -603,11 +616,12 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             $tsv = "to_tsvector('simple', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
             $lexIds = $conn->executeQuery(
                 \sprintf(
-                    "SELECT p.id FROM publication p
-                     WHERE %s AND %s @@ to_tsquery('simple', :tsq)
+                    "%s SELECT p.id FROM publication p
+                     %s AND %s @@ to_tsquery('simple', :tsq)
                      ORDER BY ts_rank(%s, to_tsquery('simple', :tsq)) DESC
                      LIMIT %d",
-                    $subtree,
+                    $cte,
+                    $scope,
                     $tsv,
                     $tsv,
                     $cand,
