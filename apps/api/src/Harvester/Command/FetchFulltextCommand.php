@@ -36,6 +36,7 @@ final class FetchFulltextCommand extends Command
     protected function configure(): void
     {
         $this->addOption('limit', null, InputOption::VALUE_REQUIRED, 'Nombre de publications à traiter', '50');
+        $this->addOption('id', null, InputOption::VALUE_REQUIRED, 'Traiter UNE publication précise (par id) — test/ops', null);
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -43,7 +44,14 @@ final class FetchFulltextCommand extends Command
         $io = new SymfonyStyle($input, $output);
         $limit = max(1, (int) $input->getOption('limit'));
 
-        $pubs = $this->publications->findNeedingFulltext($limit);
+        // --id : ré-ingère une publication précise (bypass la sélection ; utile pour
+        // tester le repli résolveur ou re-traiter une étude à la demande).
+        if (null !== ($one = $input->getOption('id'))) {
+            $pub = $this->publications->find((int) $one);
+            $pubs = null !== $pub ? [$pub] : [];
+        } else {
+            $pubs = $this->publications->findNeedingFulltext($limit);
+        }
         if ([] === $pubs) {
             $io->success('Aucune publication en attente de texte intégral.');
 

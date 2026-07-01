@@ -16,7 +16,9 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class CoreFulltextResolver implements FulltextResolver
 {
-    private const ENDPOINT = 'https://api.core.ac.uk/v3/search/works';
+    // Le slash final est REQUIS : sans lui, CORE renvoie une redirection HTML
+    // (meta-refresh) que le client HTTP ne suit pas → réponse non-JSON.
+    private const ENDPOINT = 'https://api.core.ac.uk/v3/search/works/';
     private const TIMEOUT = 20;
 
     public function __construct(

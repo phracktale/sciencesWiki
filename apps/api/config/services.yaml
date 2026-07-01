@@ -28,9 +28,6 @@ services:
     _instanceof:
         App\Harvester\Connector\SourceConnector:
             tags: ['app.source_connector']
-        # Résolveurs de texte intégral OA (repli quand pas d'oa_url) : CORE, Europe PMC.
-        App\Harvester\Resolver\FulltextResolver:
-            tags: ['app.fulltext_resolver']
 
     # makes classes in src/ available to be used as services
     # this creates a service per class whose id is the fully-qualified class name
@@ -44,6 +41,13 @@ services:
     # Le LLM de rédaction est choisi par LLM_DRIVER (openai/ollama ou stub).
     App\Ai\Llm\LlmClient:
         factory: ['@App\Ai\Llm\LlmClientFactory', 'create']
+
+    # Résolveurs de texte intégral OA (repli quand pas d'oa_url). Europe PMC d'abord
+    # (rapide, fiable, biomédical) ; CORE ensuite (large mais plus lent/capricieux).
+    App\Harvester\Resolver\EuropePmcFulltextResolver:
+        tags: [{ name: 'app.fulltext_resolver', priority: 10 }]
+    App\Harvester\Resolver\CoreFulltextResolver:
+        tags: [{ name: 'app.fulltext_resolver', priority: 0 }]
 
     # add more service definitions when explicit configuration is needed
     # please note that last definitions always *replace* previous ones

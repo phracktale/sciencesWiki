@@ -70,8 +70,12 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             \sprintf(
                 // Curation : on traite d'abord ce qui a un TEI GROBID dispo et le plus
                 // cité (haut du panier), puis les PDF directs.
+                // (a) URL OA directe, ou (b) sans oa_url mais DOI bien cité (≥20) → repli
+                // résolveur (CORE/Europe PMC). Cohérent avec app:fulltext:enqueue.
                 "SELECT id FROM publication
-                 WHERE oa_url IS NOT NULL AND oa_url <> '' AND fulltext_fetched_at IS NULL
+                 WHERE fulltext_fetched_at IS NULL
+                   AND ( (oa_url IS NOT NULL AND oa_url <> '')
+                         OR (doi IS NOT NULL AND cited_by_count >= 20) )
                  ORDER BY has_grobid_xml DESC, cited_by_count DESC, (oa_url ILIKE '%%.pdf%%') DESC, id DESC LIMIT %d",
                 max(1, $limit),
             ),
