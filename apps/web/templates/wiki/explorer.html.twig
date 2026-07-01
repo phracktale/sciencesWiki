@@ -253,6 +253,33 @@
             h += '<div class="axis-note">' + esc(d.disclaimer) + '</div></div>';
             return h;
         }
+        function mmatHtml(d) {
+            var cols = { high: '#16a34a', moderate: '#f59e0b', low: '#dc2626', insufficient: '#64748b' };
+            var ic = { yes: ['✓', 'ax-yes'], cant_tell: ['?', 'ax-unclear'], no: ['✗', 'ax-no'] };
+            var h = '<hr class="sep"><div class="meta"><b>Qualité méthodologique (MMAT)</b>' + apprStatusNote(d) + '<br>';
+            if (d.applicability !== 'applicable') {
+                h += '<span class="muted">' + esc(d.applicabilityLabel) + '</span><div class="axis-note">' + esc(d.disclaimer) + '</div></div>';
+                return h;
+            }
+            var oc = cols[d.overall] || '#f59e0b';
+            h += '<span class="axis-band" style="background:' + oc + '22; color:' + oc + '">' + esc(d.overallLabel) + '</span>';
+            if (d.categoryLabel) h += ' <span class="muted" style="font-size:.78rem">' + esc(d.categoryLabel) + '</span>';
+            if (d.overall !== 'insufficient') h += ' <span class="muted" style="font-size:.78rem">· ' + d.metCount + '/5 critères remplis</span>';
+            if (d.summary) h += '<div style="margin-top:.4rem">' + esc(d.summary) + '</div>';
+            var rows = (d.screening || []).concat(d.items || []);
+            if (rows.length) {
+                h += '<details style="margin-top:.4rem"><summary class="muted" style="cursor:pointer; font-size:.82rem">Voir le filtrage et les 5 critères</summary><ul class="axis-items">';
+                rows.forEach(function (it) {
+                    var i = ic[it.answer] || ic.cant_tell;
+                    h += '<li><span class="ax-ic ' + i[1] + '">' + i[0] + '</span><span>' + esc(it.question);
+                    if (it.quote) h += '<br><span class="muted" style="font-size:.76rem">« ' + esc(it.quote) + ' »</span>';
+                    h += '</span></li>';
+                });
+                h += '</ul></details>';
+            }
+            h += '<div class="axis-note">' + esc(d.disclaimer) + '</div></div>';
+            return h;
+        }
 
         // Panneau « Évaluation méthodologique (AXIS) » de la fiche article.
         function axisHtml(ax) {
@@ -340,7 +367,7 @@
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
                         var ap = d.appraisals || {};
-                        var html = (ap.axis ? axisHtml(ap.axis) : '') + (ap.rob2 ? rob2Html(ap.rob2) : '') + (ap.amstar2 ? amstar2Html(ap.amstar2) : '');
+                        var html = (ap.axis ? axisHtml(ap.axis) : '') + (ap.rob2 ? rob2Html(ap.rob2) : '') + (ap.amstar2 ? amstar2Html(ap.amstar2) : '') + (ap.mmat ? mmatHtml(ap.mmat) : '');
                         if (html) { var box = document.createElement('div'); box.innerHTML = html; detail.appendChild(box); }
                     })
                     .catch(function () {});

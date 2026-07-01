@@ -41,6 +41,7 @@
                         {% set recoAxis = st and st.classified and st.axisApplicable %}
                         {% set recoRob2 = st and st.classified and st.rob2Applicable %}
                         {% set recoAmstar2 = st and st.classified and st.amstar2Applicable %}
+                        {% set recoMmat = st and st.classified and st.mmatApplicable %}
                         <div style="text-align:right; min-width:220px">
                             {% if st is null or not st.classified %}
                                 <div class="muted" style="font-size:.74rem; margin-bottom:.3rem">🔎 détection du type d'étude…</div>
@@ -67,6 +68,12 @@
                                     <input type="hidden" name="tool" value="amstar2">
                                     <button type="submit"{% if not recoAmstar2 %} style="background:#e2e8f0; color:#475569"{% endif %}>AMSTAR-2{% if recoAmstar2 %} ✓{% endif %}</button>
                                 </form>
+                                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
+                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                    <input type="hidden" name="doi" value="{{ c.doi }}">
+                                    <input type="hidden" name="tool" value="mmat">
+                                    <button type="submit"{% if not recoMmat %} style="background:#e2e8f0; color:#475569"{% endif %}>MMAT{% if recoMmat %} ✓{% endif %}</button>
+                                </form>
                             </div>
                         </div>
                     {% endif %}
@@ -77,7 +84,7 @@
     {% endif %}
 
     {% if pending %}
-        {% set toolName = pending.tool == 'rob2' ? 'RoB 2' : 'AXIS' %}
+        {% set toolName = {'rob2': 'RoB 2', 'amstar2': 'AMSTAR-2', 'mmat': 'MMAT'}[pending.tool]|default('AXIS') %}
         <article class="card" id="axis-pending" data-doi="{{ pending.doi }}" data-tool="{{ pending.tool }}" data-status-url="{{ path('axis_status') }}" style="margin-top:1.2rem">
             <h2 style="margin-top:0">⏳ Évaluation {{ toolName }} en cours…</h2>
             {% if pending.publication %}<p><strong>{{ pending.publication.title }}</strong></p>{% endif %}
@@ -233,6 +240,51 @@
                         </ul>
                     </details>
                 {% endif %}
+            {% else %}{% if result.tool == 'mmat' %}
+                {% set apColor = result.applicability == 'applicable' ? '#16a34a' : (result.applicability == 'not_applicable' ? '#dc2626' : '#f59e0b') %}
+                <p><span class="badge" style="background:#1e293b22; color:#1e293b; font-weight:700">MMAT</span>
+                   <span class="badge" style="background:{{ apColor }}22; color:{{ apColor }}; font-weight:700; margin-left:.3rem">{{ result.applicabilityLabel }}</span>
+                   {% if result.category %}<span class="muted" style="margin-left:.5rem">catégorie : <strong>{{ result.categoryLabel }}</strong></span>{% endif %}
+                   {% if result.studyDesign %}<span class="muted" style="margin-left:.5rem">design détecté : {{ result.studyDesign }}</span>{% endif %}</p>
+                {% if result.applicability != 'applicable' %}
+                    <p class="muted">MMAT ne s'applique qu'aux études <strong>empiriques</strong> (les revues systématiques relèvent d'AMSTAR-2) : la grille n'est <strong>pas</strong> appliquée ici.</p>
+                {% else %}
+                    {% set ovColor = result.overall == 'high' ? '#16a34a' : (result.overall == 'low' ? '#dc2626' : (result.overall == 'insufficient' ? '#64748b' : '#f59e0b')) %}
+                    <p>Qualité indicative : <span class="badge" style="background:{{ ovColor }}22; color:{{ ovColor }}; font-weight:700">{{ result.overallLabel }}</span>
+                       <span class="muted" style="margin-left:.4rem">— filtrage {{ result.screeningPassed ? 'satisfait ✅' : 'non satisfait ⚠️' }}</span></p>
+                    {% if result.overall == 'insufficient' %}
+                        <p class="muted">MMAT nécessite le <strong>texte intégral</strong> pour une évaluation fiable ; ici, seul le <strong>résumé</strong> est disponible. Les critères ci-dessous sont donc <strong>indicatifs</strong>.</p>
+                    {% else %}
+                        <p class="muted">{{ result.metCount }}/5 critères remplis · source : résumé + texte intégral. <em>MMAT déconseille un score global : ce repère est purement indicatif.</em></p>
+                    {% endif %}
+                    {% if result.summary %}<p>{{ result.summary }}</p>{% endif %}
+                    {% if result.screening %}
+                        <details style="margin-top:.8rem">
+                            <summary style="cursor:pointer; font-weight:600">Questions de filtrage</summary>
+                            <ul style="list-style:none; padding:0; margin:.6rem 0">
+                                {% for it in result.screening %}
+                                    {% set icon = it.answer == 'yes' ? '✅' : (it.answer == 'cant_tell' ? '❔' : '⚠️') %}
+                                    <li style="padding:.4rem 0; border-bottom:1px solid var(--line)">
+                                        {{ icon }} <strong>{{ it.question }}</strong> <span class="muted">— {{ it.answerLabel }}</span>
+                                        {% if it.quote %}<blockquote style="margin:.2rem 0 0 1.4rem; font-size:.85rem; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ it.quote }} »</blockquote>{% endif %}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </details>
+                    {% endif %}
+                    <details style="margin-top:.4rem" open>
+                        <summary style="cursor:pointer; font-weight:600">Les 5 critères de la catégorie en détail</summary>
+                        <ul style="list-style:none; padding:0; margin:.6rem 0">
+                            {% for it in result.items %}
+                                {% set icon = it.answer == 'yes' ? '✅' : (it.answer == 'cant_tell' ? '❔' : '⚠️') %}
+                                <li style="padding:.4rem 0; border-bottom:1px solid var(--line)">
+                                    {{ icon }} <strong>{{ it.question }}</strong> <span class="muted">— {{ it.answerLabel }}</span>
+                                    {% if it.quote %}<blockquote style="margin:.2rem 0 0 1.4rem; font-size:.85rem; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ it.quote }} »</blockquote>{% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </details>
+                {% endif %}
             {% else %}
                 {% set ap = result.applicability %}
                 {% set apColor = ap == 'applicable' ? '#16a34a' : (ap == 'not_applicable' ? '#dc2626' : '#f59e0b') %}
@@ -265,7 +317,7 @@
                         </ul>
                     </details>
                 {% endif %}
-            {% endif %}{% endif %}
+            {% endif %}{% endif %}{% endif %}
 
             <p class="muted" style="font-size:.78rem; margin-top:1rem; border-top:1px dashed var(--line); padding-top:.6rem">{{ result.disclaimer }}</p>
         </article>

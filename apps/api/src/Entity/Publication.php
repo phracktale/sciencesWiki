@@ -80,6 +80,10 @@ class Publication
     #[ORM\Column(name: 'amstar2_appraising_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $amstar2AppraisingAt = null;
 
+    /** Idem pour l'évaluation MMAT à la demande. */
+    #[ORM\Column(name: 'mmat_appraising_at', type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $mmatAppraisingAt = null;
+
     /** Devis détecté (cross_sectional, rct, cohort, systematic_review, non_empirical…) ; null = non classée. */
     #[ORM\Column(name: 'study_design', length: 40, nullable: true)]
     #[Groups(['publication:read'])]
@@ -259,6 +263,18 @@ class Publication
     public function setAmstar2AppraisingAt(?\DateTimeImmutable $at): self
     {
         $this->amstar2AppraisingAt = $at;
+
+        return $this;
+    }
+
+    public function getMmatAppraisingAt(): ?\DateTimeImmutable
+    {
+        return $this->mmatAppraisingAt;
+    }
+
+    public function setMmatAppraisingAt(?\DateTimeImmutable $at): self
+    {
+        $this->mmatAppraisingAt = $at;
 
         return $this;
     }

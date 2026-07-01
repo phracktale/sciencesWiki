@@ -70,6 +70,7 @@ final class MeAppraisalController
             'axisApplicable' => \in_array('axis', $toolKeys, true),
             'rob2Applicable' => \in_array('rob2', $toolKeys, true),
             'amstar2Applicable' => \in_array('amstar2', $toolKeys, true),
+            'mmatApplicable' => \in_array('mmat', $toolKeys, true),
             'tools' => $this->registry->toolsMeta($toolKeys),
         ];
     }

@@ -58,6 +58,8 @@ framework:
             App\Analysis\Message\AppraiseRob2Message: analysis
             # Évaluation AMSTAR-2 (confiance dans une revue systématique) à la demande.
             App\Analysis\Message\AppraiseAmstar2Message: analysis
+            # Évaluation MMAT (qualité méthodologique d'une étude empirique) à la demande.
+            App\Analysis\Message\AppraiseMmatMessage: analysis
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism

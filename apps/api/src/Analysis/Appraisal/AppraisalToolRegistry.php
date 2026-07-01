@@ -46,7 +46,7 @@ final class AppraisalToolRegistry
         'amstar2' => ['name' => 'AMSTAR-2', 'designs' => ['systematic_review'], 'implemented' => true],
         'robis' => ['name' => 'ROBIS', 'designs' => ['systematic_review'], 'implemented' => false],
         'casp_qualitative' => ['name' => 'CASP Qualitative', 'designs' => ['qualitative'], 'implemented' => false],
-        'mmat' => ['name' => 'MMAT', 'designs' => ['mixed_methods', 'rct', 'non_randomized_trial', 'cohort', 'qualitative'], 'implemented' => false],
+        'mmat' => ['name' => 'MMAT', 'designs' => ['mixed_methods', 'qualitative', 'rct', 'non_randomized_trial', 'cohort', 'case_control', 'cross_sectional'], 'implemented' => true],
         'jbi_case' => ['name' => 'JBI (cas / séries)', 'designs' => ['case_report'], 'implemented' => false],
         'quips' => ['name' => 'QUIPS / PROBAST', 'designs' => ['prognostic'], 'implemented' => false],
     ];

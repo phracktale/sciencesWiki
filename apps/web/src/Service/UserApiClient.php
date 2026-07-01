@@ -239,7 +239,7 @@ final class UserApiClient
     public function existingAppraisals(int $id): array
     {
         $out = [];
-        foreach (['axis', 'rob2', 'amstar2'] as $tool) {
+        foreach (['axis', 'rob2', 'amstar2', 'mmat'] as $tool) {
             $res = $this->send('GET', '/api/me/'.$tool.'/status?id='.$id);
             if (($res['data']['status'] ?? null) === 'ready') {
                 $out[$tool] = $res['data'];
