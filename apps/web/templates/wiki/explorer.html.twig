@@ -112,7 +112,7 @@
                 if (!typesBuilt) buildTypes(d);
                 renderRows(d);
                 renderPager(d);
-                countEl.textContent = d.total.toLocaleString('fr-FR') + ' article(s)';
+                countEl.textContent = d.total.toLocaleString('fr-FR') + (d.totalCapped ? '+' : '') + ' article(s)';
                 updateArrows();
             });
         }

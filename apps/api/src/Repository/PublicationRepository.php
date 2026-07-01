@@ -16,6 +16,9 @@ use Pgvector\Vector;
  */
 class PublicationRepository extends ServiceEntityRepository implements PublicationLookup
 {
+    /** Plafond du décompte de pagination des listes de sous-arbre (au-delà : « N+ »). */
+    private const SUBTREE_COUNT_CAP = 5000;
+
     public function __construct(ManagerRegistry $registry)
     {
         parent::__construct($registry, Publication::class);
@@ -525,7 +528,13 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
               )
               $ftsWhere";
 
-        $total = (int) $conn->executeQuery("SELECT count(*) $base", $params, $paramTypes)->fetchOne();
+        // Total de pagination CAPPÉ : compter exactement les ~10⁶ pubs d'un gros domaine
+        // racine prend ~10 s (seq scan de publication à 14 M lignes). On plafonne le
+        // décompte : le plan incrémental (semi-jointure via idx_pub_date) s'arrête au cap
+        // → ~150 ms. Au-delà, l'UI affiche « N+ ». Le fetch des lignes, lui, reste exact.
+        $cap = self::SUBTREE_COUNT_CAP;
+        $total = (int) $conn->executeQuery("SELECT count(*) FROM (SELECT 1 $base LIMIT $cap) c", $params, $paramTypes)->fetchOne();
+        $capped = $total >= $cap;
 
         $rows = $conn->executeQuery(
             "SELECT p.id, p.title, p.doi, p.venue, p.oa_status, p.oa_url, p.landing_page_url,
@@ -542,7 +551,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             $paramTypes,
         )->fetchAllAssociative();
 
-        return ['items' => $rows, 'total' => $total];
+        return ['items' => $rows, 'total' => $total, 'capped' => $capped];
     }
 
     /**

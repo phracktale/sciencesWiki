@@ -118,6 +118,7 @@ final class PublicArticlesController
         return new JsonResponse([
             'items' => $items,
             'total' => $res['total'],
+            'totalCapped' => $res['capped'] ?? false,
             'page' => $page,
             'pages' => (int) ceil($res['total'] / self::PER_PAGE),
             'query' => $q,
