@@ -252,15 +252,19 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
 
         $rows = $conn->executeQuery(
             \sprintf(
+                // Les CTE kNN ordonnent UNIQUEMENT par distance : c'est la seule clause que
+                // l'index HNSW peut servir. Ajouter un tiebreaker (« , id ») ici casserait
+                // l'index → seq scan complet. Le déterminisme du RÉSULTAT est garanti plus
+                // bas par « ORDER BY m.distance ASC, m.id ASC ».
                 "WITH abs AS (
                     SELECT id, embedding <=> CAST(:vec AS vector) AS distance
                     FROM publication
-                    ORDER BY embedding <=> CAST(:vec AS vector), id
+                    ORDER BY embedding <=> CAST(:vec AS vector)
                     LIMIT %1\$d
                  ), chk AS (
                     SELECT publication_id AS id, embedding <=> CAST(:vec AS halfvec) AS distance
                     FROM publication_chunk
-                    ORDER BY embedding <=> CAST(:vec AS halfvec), publication_id
+                    ORDER BY embedding <=> CAST(:vec AS halfvec)
                     LIMIT %1\$d
                  ), merged AS (
                     SELECT id, MIN(distance) AS distance
