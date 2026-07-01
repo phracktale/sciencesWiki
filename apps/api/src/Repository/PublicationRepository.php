@@ -498,14 +498,22 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             'ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING,
         ];
         $ftsWhere = '';
+        $ftsJoin = '';
         $order = 'p.publication_date DESC NULLS LAST, p.id DESC';
         if ($hasQuery) {
             $params['q'] = $query;
-            // Config injectée en LITTÉRAL (liste blanche, pas une entrée utilisateur) :
-            // un paramètre empêcherait l'usage de l'index GIN fonctionnel (cf. migration).
-            // L'expression DOIT être identique à celle de l'index.
-            $tsv = "to_tsvector('$config', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
+            // Config injectée en LITTÉRAL (liste blanche, pas une entrée utilisateur).
             $tsq = "plainto_tsquery('$config', :q)";
+            if ($stemming) {
+                // Anglais (défaut) : table dédiée `publication_fts` (tsvector STOCKÉ +
+                // index GIN, maintenue par trigger) → le tri ts_rank ne recalcule plus
+                // to_tsvector, la recherche in-domaine passe de ~30 s à < 1 s.
+                $ftsJoin = 'JOIN publication_fts pf ON pf.publication_id = p.id';
+                $tsv = 'pf.tsv';
+            } else {
+                // « simple » (sans stemming, rare) : calculé à la volée.
+                $tsv = "to_tsvector('simple', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
+            }
             $ftsWhere = "AND $tsv @@ $tsq";
             $order = "ts_rank($tsv, $tsq) DESC, p.publication_date DESC NULLS LAST";
         }
@@ -519,6 +527,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         };
 
         $base = "FROM publication p
+            $ftsJoin
             LEFT JOIN journal j ON j.id = p.journal_id
             WHERE p.retraction_status = 'none'
               AND p.type IN (:ptypes)
