@@ -112,13 +112,31 @@ final class ContribController extends AbstractController
         return $this->generateUrl('home');
     }
 
+    /**
+     * Renvoie la cible SI elle est locale (chemin /… ou URL absolue vers notre hôte),
+     * sinon l'accueil. Empêche l'open redirect via un « back »/referer contrôlé.
+     */
+    private function localSafe(Request $request, ?string $target): string
+    {
+        $target = (string) $target;
+        if (str_starts_with($target, '/') && !str_starts_with($target, '//')) {
+            return $target;
+        }
+        $host = parse_url($target, \PHP_URL_HOST);
+        if (\is_string($host) && strtolower($host) === strtolower($request->getHost())) {
+            return $target;
+        }
+
+        return $this->generateUrl('home');
+    }
+
     #[Route('/{_locale}/deconnexion', name: 'logout', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function logout(Request $request): Response
     {
         $this->user->logout();
         $this->addFlash('success', 'Déconnecté·e.');
 
-        return $this->redirect($request->headers->get('referer') ?: $this->generateUrl('home'));
+        return $this->redirect($this->localSafe($request, $request->headers->get('referer')));
     }
 
     #[Route('/{_locale}/article/{id}/edit', name: 'article_edit', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['POST'])]
@@ -183,6 +201,8 @@ final class ContribController extends AbstractController
 
     private function back(Request $request): Response
     {
-        return $this->redirect($request->request->get('back') ?: ($request->headers->get('referer') ?: $this->generateUrl('home')));
+        $target = $request->request->get('back') ?: $request->headers->get('referer');
+
+        return $this->redirect($this->localSafe($request, \is_string($target) ? $target : null));
     }
 }

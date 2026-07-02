@@ -12,6 +12,28 @@
 # Démarrage :  docker compose --env-file .env.prod up -d --build
 name: scienceswiki
 
+# Durcissement runtime commun aux conteneurs applicatifs (défense en profondeur).
+#  - no-new-privileges : interdit l'escalade via binaires setuid.
+#  - cap_drop ALL puis réintroduction du strict nécessaire :
+#      NET_BIND_SERVICE (FrankenPHP écoute sur :80), CHOWN/SETUID/SETGID/DAC_OVERRIDE/FOWNER
+#      (l'entrypoint initialise clés JWT + migrations, et l'image peut ajuster des droits).
+# NB : les conteneurs tournent encore en root (image FrankenPHP par défaut). Passer en
+# USER non-root (www-data) est le durcissement suivant — il exige un `chown` unique des
+# volumes nommés EXISTANTS côté hôte (jwt_keys, secrets_vault, web_sessions, web_uploads),
+# sinon le conteneur non-root perd l'accès en écriture. À planifier hors de ce lot.
+x-app-hardening: &app-hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  cap_add:
+    - NET_BIND_SERVICE
+    - CHOWN
+    - SETUID
+    - SETGID
+    - DAC_OVERRIDE
+    - FOWNER
+
 services:
   # ⚠️ Base MIGRÉE sur Marvin (cf. infra/marvin). Cette base locale n'est plus
   # utilisée — conservée en ROLLBACK uniquement (volume database_data intact).
@@ -35,6 +57,7 @@ services:
     restart: unless-stopped
 
   api:
+    <<: *app-hardening
     build:
       context: ../apps/api
       dockerfile: Dockerfile
@@ -48,8 +71,13 @@ services:
       MESSENGER_TRANSPORT_DSN: "doctrine://default?auto_setup=1"
       SERVER_NAME: ":80"
       TRUSTED_PROXIES: ${TRUSTED_PROXIES}
+      # Hôtes de confiance (anti Host spoofing). Régler p.ex. « ^(.*\.)?scienceswiki\.eu$ ».
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
       CORS_ALLOW_ORIGIN: ${CORS_ALLOW_ORIGIN}
       DEFAULT_URI: ${PUBLIC_URL}
+      # Jeton du endpoint RAG (/api/rag). OBLIGATOIRE en prod : sans lui, l'endpoint
+      # LLM refuse tout (fail-closed). Doit être identique à l'OPENAI_API_KEY d'Open WebUI.
+      RAG_API_TOKEN: ${RAG_API_TOKEN}
       # JWT (lexik) — la clé est générée au 1er démarrage dans le volume jwt_keys.
       JWT_SECRET_KEY: "%kernel.project_dir%/config/jwt/private.pem"
       JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
@@ -73,6 +101,9 @@ services:
       MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
       MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
       MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
+      # CORS du hub Mercure (lu par le Caddyfile). Restreindre au domaine public :
+      # défaut « * » trop permissif. En prod : https://scienceswiki.eu.
+      MERCURE_CORS_ORIGINS: ${MERCURE_CORS_ORIGINS:-${PUBLIC_URL:-https://scienceswiki.eu}}
       # Cette instance initialise la base (migrations + clés JWT + seed).
       RUN_INIT: "1"
     volumes:
@@ -86,10 +117,14 @@ services:
       # Hors prod : placeholder vide pour ne pas casser le `up`.
       - ${OPENALEX_SNAPSHOT_DIR:-./.snapshot-placeholder}:/openalexSnapshot:ro
     ports:
-      - "${API_PORT:-8000}:80"
+      # Publier sur l'IP LAN de Thor (BIND_IP=192.168.1.36 en prod) pour n'être
+      # joignable QUE par Heimdall, jamais sur d'éventuelles interfaces WAN/WiFi.
+      # Défaut 0.0.0.0 pour ne pas casser le dev local.
+      - "${BIND_IP:-0.0.0.0}:${API_PORT:-8000}:80"
     restart: unless-stopped
 
   worker:
+    <<: *app-hardening
     build:
       context: ../apps/api
       dockerfile: Dockerfile
@@ -141,6 +176,7 @@ services:
   # Pool dédié à l'ingestion du TEXTE INTÉGRAL (PDF éditeur → GROBID → vecteurs),
   # en parallèle, sans bloquer la moisson. Débit ≈ replicas × ~1 article/~20 s.
   fulltext-worker:
+    <<: *app-hardening
     build:
       context: ../apps/api
       dockerfile: Dockerfile
@@ -180,6 +216,7 @@ services:
   # débit de moisson NI être affamé par les milliers de messages de moisson en
   # attente. Un seul exemplaire (GPU unique côté Marvin → pas de parallélisme utile).
   analysis-worker:
+    <<: *app-hardening
     build:
       context: ../apps/api
       dockerfile: Dockerfile
@@ -215,6 +252,7 @@ services:
     restart: unless-stopped
 
   web:
+    <<: *app-hardening
     build:
       context: ../apps/web
       dockerfile: Dockerfile
@@ -232,24 +270,30 @@ services:
       # SSO chat : « .scienceswiki.eu » pour partager la session avec chat.scienceswiki.eu
       # (forward-auth Open WebUI). Vide = host-only (défaut). À régler au go-live.
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
+      # Jeton de contournement du mode maintenance (prévisualisation admin). Vide = aucun.
+      MAINTENANCE_BYPASS_TOKEN: ${MAINTENANCE_BYPASS_TOKEN:-}
     # Sessions + médias uploadés persistants (survivent aux rebuilds).
     volumes:
       - web_sessions:/app/var/sessions:rw
       - web_uploads:/app/public/uploads:rw
     ports:
-      - "${WEB_PORT:-8080}:80"
+      # Cf. api : publier sur l'IP LAN de Thor en prod (BIND_IP), pas 0.0.0.0.
+      - "${BIND_IP:-0.0.0.0}:${WEB_PORT:-8080}:80"
     restart: unless-stopped
 
-  # Adminer : visualisation directe de la base (désormais sur Marvin). Exposé
-  # UNIQUEMENT sur le LAN (non proxifié par Heimdall). Accès total → jamais public.
-  # Identifiants = POSTGRES_* (.env.prod), serveur = Marvin. URL : http://<IP-Thor>:${ADMINER_PORT:-8091}
+  # Adminer : visualisation directe de la base (accès TOTAL → jamais public).
+  # Publié par DÉFAUT sur 127.0.0.1 uniquement (accès via tunnel SSH : `ssh -L`).
+  # Pour un accès LAN, mettre ADMINER_BIND=192.168.1.36 ET restreindre au pare-feu.
+  # Idéalement : NE PAS déployer Adminer en production (outil de debug) → profil dédié.
   adminer:
+    <<: *app-hardening
     image: adminer:5
     environment:
       ADMINER_DEFAULT_SERVER: ${DB_HOST:-192.168.1.171}
       ADMINER_DESIGN: dracula
     ports:
-      - "${ADMINER_PORT:-8091}:8080"
+      - "${ADMINER_BIND:-127.0.0.1}:${ADMINER_PORT:-8091}:8080"
     restart: unless-stopped
 
   # Open WebUI : interface de chat pour les profils connectés (cf.
@@ -269,7 +313,9 @@ services:
       ENABLE_PERSISTENT_CONFIG: "false"
       # Notre endpoint RAG (compatible OpenAI) : Open WebUI y ajoute /chat/completions et /models.
       OPENAI_API_BASE_URL: "http://api/api/rag"
-      OPENAI_API_KEY: "sk-scienceswiki-rag"
+      # Clé envoyée en Bearer à /api/rag : DOIT être identique au RAG_API_TOKEN de l'api
+      # (sinon l'api, en fail-closed, refuse). Défini dans .env.prod (pas de valeur en dur).
+      OPENAI_API_KEY: ${RAG_API_TOKEN}
       # Assistant VERROUILLÉ : seul le RAG sourcé (« scienceswiki-rag-mistral »,
       # exposé par /api/rag) est disponible. On COUPE l'accès aux LLM bruts d'Ollama
       # → aucun chat non sourcé possible, et un seul modèle = pas de sélection
@@ -292,7 +338,10 @@ services:
       # Thème CRT SciencesWiki : Open WebUI charge nativement /static/custom.css.
       - ./openwebui/custom.css:/app/backend/open_webui/static/custom.css:ro
     ports:
-      - "${OPENWEBUI_PORT:-8092}:8080"
+      # ⚠️ L'accès DIRECT (hors Heimdall) contourne le SSO (pas d'en-têtes X-SW-Auth-*).
+      # Publié par DÉFAUT sur 127.0.0.1 : joignable uniquement en local/tunnel. En prod,
+      # mettre OPENWEBUI_BIND=192.168.1.36 ET n'autoriser Heimdall (192.168.1.195) au pare-feu.
+      - "${OPENWEBUI_BIND:-127.0.0.1}:${OPENWEBUI_PORT:-8092}:8080"
     restart: unless-stopped
 
 volumes:

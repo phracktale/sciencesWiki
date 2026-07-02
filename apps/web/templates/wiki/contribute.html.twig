@@ -29,7 +29,7 @@
 
     <script nonce="{{ csp_nonce.value }}">
     (function () {
-        var TOKEN = {{ token|json_encode|raw }};
+        var TOKEN = {{ token|json_js }};
         var stateEl = document.getElementById('ct-state');
         var formWrap = document.getElementById('ct-form');
         var result = document.getElementById('ct-result');

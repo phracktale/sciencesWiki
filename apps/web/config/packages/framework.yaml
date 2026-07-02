@@ -7,6 +7,9 @@ parameters:
     # « .scienceswiki.eu » pour partager la session avec le sous-domaine chat.
     # (SSO Open WebUI forward-auth, cf. docs/spec-openwebui-rag.md).
     env(SESSION_COOKIE_DOMAIN): ''
+    # Hôtes de confiance (anti Host spoofing). Vide = aucune restriction (dev/build) ;
+    # en prod, régler p.ex. « ^(.*\.)?scienceswiki\.eu$ ».
+    env(TRUSTED_HOSTS): ''
 
 framework:
     secret: '%env(APP_SECRET)%'
@@ -19,6 +22,7 @@ framework:
     # Derrière le reverse-proxy nginx (Heimdall) qui termine le TLS.
     trusted_proxies: '%env(TRUSTED_PROXIES)%'
     trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
+    trusted_hosts: '%env(TRUSTED_HOSTS)%'
 
     # Session du back-office : 8 h (journée de travail) pour ne pas redemander le
     # login toutes les ~20 min (défaut PHP gc_maxlifetime), sans session interminable.

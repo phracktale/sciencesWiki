@@ -3,6 +3,9 @@ parameters:
     # Défaut inoffensif si la variable n'est pas fournie (build, dev) ; en prod
     # le compose injecte les plages privées du homelab (proxy nginx Heimdall).
     env(TRUSTED_PROXIES): '127.0.0.1'
+    # Hôtes de confiance (anti Host spoofing / cache poisoning). Vide = aucune
+    # restriction (dev/build) ; en prod, régler p.ex. « ^(.*\.)?scienceswiki\.eu$ ».
+    env(TRUSTED_HOSTS): ''
 
 framework:
     secret: '%env(APP_SECRET)%'
@@ -11,6 +14,8 @@ framework:
     # confiance aux en-têtes X-Forwarded-* pour reconstituer scheme/host/IP.
     trusted_proxies: '%env(TRUSTED_PROXIES)%'
     trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
+    # Rejette toute requête dont l'en-tête Host ne correspond pas (si TRUSTED_HOSTS défini).
+    trusted_hosts: '%env(TRUSTED_HOSTS)%'
 
     # Note that the session will be started ONLY if you read or write from it.
     session: true

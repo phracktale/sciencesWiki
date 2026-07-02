@@ -9,9 +9,11 @@ use App\Enum\UserRole;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Symfony\Component\DependencyInjection\Attribute\Target;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
+use Symfony\Component\RateLimiter\RateLimiterFactoryInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -35,12 +37,19 @@ final class RegistrationController
         private readonly UserPasswordHasherInterface $hasher,
         private readonly EntityManagerInterface $em,
         private readonly JWTTokenManagerInterface $jwt,
+        #[Target('register')]
+        private readonly RateLimiterFactoryInterface $registerLimiter,
     ) {
     }
 
     #[Route('/api/register', name: 'api_register', methods: ['POST'])]
     public function __invoke(Request $request): JsonResponse
     {
+        // Anti-abus : bride la création de comptes par IP (5 / heure, cf. rate_limiter.yaml).
+        if (!$this->registerLimiter->create($request->getClientIp())->consume()->isAccepted()) {
+            return new JsonResponse(['error' => 'Trop de tentatives. Réessayez plus tard.'], 429);
+        }
+
         $data = json_decode($request->getContent() ?: '[]', true);
         if (!\is_array($data)) {
             return new JsonResponse(['error' => 'Requête invalide.'], 400);
@@ -56,8 +65,8 @@ final class RegistrationController
         if (!filter_var($email, \FILTER_VALIDATE_EMAIL)) {
             return new JsonResponse(['error' => 'Adresse e-mail invalide.'], 422);
         }
-        if (mb_strlen($password) < 8) {
-            return new JsonResponse(['error' => 'Mot de passe trop court (8 caractères minimum).'], 422);
+        if (mb_strlen($password) < 12) {
+            return new JsonResponse(['error' => 'Mot de passe trop court (12 caractères minimum).'], 422);
         }
         if ('' === $realName) {
             return new JsonResponse(['error' => 'Le nom est obligatoire.'], 422);

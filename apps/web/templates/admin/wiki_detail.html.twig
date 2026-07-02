@@ -40,7 +40,7 @@
 
         <script nonce="{{ csp_nonce.value }}">
         (function () {
-            var REV = {{ article.revisions|json_encode|raw }};
+            var REV = {{ article.revisions|json_js }};
             function esc(s){ var d=document.createElement('div'); d.textContent=(s==null?'':String(s)); return d.innerHTML; }
             function byId(id){ for (var i=0;i<REV.length;i++) if (String(REV[i].id)===String(id)) return REV[i]; return null; }
             function lines(s){ return (s||'').split('\n'); }

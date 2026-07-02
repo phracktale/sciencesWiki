@@ -524,10 +524,33 @@ final class WikiController extends AbstractController
     #[Route('/{_locale}/q/{id}/vote', name: 'answer_vote', requirements: ['id' => '\d+', '_locale' => 'fr'], methods: ['POST'])]
     public function vote(int $id, Request $request): JsonResponse
     {
+        // Protection CSRF sans état (le vote est public/anonyme, pas de session forcée) :
+        // on exige que la requête provienne de NOTRE origine. Un POST cross-site forgé
+        // porte une origine différente (ou une absence d'origine sur navigation top-level,
+        // que le fetch same-origin ne produit jamais) → rejeté.
+        if (!$this->isSameOrigin($request)) {
+            return new JsonResponse(['error' => 'Origine non autorisée.'], 403);
+        }
+
         $value = (string) ($request->request->get('value') ?? '');
         $res = $this->api->voteAnswer($id, $value, $this->user->token(), $request->getClientIp());
 
         return new JsonResponse($res['data'], $res['ok'] ? 200 : (0 !== $res['status'] ? $res['status'] : 502));
+    }
+
+    /**
+     * Vérifie que la requête provient de la même origine (défense CSRF sans état).
+     * Compare l'hôte de l'en-tête Origin (ou, à défaut, Referer) à l'hôte courant.
+     */
+    private function isSameOrigin(Request $request): bool
+    {
+        $source = (string) ($request->headers->get('Origin') ?: $request->headers->get('Referer') ?: '');
+        if ('' === $source) {
+            return false; // un fetch same-origin envoie toujours Origin sur un POST.
+        }
+        $host = parse_url($source, \PHP_URL_HOST);
+
+        return \is_string($host) && strtolower($host) === strtolower($request->getHost());
     }
 
     /** Moteur de recherche des articles encyclopédiques (rendu JS via /api/wiki/search). */

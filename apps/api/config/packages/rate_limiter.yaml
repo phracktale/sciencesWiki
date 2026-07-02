@@ -1,0 +1,9 @@
+# Limiteurs de débit applicatifs (symfony/rate-limiter).
+# - register : bride la création de comptes self-service (anti-spam / anti-abus).
+#   Consommé par IP dans RegistrationController.
+framework:
+    rate_limiter:
+        register:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '1 hour'

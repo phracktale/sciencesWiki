@@ -10,6 +10,7 @@ use App\Repository\AnswerRepository;
 use App\Repository\AnswerVoteRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -117,8 +118,18 @@ final class AnswerVoteController
         if (null !== $user) {
             return 'u:'.$user->getId();
         }
-        // IP réelle transmise par le proxy web (le front appelle l'API côté serveur).
-        $ip = $request->headers->get('X-Voter-Ip') ?: ($request->getClientIp() ?? '0.0.0.0');
+        // Anti-bourrage : l'en-tête X-Voter-Ip (IP réelle du visiteur, posée par le
+        // front qui appelle l'API côté serveur) n'est HONORÉ que si le pair immédiat
+        // est un proxy de CONFIANCE (front interne). En accès direct à l'API par un
+        // pair non fiable, l'en-tête est ignoré → on retombe sur l'IP de connexion
+        // réelle, non usurpable (plus de clés infinies via un header forgé).
+        $ip = null;
+        $remote = $request->server->get('REMOTE_ADDR');
+        $trusted = Request::getTrustedProxies();
+        if ([] !== $trusted && \is_string($remote) && IpUtils::checkIp($remote, $trusted)) {
+            $ip = $request->headers->get('X-Voter-Ip');
+        }
+        $ip = $ip ?: ($request->getClientIp() ?? '0.0.0.0');
 
         return 'ip:'.substr(hash('sha256', $ip), 0, 40);
     }

@@ -39,6 +39,12 @@ security:
                 password_path: password
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure
+            # Anti brute-force / credential stuffing : au-delà de 5 tentatives
+            # échouées en 15 min (par IP + identifiant), l'authentification est
+            # bloquée (429). Nécessite symfony/rate-limiter (ajouté au composer.json).
+            login_throttling:
+                max_attempts: 5
+                interval: '15 minutes'
 
         # Endpoint RAG chat (Open WebUI, compatible OpenAI) : HORS firewall JWT.
         # Open WebUI envoie un Bearer (sa clé OpenAI) qui n'est PAS un JWT ; sous le

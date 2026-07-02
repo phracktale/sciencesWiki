@@ -46,9 +46,9 @@
         <script nonce="{{ csp_nonce.value }}">
         (function () {
             var btn = document.getElementById('share-btn');
-            var shareUrl = {{ (pub.doiUrl ?? pub.oaUrl)|json_encode|raw }};
+            var shareUrl = {{ (pub.doiUrl ?? pub.oaUrl)|json_js }};
             btn && btn.addEventListener('click', function () {
-                if (navigator.share) { navigator.share({ title: {{ pub.title|json_encode|raw }}, url: shareUrl }).catch(function(){}); return; }
+                if (navigator.share) { navigator.share({ title: {{ pub.title|json_js }}, url: shareUrl }).catch(function(){}); return; }
                 navigator.clipboard.writeText(shareUrl).then(function () { btn.textContent = '✓ Lien copié'; setTimeout(function(){ btn.textContent = '🔗 Partager'; }, 2000); });
             });
             // Repli : si le viewer PDF.js n'est pas vendoré (404), bascule sur le rendu natif.
@@ -56,7 +56,7 @@
             frame && frame.addEventListener('load', function () {
                 try {
                     if (frame.contentDocument && /404|not found/i.test(frame.contentDocument.title || '')) {
-                        frame.src = {{ pdfProxy|json_encode|raw }};
+                        frame.src = {{ pdfProxy|json_js }};
                     }
                 } catch (e) { /* cross-origin une fois le PDF chargé : normal */ }
             });

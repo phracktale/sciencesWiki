@@ -79,7 +79,7 @@
 
     <script nonce="{{ csp_nonce.value }}">
     (function () {
-        var SLUG = {{ slug|json_encode|raw }};
+        var SLUG = {{ slug|json_js }};
         var state = { q: '', stemming: true, semantic: false, sort: '', dir: 'asc', page: 1, selected: null, types: [] };
         var rows = document.getElementById('xp-rows');
         var pager = document.getElementById('xp-pager');

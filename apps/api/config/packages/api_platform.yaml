@@ -13,3 +13,12 @@ api_platform:
         stateless: true
         cache_headers:
             vary: ['Content-Type', 'Authorization', 'Origin']
+
+# En production, on n'expose PAS la documentation interactive (Swagger UI / doc HTML
+# Hydra) : réduction de la fuite d'information sur la structure de l'API. Les formats
+# de données (JSON, JSON-LD) restent disponibles pour les clients.
+when@prod:
+    api_platform:
+        enable_docs: false
+        enable_swagger_ui: false
+        enable_re_doc: false

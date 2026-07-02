@@ -160,13 +160,13 @@
         <p class="muted" id="enr-updated" style="font-size:.8rem; margin-top:.6rem"></p>
     </section>
 
-    <script type="application/json" id="bootstrap">{{ status|json_encode|raw }}</script>
+    <script type="application/json" id="bootstrap">{{ status|json_js }}</script>
     <script nonce="{{ csp_nonce.value }}">
     (function () {
         var tbody = document.getElementById('jobs');
         if (!tbody) return;
         var HARVEST = { maxPerRun: 500, capPerRubric: 0 }; // mis à jour par render() depuis l'API
-        var CSRF = {{ admin_csrf.token|json_encode|raw }};
+        var CSRF = {{ admin_csrf.token|json_js }};
 
         function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 

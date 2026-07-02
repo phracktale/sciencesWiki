@@ -2,11 +2,22 @@
 .gitignore
 /vendor/
 /var/
+# Fichiers d'environnement : on GARDE /.env (défauts NON secrets requis par
+# `composer dump-env prod` au build) mais on exclut les variantes dev/test/local.
+# La config prod réelle est injectée par l'environnement (compose), pas par un fichier.
+/.env.dev
+/.env.test
 /.env.local
 /.env.*.local
 /.env.local.php
 /config/jwt/*.pem
+# Coffre de secrets dev (chiffré, mais inutile en image) et clés de déchiffrage.
+/config/secrets/dev/
+/config/secrets/*/*.decrypt.private.php
 /phpunit.xml
+/phpunit.dist.xml
 /.phpunit.cache/
+/tests/
+/docs/
 compose.yaml
 compose.override.yaml

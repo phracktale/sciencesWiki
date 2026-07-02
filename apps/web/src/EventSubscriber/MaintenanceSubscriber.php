@@ -19,13 +19,15 @@ use Twig\Environment;
  */
 final class MaintenanceSubscriber implements EventSubscriberInterface
 {
-    /** Jeton de contournement (prévisualisation du site pendant la maintenance). */
-    private const BYPASS_TOKEN = 'white-rabbit-8f3c';
-
     public function __construct(
         private readonly Environment $twig,
         #[Autowire('%kernel.project_dir%')]
         private readonly string $projectDir,
+        // Jeton de contournement (prévisualisation du site pendant la maintenance).
+        // Fourni par l'environnement (MAINTENANCE_BYPASS_TOKEN) et JAMAIS committé.
+        // Vide = aucun contournement possible (comportement sûr par défaut).
+        #[Autowire(env: 'MAINTENANCE_BYPASS_TOKEN')]
+        private readonly string $bypassToken = '',
     ) {
     }
 
@@ -43,8 +45,10 @@ final class MaintenanceSubscriber implements EventSubscriberInterface
 
         $request = $event->getRequest();
         // Contournement admin (prévisualisation du site réel pendant la maintenance).
-        if (self::BYPASS_TOKEN === $request->query->get('wake')
-            || self::BYPASS_TOKEN === $request->cookies->get('wake')) {
+        // Désactivé si aucun jeton n'est configuré (comparaison à vide interdite).
+        if ('' !== $this->bypassToken
+            && (hash_equals($this->bypassToken, (string) $request->query->get('wake'))
+                || hash_equals($this->bypassToken, (string) $request->cookies->get('wake')))) {
             return;
         }
 

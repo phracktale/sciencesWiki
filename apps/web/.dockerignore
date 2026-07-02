@@ -2,6 +2,12 @@
 .gitignore
 /vendor/
 /var/
+# On GARDE /.env (défauts non secrets requis par `composer dump-env prod`) mais on
+# exclut les variantes dev/test/local et tout secret compilé.
+/.env.dev
+/.env.test
 /.env.local
 /.env.*.local
 /.env.local.php
+/config/secrets/*/*.decrypt.private.php
+/tests/

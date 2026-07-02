@@ -74,6 +74,8 @@ final class RagChatController
         private readonly SettingsService $settings,
         #[Autowire(env: 'RAG_API_TOKEN')]
         private readonly string $apiToken = '',
+        #[Autowire('%kernel.environment%')]
+        private readonly string $appEnv = 'prod',
     ) {
     }
 
@@ -336,7 +338,10 @@ final class RagChatController
     private function authorized(Request $request): bool
     {
         if ('' === $this->apiToken) {
-            return true; // pas de jeton configuré : endpoint ouvert (réseau interne)
+            // Fail-closed en production : sans jeton configuré, l'endpoint LLM ne doit
+            // PAS être ouvert (coût, abus, fuite de prompt). Hors prod (dev/test), on
+            // reste ouvert pour le confort local.
+            return 'prod' !== $this->appEnv;
         }
         $auth = $request->headers->get('Authorization', '');
 
