@@ -14,7 +14,12 @@
 
 {$SERVER_NAME:80} {
 	root * /app/public
-	encode zstd br gzip
+
+	# Compression de tout SAUF les flux SSE de l'assistant RAG : compresser un
+	# text/event-stream le bufferise (le client ne reçoit rien avant la fin), ce qui
+	# casse l'affichage « au fil de l'eau » d'Open WebUI. On exclut donc /api/rag.
+	@compressible not path /api/rag /api/rag/*
+	encode @compressible zstd br gzip
 
 	# Hub Mercure : abonnements anonymes autorisés (topics publics, ex. ticks de
 	# moisson sans données sensibles) ; publication réservée à l'api (JWT).

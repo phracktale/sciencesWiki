@@ -38,8 +38,12 @@ final class RagChatController
      * fait une recherche GLOBALE (tout le corpus multi-domaines) ; la fusion RRF
      * (cf. PublicationRepository::nearestHybrid) remonte le pertinent même quand un
      * terme générique domine l'embedding, donc un K modéré suffit (contexte LLM léger).
+     *
+     * Réduit à 6 (au lieu de 12) : sur le LLM 24B auto-hébergé (Marvin, CPU partagé
+     * avec la moisson), le « prompt eval » du contexte est le goulot ; moitié moins de
+     * sources ≈ moitié moins de temps de lecture, pour une couverture toujours suffisante.
      */
-    private const CHAT_NEIGHBORS = 12;
+    private const CHAT_NEIGHBORS = 6;
 
     /**
      * Assistant UNIQUE exposé à Open WebUI : le RAG sourcé de SciencesWiki, rédigé
@@ -328,7 +332,9 @@ final class RagChatController
                 '' !== $authors ? $authors : 'auteurs inconnus',
                 $year,
                 $s->getDoi() ?? 'n/a',
-                mb_substr($s->getAbstract() ?? '(pas de résumé)', 0, 700),
+                // Résumé tronqué à 400 car. (au lieu de 700) : réduit le prompt envoyé
+                // au LLM → lecture plus rapide, sans perdre l'essentiel du résumé.
+                mb_substr($s->getAbstract() ?? '(pas de résumé)', 0, 400),
             );
         }
 
