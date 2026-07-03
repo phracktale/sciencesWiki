@@ -111,7 +111,10 @@ final class SettingsService
 
     private const DEFAULTS = [
         self::RAG_TEMPERATURE => '0.6',
-        self::RAG_MAX_TOKENS => '10000',
+        // Borne la longueur de réponse : sur le LLM auto-hébergé (Marvin, ~4 tok/s en
+        // génération), 10000+ tokens = plusieurs minutes → dépassement des délais du
+        // chat. 800 suffit largement pour une réponse de vulgarisation sourcée.
+        self::RAG_MAX_TOKENS => '800',
         self::RAG_MODEL => '',
         self::RAG_NEIGHBORS => '6',
         self::RAG_VERIFY => '1',
