@@ -338,10 +338,12 @@ services:
       # Thème CRT SciencesWiki : Open WebUI charge nativement /static/custom.css.
       - ./openwebui/custom.css:/app/backend/open_webui/static/custom.css:ro
     ports:
-      # ⚠️ L'accès DIRECT (hors Heimdall) contourne le SSO (pas d'en-têtes X-SW-Auth-*).
-      # Publié par DÉFAUT sur 127.0.0.1 : joignable uniquement en local/tunnel. En prod,
-      # mettre OPENWEBUI_BIND=192.168.1.36 ET n'autoriser Heimdall (192.168.1.195) au pare-feu.
-      - "${OPENWEBUI_BIND:-127.0.0.1}:${OPENWEBUI_PORT:-8092}:8080"
+      # Open WebUI est PROXIFIÉ par Heimdall (chat.scienceswiki.eu) : il doit donc
+      # écouter sur l'IP LAN de Thor (BIND_IP), sinon Heimdall ne le joint pas → 504.
+      # ⚠️ L'accès DIRECT sur cette IP:port contourne le SSO (pas d'en-têtes X-SW-Auth-*)
+      # → à DURCIR AU PARE-FEU : n'autoriser :8092 QUE depuis Heimdall (192.168.1.195).
+      # (OPENWEBUI_BIND permet de forcer une autre IP ; défaut = BIND_IP comme api/web.)
+      - "${OPENWEBUI_BIND:-${BIND_IP:-0.0.0.0}}:${OPENWEBUI_PORT:-8092}:8080"
     restart: unless-stopped
 
 volumes:
