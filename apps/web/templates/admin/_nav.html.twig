@@ -28,6 +28,7 @@
 <nav class="admin-nav">
     <span class="admin-nav-brand">⚙️ Administration</span>
     <a href="{{ path('admin_dashboard') }}"{{ r == 'admin_dashboard' ? ' class="active"' : '' }}>Tableau de bord</a>
+    <a href="{{ path('axis_tool') }}" target="_blank" rel="noopener" title="Évaluation critique des études (AXIS, RoB 2, AMSTAR-2, MMAT)">🔬 Analyses ↗</a>
     {% for g in groups %}
         <div class="dd">
             <span class="dd-top{{ r in g.match ? ' active' : '' }}" tabindex="0">{{ g.label }} ▾</span>
