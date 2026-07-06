@@ -202,7 +202,7 @@ final class WikiController extends AbstractController
         $privateStudy = null;
         $query = trim((string) $request->request->get('query', ''));
         $doi = trim((string) $request->request->get('doi', ''));
-        $id = $request->request->getInt('id');
+        $id = (int) $request->request->get('id', 0);
 
         $tool = $request->request->get('tool', 'axis');
         $tool = \in_array($tool, ['axis', 'rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis';
@@ -315,7 +315,7 @@ final class WikiController extends AbstractController
         if (!$this->csrf->isValidToken((string) ($request->request->get('_csrf') ?? $request->headers->get('X-CSRF-Token', '')))) {
             return new JsonResponse(['ok' => false, 'error' => 'Jeton CSRF invalide.'], 403);
         }
-        $id = $request->request->getInt('id');
+        $id = (int) $request->request->get('id', 0);
         if ($id < 1) {
             return new JsonResponse(['ok' => false, 'error' => 'Étude invalide.'], 422);
         }
@@ -403,7 +403,7 @@ final class WikiController extends AbstractController
         $tool = $request->query->get('tool', 'axis');
         $tool = \in_array($tool, ['axis', 'rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis';
         $doi = (string) $request->query->get('doi', '');
-        $id = $request->query->getInt('id');
+        $id = (int) $request->query->get('id', 0);
         // Étude déposée (privée) → polling par id ; sinon par DOI.
         $q = $id > 0 ? 'id='.$id : 'doi='.rawurlencode($doi);
         $res = $this->user->send('GET', '/api/me/'.$tool.'/status?'.$q);
