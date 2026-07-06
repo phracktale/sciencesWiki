@@ -13,14 +13,18 @@ namespace App\Enum;
 enum AxisAnswer: string
 {
     case Yes = 'yes';
+    case Partial = 'partial';   // partiellement / oui avec réserve
     case No = 'no';
+    case Na = 'na';             // non applicable à cette étude (item hors-sujet)
     case Unclear = 'unclear';
 
     public function label(): string
     {
         return match ($this) {
             self::Yes => 'Oui',
+            self::Partial => 'Partiellement',
             self::No => 'Non',
+            self::Na => 'Non applicable',
             self::Unclear => 'Indéterminé',
         };
     }

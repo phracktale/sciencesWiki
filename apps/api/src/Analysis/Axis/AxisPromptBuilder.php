@@ -48,19 +48,27 @@ final class AxisPromptBuilder
             systématique, méta-analyse, in vivo/in vitro, modélisation), réponds
             "applicable": false et N'évalue PAS les 20 items (AXIS serait hors-sujet).
 
-            ÉTAPE 1 — Si l'étude est transversale, réponds aux 20 items ci-dessous par
-            "yes", "no" ou "unclear" :
+            ÉTAPE 1 — Si l'étude est transversale, évalue les 20 items ci-dessous :
             $list
 
             Règles :
-            - Pour CHAQUE item, fournis TOUJOURS trois éléments :
-                • "answer"    : "yes", "no" ou "unclear" ;
-                • "reasoning" : ta RÉFLEXION en une phrase claire en français, expliquant
-                  pourquoi tu réponds ainsi (JAMAIS vide — c'est ta justification) ;
+            - Pour CHAQUE item, fournis TOUJOURS quatre éléments :
+                • "answer"    : une modalité CANONIQUE parmi :
+                    "yes"     = critère clairement rempli ;
+                    "partial" = partiellement rempli / rempli avec réserve ;
+                    "no"      = non rempli ;
+                    "na"      = non applicable à CE type d'étude (item hors-sujet) ;
+                    "unclear" = information réellement absente du texte.
+                • "verdict"   : un LIBELLÉ court et NUANCÉ en français reflétant ta réponse,
+                  à la manière d'un relecteur — ex. « Oui », « Oui, avec réserve »,
+                  « Oui, avec prudence », « Partiellement », « Partiellement clair »,
+                  « Non », « Non applicable », « Indéterminé ». Sois précis et nuancé.
+                • "reasoning" : ta RÉFLEXION en une phrase claire en français expliquant
+                  pourquoi (JAMAIS vide) ;
                 • "quote"     : une phrase EXACTE (verbatim, langue d'origine) du texte qui
                   étaye ta réponse si elle existe, sinon null.
             - N'invente RIEN : fonde-toi uniquement sur le texte fourni. Si l'information est
-              réellement absente, réponds "unclear" en l'expliquant dans "reasoning".
+              réellement absente, réponds "unclear".
             - "study_design" : un mot-clé court en anglais (cross-sectional, rct, cohort,
               case_control, systematic_review, meta_analysis, in_vivo, in_vitro, modeling, other).
             - "summary" : une RÉFLEXION GÉNÉRALE de 2 à 4 phrases en français (forces et
@@ -72,9 +80,9 @@ final class AxisPromptBuilder
               "study_design": "cross-sectional|rct|cohort|case_control|systematic_review|meta_analysis|in_vivo|in_vitro|modeling|other",
               "applicable": true,
               "items": {
-                "q1": {"answer": "yes|no|unclear", "reasoning": "ta réflexion en français", "quote": "phrase verbatim ou null"},
-                "…": {"answer": "…", "reasoning": "…", "quote": null},
-                "q20": {"answer": "yes|no|unclear", "reasoning": "…", "quote": null}
+                "q1": {"answer": "yes|partial|no|na|unclear", "verdict": "libellé nuancé en français", "reasoning": "ta réflexion", "quote": "phrase verbatim ou null"},
+                "…": {"answer": "…", "verdict": "…", "reasoning": "…", "quote": null},
+                "q20": {"answer": "yes|partial|no|na|unclear", "verdict": "…", "reasoning": "…", "quote": null}
               },
               "summary": "réflexion générale en 2-4 phrases"
             }

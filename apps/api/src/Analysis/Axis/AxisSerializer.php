@@ -32,8 +32,9 @@ final class AxisSerializer
                 continue;
             }
             $answer = AxisAnswer::tryFrom($answers[$key]) ?? AxisAnswer::Unclear;
-            // Compat : ancien format (string = citation) ou nouveau ({reasoning,quote,anchored}).
+            // Compat : ancien format (string = citation) ou nouveau ({verdict,reasoning,quote,anchored}).
             $detail = $justifications[$key] ?? null;
+            $verdict = \is_array($detail) ? ($detail['verdict'] ?? null) : null;
             $reasoning = \is_array($detail) ? ($detail['reasoning'] ?? null) : null;
             $quote = \is_array($detail) ? ($detail['quote'] ?? null) : (\is_string($detail) ? $detail : null);
             $items[] = [
@@ -41,7 +42,8 @@ final class AxisSerializer
                 'section' => $meta['section'],
                 'question' => $meta['text'],
                 'answer' => $answer->value,
-                'answerLabel' => $answer->label(),
+                // Libellé NUANCÉ du modèle (« Oui, avec réserve »…) sinon le libellé canonique.
+                'answerLabel' => '' !== (string) $verdict ? $verdict : $answer->label(),
                 'favorable' => AxisChecklist::isFavorable($key, $answer),
                 'reverse' => \in_array($key, AxisChecklist::REVERSE, true),
                 'reasoning' => $reasoning,

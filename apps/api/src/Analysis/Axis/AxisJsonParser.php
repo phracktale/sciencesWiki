@@ -107,10 +107,12 @@ final class AxisJsonParser
             }
             if (\is_array($entry)) {
                 $answer = AxisAnswer::tryFrom((string) ($entry['answer'] ?? ''));
+                $verdict = $this->str($entry['verdict'] ?? null);
                 $reasoning = $this->str($entry['reasoning'] ?? null);
                 $quote = $this->str($entry['quote'] ?? null);
             } else {
                 $answer = AxisAnswer::tryFrom((string) $entry);
+                $verdict = null;
                 $reasoning = null;
                 $quote = null;
             }
@@ -118,7 +120,7 @@ final class AxisJsonParser
                 continue;
             }
             $answers[$key] = $answer;
-            $justifications[$key] = ['reasoning' => $reasoning, 'quote' => $quote];
+            $justifications[$key] = ['verdict' => $verdict, 'reasoning' => $reasoning, 'quote' => $quote];
         }
 
         return [$answers, $justifications];

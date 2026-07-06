@@ -137,7 +137,9 @@ final class AxisAppraiser
 
         [$answers, $justifications] = $this->applyGuardrail($parsed, $sourceText);
         $favorable = $this->favorableCount($answers);
-        $assessable = \count(array_filter($answers, static fn (AxisAnswer $a): bool => AxisAnswer::Unclear !== $a));
+        // Évaluables = ni « Indéterminé » ni « Non applicable » (un item hors-sujet ne
+        // pénalise pas la fiabilité). « Partiellement » compte comme évaluable non favorable.
+        $assessable = \count(array_filter($answers, static fn (AxisAnswer $a): bool => AxisAnswer::Unclear !== $a && AxisAnswer::Na !== $a));
 
         $appraisal
             ->setAnswers(array_map(static fn (AxisAnswer $a): string => $a->value, $answers))
@@ -167,13 +169,15 @@ final class AxisAppraiser
 
         foreach (AxisChecklist::keys() as $key) {
             $answer = $parsed->answers[$key] ?? AxisAnswer::Unclear;
-            $detail = $parsed->justifications[$key] ?? ['reasoning' => null, 'quote' => null];
+            $detail = $parsed->justifications[$key] ?? [];
+            $verdict = \is_array($detail) ? ($detail['verdict'] ?? null) : null;
             $reasoning = \is_array($detail) ? ($detail['reasoning'] ?? null) : (\is_string($detail) ? $detail : null);
             $quote = \is_array($detail) ? ($detail['quote'] ?? null) : null;
 
             $anchored = null !== $quote && $this->quoteExists($quote, $haystack);
             $answers[$key] = $answer;
             $justifications[$key] = [
+                'verdict' => $verdict,
                 'reasoning' => $reasoning,
                 'quote' => $anchored ? $quote : null,
                 'anchored' => $anchored,

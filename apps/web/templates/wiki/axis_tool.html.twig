@@ -337,7 +337,7 @@
                         <summary style="cursor:pointer; font-weight:600">Les 20 critères en détail</summary>
                         <ul style="list-style:none; padding:0; margin:.6rem 0">
                             {% for it in result.items %}
-                                {% set icon = it.favorable ? '✅' : (it.answer == 'unclear' ? '❔' : '⚠️') %}
+                                {% set icon = it.favorable ? '✅' : (it.answer == 'partial' ? '🟡' : (it.answer == 'na' ? '➖' : (it.answer == 'unclear' ? '❔' : '⚠️'))) %}
                                 <li style="padding:.5rem 0; border-bottom:1px solid var(--line)">
                                     {{ icon }} <strong>{{ it.question }}</strong>
                                     <span class="muted">— {{ it.answerLabel }}</span>
