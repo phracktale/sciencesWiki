@@ -45,6 +45,11 @@ final class OpenAiCompatibleLlmClient implements LlmClient
         if (isset($options['stop'])) {
             $payload['stop'] = $options['stop'];
         }
+        // Mode JSON strict (OpenAI/Ollama) : la sortie est garantie JSON valide ET la
+        // génération est plus rapide (sortie contrainte). Utilisé par les évaluations.
+        if (!empty($options['json'])) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
 
         $headers = ['Content-Type' => 'application/json'];
         if ('' !== $this->apiToken) {

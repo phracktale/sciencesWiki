@@ -31,7 +31,10 @@ use Psr\Log\NullLogger;
 final class AxisAppraiser
 {
     private const FLUSH_EVERY = 10;
-    private const LLM_TIMEOUT = 300;
+    // Large : sur le LLM auto-hébergé (Marvin, CPU), une évaluation complète (texte
+    // intégral + 20 items) peut durer 6-10 min ; le timeout d'inactivité doit couvrir
+    // toute la génération (réponse non streamée = aucun octet avant la fin).
+    private const LLM_TIMEOUT = 900;
 
     /** En deçà de ce nombre d'items évaluables, le texte est jugé insuffisant. */
     private const MIN_ASSESSABLE = 10;
@@ -244,7 +247,7 @@ final class AxisAppraiser
     private function complete(Publication $publication, string $sourceText): ?ParsedAxisAppraisal
     {
         $messages = $this->promptBuilder->build($publication, $sourceText);
-        $opts = ['temperature' => 0.0, 'max_tokens' => 2000, 'model' => $this->settings->appraisalModel(), 'timeout' => self::LLM_TIMEOUT];
+        $opts = ['temperature' => 0.0, 'max_tokens' => 4000, 'model' => $this->settings->appraisalModel(), 'timeout' => self::LLM_TIMEOUT, 'json' => true];
 
         $parsed = $this->parser->parse($this->llm->complete($messages, $opts)->content);
         if (null === $parsed) {
