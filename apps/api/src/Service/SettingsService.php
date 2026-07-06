@@ -129,7 +129,7 @@ final class SettingsService
         self::WIKI_MODEL => 'qwen3.6:latest',
         // Tâches légères (extraction de claims…) : petit modèle rapide par défaut.
         self::LIGHT_MODEL => 'llama3.1:8b',
-        self::APPRAISAL_MODEL => 'qwen3.6:latest',
+        self::APPRAISAL_MODEL => 'glm-5.2:cloud',
         // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
