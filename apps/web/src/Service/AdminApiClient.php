@@ -135,6 +135,20 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/duplications/'.$id.'/review', ['status' => $status]);
     }
 
+    /** @return array<string,mixed> file des études déposées proposées au corpus */
+    public function corpusSubmissions(): array
+    {
+        $res = $this->send('GET', '/api/admin/corpus-submissions', null);
+
+        return $res['ok'] ? $res['data'] : ['items' => [], 'pending' => 0];
+    }
+
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} décision comité (approve|reject) */
+    public function reviewCorpusSubmission(int $id, string $decision): array
+    {
+        return $this->send('POST', '/api/admin/corpus-submissions/'.$id.'/review', ['decision' => $decision]);
+    }
+
     /** @return array{ok:bool,status:int,data:array<string,mixed>} lance la (re)génération d'article (async) */
     public function regenerateNodeArticle(int $id): array
     {

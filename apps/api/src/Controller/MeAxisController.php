@@ -9,6 +9,7 @@ use App\Analysis\Message\AppraisePublicationMessage;
 use App\Entity\Publication;
 use App\Repository\AxisAppraisalRepository;
 use App\Repository\PublicationRepository;
+use App\Service\StudyAccess;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,13 +33,14 @@ final class MeAxisController
         private readonly AxisSerializer $serializer,
         private readonly EntityManagerInterface $em,
         private readonly MessageBusInterface $bus,
+        private readonly StudyAccess $access,
     ) {
     }
 
     #[Route('/api/me/axis/{id}', name: 'me_axis_appraise', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function byId(int $id): JsonResponse
     {
-        return $this->dispatch($this->publications->find($id));
+        return $this->dispatch($this->access->accessible($this->publications->find($id)));
     }
 
     /** Par DOI (le plus naturel : le chercheur a le DOI du papier). Body : {doi}. */
@@ -58,7 +60,7 @@ final class MeAxisController
             ? $this->publications->findOneByDoi($this->normalizeDoi($doi))
             : ($id > 0 ? $this->publications->find($id) : null);
 
-        return $this->state($publication);
+        return $this->state($this->access->accessible($publication));
     }
 
     /** POST : renvoie le résultat s'il existe (cache), sinon met en file et renvoie « pending ». */
@@ -134,7 +136,7 @@ final class MeAxisController
         $data = json_decode($body ?: '[]', true);
         $doi = \is_array($data) ? $this->normalizeDoi((string) ($data['doi'] ?? '')) : '';
 
-        return '' !== $doi ? $this->publications->findOneByDoi($doi) : null;
+        return '' !== $doi ? $this->access->accessible($this->publications->findOneByDoi($doi)) : null;
     }
 
     /** Tolère un DOI collé sous forme d'URL (https://doi.org/10.xxxx). */

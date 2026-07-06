@@ -199,8 +199,10 @@ final class WikiController extends AbstractController
         $error = null;
         $candidates = null;
         $toolStates = [];
+        $privateStudy = null;
         $query = trim((string) $request->request->get('query', ''));
         $doi = trim((string) $request->request->get('doi', ''));
+        $id = $request->request->getInt('id');
 
         $tool = $request->request->get('tool', 'axis');
         $tool = \in_array($tool, ['axis', 'rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis';
@@ -208,6 +210,12 @@ final class WikiController extends AbstractController
         if ($request->isMethod('POST')) {
             if (!$this->csrf->isValid($request)) {
                 $error = 'Jeton de sécurité invalide.';
+            } elseif ($id > 0) {
+                // Étude déposée (privée) évaluée par son id.
+                $this->triggerAppraisalById($id, $tool, $result, $pending, $error);
+                if ('1' === $request->request->get('private')) {
+                    $privateStudy = ['id' => $id];
+                }
             } elseif ('' !== $doi) {
                 // Clic sur un résultat (ou DOI fourni) → mise en file / résultat caché.
                 $this->triggerAppraisal($doi, $tool, $result, $pending, $error);
@@ -238,7 +246,98 @@ final class WikiController extends AbstractController
         return $this->render('wiki/axis_tool.html.twig', [
             'result' => $result, 'pending' => $pending, 'error' => $error,
             'candidates' => $candidates, 'toolStates' => $toolStates, 'query' => $query,
+            'privateStudy' => $privateStudy,
         ]);
+    }
+
+    /**
+     * Dépôt d'un PDF d'étude (absente du corpus) pour évaluation critique : upload API
+     * → étude PRIVÉE → déclenchement de l'évaluation. Rend l'outil avec le résultat en
+     * cours + la possibilité de proposer l'ajout au corpus.
+     */
+    #[Route('/{_locale}/outils/axis/deposer', name: 'axis_deposit', requirements: ['_locale' => 'fr'], methods: ['POST'])]
+    public function axisDeposit(Request $request): Response
+    {
+        if (!$this->user->isLogged() || !$this->user->canUseAxis()) {
+            return $this->redirectToRoute('axis_tool', ['_locale' => 'fr']);
+        }
+        if (!$this->csrf->isValid($request)) {
+            $this->addFlash('error', 'Jeton de sécurité invalide.');
+
+            return $this->redirectToRoute('axis_tool', ['_locale' => 'fr']);
+        }
+        $file = $request->files->get('pdf');
+        if (!$file instanceof \Symfony\Component\HttpFoundation\File\UploadedFile) {
+            $this->addFlash('error', 'Veuillez joindre un fichier PDF.');
+
+            return $this->redirectToRoute('axis_tool', ['_locale' => 'fr']);
+        }
+        $tool = $request->request->get('tool', 'axis');
+        $tool = \in_array($tool, ['axis', 'rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis';
+
+        $res = $this->user->uploadStudy($file, [
+            'title' => trim((string) $request->request->get('title', '')),
+            'doi' => trim((string) $request->request->get('doi', '')),
+            'year' => trim((string) $request->request->get('year', '')),
+            'venue' => trim((string) $request->request->get('venue', '')),
+            'abstract' => trim((string) $request->request->get('abstract', '')),
+        ]);
+        if (!$res['ok']) {
+            $this->addFlash('error', (string) ($res['data']['error'] ?? 'Échec du dépôt de l’étude.'));
+
+            return $this->redirectToRoute('axis_tool', ['_locale' => 'fr']);
+        }
+
+        $pubId = (int) ($res['data']['publicationId'] ?? 0);
+        $inCorpus = (bool) ($res['data']['inCorpus'] ?? false);
+        $result = null;
+        $pending = null;
+        $error = null;
+        $this->triggerAppraisalById($pubId, $tool, $result, $pending, $error);
+
+        return $this->render('wiki/axis_tool.html.twig', [
+            'result' => $result, 'pending' => $pending, 'error' => $error,
+            'candidates' => null, 'toolStates' => [], 'query' => '',
+            // Étude privée → proposer l'ajout au corpus (sauf si déjà dans le corpus).
+            'privateStudy' => $inCorpus ? null : ['id' => $pubId],
+        ]);
+    }
+
+    /**
+     * Proxy JSON : demande d'ajout d'une étude déposée au corpus (validation comité).
+     */
+    #[Route('/{_locale}/outils/axis/corpus', name: 'axis_corpus', requirements: ['_locale' => 'fr'], methods: ['POST'])]
+    public function axisCorpus(Request $request): JsonResponse
+    {
+        if (!$this->user->isLogged() || !$this->user->canUseAxis()) {
+            return new JsonResponse(['ok' => false, 'error' => 'Accès refusé.'], 403);
+        }
+        if (!$this->csrf->isValidToken((string) ($request->request->get('_csrf') ?? $request->headers->get('X-CSRF-Token', '')))) {
+            return new JsonResponse(['ok' => false, 'error' => 'Jeton CSRF invalide.'], 403);
+        }
+        $id = $request->request->getInt('id');
+        if ($id < 1) {
+            return new JsonResponse(['ok' => false, 'error' => 'Étude invalide.'], 422);
+        }
+        $res = $this->user->submitStudyToCorpus($id, trim((string) $request->request->get('note', '')));
+
+        return new JsonResponse($res['data'] + ['ok' => (bool) ($res['data']['ok'] ?? $res['ok'])], $res['status'] > 0 ? $res['status'] : 502);
+    }
+
+    /** Espace « mes études » : études déposées par l'utilisateur + leur statut. */
+    #[Route('/{_locale}/mes-etudes', name: 'my_studies', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function myStudies(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/mes-etudes']);
+        }
+        if (!$this->user->canUseAxis()) {
+            $this->addFlash('error', 'Espace réservé aux espaces recherche / pédagogie.');
+
+            return $this->redirectToRoute('home');
+        }
+
+        return $this->render('wiki/my_studies.html.twig', ['studies' => $this->user->myStudies()['items'] ?? []]);
     }
 
     /**
@@ -268,6 +367,32 @@ final class WikiController extends AbstractController
         }
     }
 
+    /**
+     * Comme triggerAppraisal mais par id de publication (étude déposée / privée).
+     *
+     * @param array<string,mixed>|null $result
+     * @param array<string,mixed>|null $pending
+     */
+    private function triggerAppraisalById(int $id, string $tool, ?array &$result, ?array &$pending, ?string &$error): void
+    {
+        $path = '/api/me/'.(\in_array($tool, ['rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis').'/'.$id;
+        $res = $this->user->send('POST', $path);
+        $data = $res['data'];
+        switch ($data['status'] ?? null) {
+            case 'ready':
+                $result = ['tool' => $tool] + $data;
+                break;
+            case 'pending':
+                $pending = ['id' => $id, 'doi' => '', 'tool' => $tool, 'publication' => $data['publication'] ?? null];
+                break;
+            case 'not_found':
+                $error = 'Étude introuvable.';
+                break;
+            default:
+                $error = (string) ($data['error'] ?? ('Échec (HTTP '.$res['status'].').'));
+        }
+    }
+
     /** Polling de l'état d'une évaluation (axis | rob2), interrogé par l'outil. */
     #[Route('/{_locale}/outils/axis/statut', name: 'axis_status', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function axisStatus(Request $request): JsonResponse
@@ -278,7 +403,10 @@ final class WikiController extends AbstractController
         $tool = $request->query->get('tool', 'axis');
         $tool = \in_array($tool, ['axis', 'rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis';
         $doi = (string) $request->query->get('doi', '');
-        $res = $this->user->send('GET', '/api/me/'.$tool.'/status?doi='.rawurlencode($doi));
+        $id = $request->query->getInt('id');
+        // Étude déposée (privée) → polling par id ; sinon par DOI.
+        $q = $id > 0 ? 'id='.$id : 'doi='.rawurlencode($doi);
+        $res = $this->user->send('GET', '/api/me/'.$tool.'/status?'.$q);
 
         return new JsonResponse(['status' => (string) ($res['data']['status'] ?? 'unknown')]);
     }

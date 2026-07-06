@@ -50,11 +50,30 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
      *
      * @return list<Publication>
      */
+    /**
+     * Études déposées par un utilisateur (son espace « mes études »), récentes d'abord.
+     *
+     * @return list<Publication>
+     */
+    public function findBySubmitter(\App\Entity\User $user, int $limit = 100): array
+    {
+        return $this->createQueryBuilder('p')
+            ->andWhere('p.submittedBy = :u')
+            ->setParameter('u', $user)
+            ->orderBy('p.id', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
     public function findNeedingEmbedding(int $limit): array
     {
         return $this->createQueryBuilder('p')
             ->andWhere('p.embedding IS NULL')
             ->andWhere("p.title <> ''")
+            // Exclut les études déposées non validées (privées) : elles ne doivent
+            // PAS être vectorisées (sinon elles apparaîtraient dans les recherches).
+            ->andWhere('p.listedInCorpus = true')
             ->orderBy('p.id', 'ASC')
             ->setMaxResults($limit)
             ->getQuery()
@@ -133,6 +152,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         return $this->createQueryBuilder('p')
             ->andWhere('p.embedding IS NOT NULL')
             ->andWhere('p.processingStatus = :status')
+            ->andWhere('p.listedInCorpus = true')
             ->setParameter('status', ProcessingStatus::Normalized->value)
             ->orderBy('p.id', 'ASC')
             ->setMaxResults($limit)
@@ -277,7 +297,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                  SELECT m.id, m.distance
                  FROM merged m
                  JOIN publication p ON p.id = m.id
-                 WHERE p.retraction_status = 'none' AND p.".\App\Catalog\PublicationType::notSatelliteSql().$typeClause."
+                 WHERE p.retraction_status = 'none' AND p.listed_in_corpus AND p.".\App\Catalog\PublicationType::notSatelliteSql().$typeClause."
                  ORDER BY m.distance ASC, m.id ASC
                  LIMIT %2\$d",
                 $perSide,
@@ -351,7 +371,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             \sprintf(
                 "SELECT p.id
                  FROM publication p
-                 WHERE p.retraction_status = 'none' AND p.%s
+                 WHERE p.retraction_status = 'none' AND p.listed_in_corpus AND p.%s
                    AND %s @@ to_tsquery('simple', :tsq)
                  ORDER BY ts_rank(%s, to_tsquery('simple', :tsq)) DESC, p.cited_by_count DESC
                  LIMIT %d",
@@ -410,7 +430,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
                  FROM publication p
                  JOIN placement_suggestion ps ON ps.publication_id = p.id
                  WHERE ps.tree_node_id = :node AND ps.status <> 'rejected'
-                   AND p.retraction_status = 'none'
+                   AND p.retraction_status = 'none' AND p.listed_in_corpus
                  ORDER BY p.cited_by_count DESC, p.id DESC
                  LIMIT %d",
                 max(1, $limit),
@@ -437,7 +457,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
              FROM placement_suggestion ps
              JOIN publication p ON p.id = ps.publication_id
              WHERE ps.tree_node_id = :node AND ps.status <> 'rejected'
-               AND p.retraction_status = 'none'",
+               AND p.retraction_status = 'none' AND p.listed_in_corpus",
             ['node' => $nodeId],
         )->fetchOne();
     }
@@ -451,6 +471,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     {
         return $this->createQueryBuilder('p')
             ->andWhere('LOWER(p.title) LIKE :q OR LOWER(p.abstract) LIKE :q')
+            ->andWhere('p.listedInCorpus = true')
             ->setParameter('q', '%'.mb_strtolower($query).'%')
             ->orderBy('p.publicationDate', 'DESC')
             ->setMaxResults(max(1, $limit))
@@ -529,7 +550,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
         $base = "FROM publication p
             $ftsJoin
             LEFT JOIN journal j ON j.id = p.journal_id
-            WHERE p.retraction_status = 'none'
+            WHERE p.retraction_status = 'none' AND p.listed_in_corpus
               AND p.type IN (:ptypes)
               AND EXISTS (
                 SELECT 1 FROM placement_suggestion ps
@@ -595,7 +616,7 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
             'ptypes' => \Doctrine\DBAL\ArrayParameterType::STRING,
         ];
         // Périmètre commun : non rétracté, types demandés, placé dans le sous-arbre.
-        $subtree = "p.retraction_status = 'none' AND p.type IN (:ptypes)
+        $subtree = "p.retraction_status = 'none' AND p.listed_in_corpus AND p.type IN (:ptypes)
             AND EXISTS (SELECT 1 FROM placement_suggestion ps
                         WHERE ps.publication_id = p.id AND ps.tree_node_id IN (:nodes))";
 

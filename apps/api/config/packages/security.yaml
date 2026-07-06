@@ -72,6 +72,9 @@ security:
         - { path: ^/api/me/rob2, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
         - { path: ^/api/me/amstar2, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
         - { path: ^/api/me/mmat, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
+        # Dépôt d'une étude (PDF) pour évaluation critique + demande d'ajout au corpus.
+        - { path: ^/api/me/study, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
+        - { path: ^/api/me/studies, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
         - { path: ^/api/me, roles: ROLE_USER }
         - { path: ^/api/admin, roles: ROLE_ADMIN }
         - { path: ^/api/literature-reviews, roles: ROLE_RESEARCHER }

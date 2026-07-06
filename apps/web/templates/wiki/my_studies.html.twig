@@ -1,0 +1,37 @@
+{% extends 'base.html.twig' %}
+{% block title %}Mes études — SciencesWiki{% endblock %}
+{% block body %}
+    <h1>Mes études déposées 📄</h1>
+    <p class="muted">Les études que vous avez déposées pour évaluation critique. Elles restent <strong>privées</strong> (visibles de vous seul) tant que le comité n'a pas validé leur ajout au corpus.</p>
+    <p><a href="{{ path('axis_tool') }}">← Déposer / évaluer une étude</a></p>
+
+    {% if studies is empty %}
+        <p class="muted" style="margin-top:1rem">Vous n'avez encore déposé aucune étude.</p>
+    {% else %}
+        <ul style="list-style:none; padding:0; margin-top:1rem">
+            {% for s in studies %}
+                <li class="card" style="margin:.5rem 0">
+                    <strong>{{ s.title }}</strong>
+                    <div class="muted" style="font-size:.85rem">{% if s.year %}{{ s.year }} · {% endif %}{% if s.doi %}<a href="https://doi.org/{{ s.doi }}" target="_blank" rel="noopener">{{ s.doi }}</a>{% endif %}</div>
+                    <div style="margin-top:.35rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap">
+                        {% if s.inCorpus %}
+                            <span class="badge" style="background:#dcfce7; color:#166534">✅ Dans le corpus</span>
+                        {% elseif s.submission %}
+                            {% set c = {'pending':'#f59e0b','approved':'#16a34a','rejected':'#dc2626'} %}
+                            <span class="badge" style="background:{{ (c[s.submission.status] ?? '#64748b') }}22; color:{{ c[s.submission.status] ?? '#64748b' }}">{{ s.submission.label }}</span>
+                        {% else %}
+                            <span class="badge" style="background:#e2e8f0; color:#475569">Privée</span>
+                        {% endif %}
+                        <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="id" value="{{ s.id }}">
+                            <input type="hidden" name="private" value="{% if not s.inCorpus %}1{% endif %}">
+                            <input type="hidden" name="tool" value="axis">
+                            <button type="submit" style="font-size:.85rem">Voir l'évaluation →</button>
+                        </form>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock %}

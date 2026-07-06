@@ -13,6 +13,7 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
+use App\Service\StudyAccess;
 use Symfony\Component\Routing\Attribute\Route;
 
 /**
@@ -27,13 +28,14 @@ final class MeAmstar2Controller
         private readonly Amstar2Serializer $serializer,
         private readonly EntityManagerInterface $em,
         private readonly MessageBusInterface $bus,
+        private readonly StudyAccess $access,
     ) {
     }
 
     #[Route('/api/me/amstar2/{id}', name: 'me_amstar2_appraise', methods: ['POST'], requirements: ['id' => '\d+'])]
     public function byId(int $id): JsonResponse
     {
-        return $this->dispatch($this->publications->find($id));
+        return $this->dispatch($this->access->accessible($this->publications->find($id)));
     }
 
     #[Route('/api/me/amstar2', name: 'me_amstar2_appraise_doi', methods: ['POST'])]
@@ -51,7 +53,7 @@ final class MeAmstar2Controller
             ? $this->publications->findOneByDoi($this->normalizeDoi($doi))
             : ($id > 0 ? $this->publications->find($id) : null);
 
-        return $this->state($publication);
+        return $this->state($this->access->accessible($publication));
     }
 
     private function dispatch(?Publication $publication): JsonResponse
@@ -120,7 +122,7 @@ final class MeAmstar2Controller
         $data = json_decode($body ?: '[]', true);
         $doi = \is_array($data) ? $this->normalizeDoi((string) ($data['doi'] ?? '')) : '';
 
-        return '' !== $doi ? $this->publications->findOneByDoi($doi) : null;
+        return '' !== $doi ? $this->access->accessible($this->publications->findOneByDoi($doi)) : null;
     }
 
     private function normalizeDoi(string $doi): string

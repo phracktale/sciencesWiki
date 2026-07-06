@@ -3,6 +3,7 @@
 {% block body %}
     <h1>Évaluation critique des études 🔬</h1>
     <p class="muted">Cherchez une étude par <strong>titre, mots-clés ou DOI</strong>. Selon le devis détecté, l'IA propose l'outil adapté : <strong>AXIS</strong> (études transversales), <strong>RoB 2</strong> (essais randomisés) ou <strong>AMSTAR-2</strong> (revues systématiques). <strong>Ce ne sont pas des notes</strong> — des signaux pour vous aider à juger, jamais un verdict.</p>
+    <p style="font-size:.9rem"><a href="{{ path('my_studies') }}">📄 Mes études déposées →</a></p>
 
     <form class="ask" method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="max-width:560px; display:flex; gap:.5rem; align-items:flex-end; flex-wrap:wrap">
         <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
@@ -14,6 +15,31 @@
     </form>
 
     {% if error %}<p class="badge warn" style="margin-top:1rem">{{ error }}</p>{% endif %}
+
+    <details style="margin-top:1rem; max-width:660px"{% if error %} open{% endif %}>
+        <summary style="cursor:pointer; color:var(--accent); font-weight:600">📎 L'étude n'est pas dans le corpus ? Déposez son PDF pour l'évaluer</summary>
+        <form method="post" action="{{ path('axis_deposit') }}" enctype="multipart/form-data" data-turbo="false" class="card" style="margin-top:.6rem; display:grid; gap:.55rem">
+            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+            <div><label for="d-title">Titre de l'étude *</label><input type="text" id="d-title" name="title" required></div>
+            <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+                <div style="flex:1; min-width:180px"><label for="d-doi">DOI (optionnel)</label><input type="text" id="d-doi" name="doi" placeholder="10.xxxx/…"></div>
+                <div style="width:110px"><label for="d-year">Année</label><input type="text" id="d-year" name="year" inputmode="numeric" pattern="[0-9]{4}"></div>
+            </div>
+            <div><label for="d-venue">Revue (optionnel)</label><input type="text" id="d-venue" name="venue"></div>
+            <div><label for="d-abstract">Résumé (optionnel — améliore la détection du type d'étude)</label><textarea id="d-abstract" name="abstract" rows="3"></textarea></div>
+            <div><label for="d-tool">Outil d'évaluation</label>
+                <select id="d-tool" name="tool">
+                    <option value="axis">AXIS (étude transversale)</option>
+                    <option value="rob2">RoB 2 (essai randomisé)</option>
+                    <option value="amstar2">AMSTAR-2 (revue systématique)</option>
+                    <option value="mmat">MMAT (étude empirique / mixte)</option>
+                </select>
+            </div>
+            <div><label for="d-pdf">PDF de l'étude * <span class="muted">(avec couche texte — pas un scan image)</span></label><input type="file" id="d-pdf" name="pdf" accept="application/pdf,.pdf" required></div>
+            <button type="submit">Déposer et évaluer</button>
+            <p class="muted" style="font-size:.78rem; margin:0">Votre étude reste <strong>privée</strong> (visible de vous seul). Après l'évaluation, vous pourrez proposer son ajout au corpus (soumis à validation du comité).</p>
+        </form>
+    </details>
 
     {% if candidates is not empty and candidates is not null %}
         <h2 style="margin-top:1.4rem">Choisissez l'étude à évaluer</h2>
@@ -85,7 +111,7 @@
 
     {% if pending %}
         {% set toolName = {'rob2': 'RoB 2', 'amstar2': 'AMSTAR-2', 'mmat': 'MMAT'}[pending.tool]|default('AXIS') %}
-        <article class="card" id="axis-pending" data-doi="{{ pending.doi }}" data-tool="{{ pending.tool }}" data-status-url="{{ path('axis_status') }}" style="margin-top:1.2rem">
+        <article class="card" id="axis-pending" data-doi="{{ pending.doi }}" data-id="{{ pending.id|default('') }}" data-tool="{{ pending.tool }}" data-status-url="{{ path('axis_status') }}" style="margin-top:1.2rem">
             <h2 style="margin-top:0">⏳ Évaluation {{ toolName }} en cours…</h2>
             {% if pending.publication %}<p><strong>{{ pending.publication.title }}</strong></p>{% endif %}
             <p class="muted">L'IA applique la grille {{ toolName }} (résumé + texte intégral) sur un serveur dédié. Cela prend <strong>~1 minute</strong>. Cette page se met à jour <strong>automatiquement</strong> ; vous pouvez aussi fermer et revenir plus tard : le résultat sera conservé.</p>
@@ -93,6 +119,8 @@
             <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" id="axis-pending-form" style="margin-top:.4rem">
                 <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
                 <input type="hidden" name="doi" value="{{ pending.doi }}">
+                <input type="hidden" name="id" value="{{ pending.id|default('') }}">
+                <input type="hidden" name="private" value="{{ privateStudy ? '1' : '' }}">
                 <input type="hidden" name="tool" value="{{ pending.tool }}">
                 <button type="submit">Rafraîchir maintenant</button>
             </form>
@@ -101,7 +129,9 @@
         (function () {
             var box = document.getElementById('axis-pending');
             if (!box) { return; }
-            var url = box.getAttribute('data-status-url') + '?tool=' + encodeURIComponent(box.getAttribute('data-tool')) + '&doi=' + encodeURIComponent(box.getAttribute('data-doi'));
+            var pid = box.getAttribute('data-id');
+            var q = pid ? ('&id=' + encodeURIComponent(pid)) : ('&doi=' + encodeURIComponent(box.getAttribute('data-doi')));
+            var url = box.getAttribute('data-status-url') + '?tool=' + encodeURIComponent(box.getAttribute('data-tool')) + q;
             var msg = document.getElementById('axis-pending-msg');
             var form = document.getElementById('axis-pending-form');
             var tries = 0;
@@ -321,5 +351,27 @@
 
             <p class="muted" style="font-size:.78rem; margin-top:1rem; border-top:1px dashed var(--line); padding-top:.6rem">{{ result.disclaimer }}</p>
         </article>
+    {% endif %}
+
+    {% if privateStudy %}
+        <article class="card" id="corpus-offer" data-id="{{ privateStudy.id }}" data-url="{{ path('axis_corpus') }}" data-csrf="{{ admin_csrf.token }}" style="margin-top:1rem; background:#f0f9ff; border-color:#38bdf8">
+            <p style="margin:0 0 .5rem"><strong>📥 Cette étude n'est pas dans le corpus.</strong> Souhaitez-vous la proposer pour que les autres en profitent&nbsp;? Un membre du comité la validera avant l'ajout ; elle sera alors indexée (recherche) et placée dans l'arborescence.</p>
+            <button type="button" id="corpus-btn">Proposer l'ajout au corpus</button>
+            <span id="corpus-msg" class="muted" style="margin-left:.6rem"></span>
+        </article>
+        <script nonce="{{ csp_nonce.value }}">
+        (function () {
+            var box = document.getElementById('corpus-offer'); if (!box) { return; }
+            var btn = document.getElementById('corpus-btn'), msg = document.getElementById('corpus-msg');
+            btn.addEventListener('click', function () {
+                btn.disabled = true; btn.textContent = '⏳…';
+                var body = new URLSearchParams(); body.set('id', box.dataset.id); body.set('_csrf', box.dataset.csrf);
+                fetch(box.dataset.url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': box.dataset.csrf }, body: body.toString(), credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) { btn.style.display = 'none'; if (msg) { msg.textContent = d.message || (d.ok ? 'Proposition envoyée.' : 'Échec.'); } })
+                    .catch(function () { btn.disabled = false; btn.textContent = 'Proposer l\'ajout au corpus'; if (msg) { msg.textContent = 'Erreur réseau, réessayez.'; } });
+            });
+        })();
+        </script>
     {% endif %}
 {% endblock %}

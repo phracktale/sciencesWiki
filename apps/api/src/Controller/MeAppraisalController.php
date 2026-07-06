@@ -8,6 +8,7 @@ use App\Analysis\Appraisal\AppraisalToolRegistry;
 use App\Analysis\Message\ClassifyStudyMessage;
 use App\Entity\Publication;
 use App\Repository\PublicationRepository;
+use App\Service\StudyAccess;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Messenger\MessageBusInterface;
@@ -27,6 +28,7 @@ final class MeAppraisalController
         private readonly PublicationRepository $publications,
         private readonly AppraisalToolRegistry $registry,
         private readonly MessageBusInterface $bus,
+        private readonly StudyAccess $access,
     ) {
     }
 
@@ -42,7 +44,7 @@ final class MeAppraisalController
             if ('' === $doi || isset($results[$doi])) {
                 continue;
             }
-            $publication = $this->publications->findOneByDoi($doi);
+            $publication = $this->access->accessible($this->publications->findOneByDoi($doi));
             $results[$doi] = null === $publication ? ['found' => false] : $this->stateFor($publication);
         }
 

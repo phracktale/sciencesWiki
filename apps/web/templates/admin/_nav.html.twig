@@ -7,10 +7,11 @@
         { label: 'Auteurs', route: 'admin_authors' },
         { label: 'Importer un PDF', route: 'admin_pdf_upload' },
     ] },
-    { label: 'Wiki', match: ['admin_wiki', 'admin_wiki_detail', 'admin_questions', 'admin_duplications'], items: [
+    { label: 'Wiki', match: ['admin_wiki', 'admin_wiki_detail', 'admin_questions', 'admin_duplications', 'admin_corpus_submissions'], items: [
         { label: 'Articles wiki', route: 'admin_wiki' },
         { label: 'Questions / Réponses', route: 'admin_questions' },
         { label: 'Doublons & plagiat', route: 'admin_duplications' },
+        { label: 'Études proposées', route: 'admin_corpus_submissions' },
     ] },
     { label: 'Administration', match: ['admin_users', 'admin_join', 'admin_roadmap', 'admin_newsletter', 'admin_activity'], items: [
         { label: 'Utilisateurs', route: 'admin_users' },

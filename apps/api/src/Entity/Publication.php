@@ -217,6 +217,23 @@ class Publication
     #[ORM\OneToMany(targetEntity: PublicationProvenance::class, mappedBy: 'publication', cascade: ['persist', 'remove'], orphanRemoval: true)]
     private Collection $provenances;
 
+    /**
+     * Uploadeur (dépôt utilisateur d'un PDF pour évaluation critique) ; null pour la
+     * moisson. Une étude déposée reste PRIVÉE (visible du seul uploadeur) tant qu'elle
+     * n'est pas validée par le comité pour intégrer le corpus.
+     */
+    #[ORM\ManyToOne(targetEntity: User::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?User $submittedBy = null;
+
+    /**
+     * Listée dans le corpus PUBLIC (recherchable, embeddée, plaçable). true par défaut
+     * (moisson) ; false pour un dépôt utilisateur tant que le comité ne l'a pas validée.
+     * Les recherches ET les drains (embed/placement) excluent listedInCorpus=false.
+     */
+    #[ORM\Column(options: ['default' => true])]
+    private bool $listedInCorpus = true;
+
     public function __construct(string $title)
     {
         $this->title = $title;
@@ -229,6 +246,30 @@ class Publication
     public function getId(): ?int
     {
         return $this->id;
+    }
+
+    public function getSubmittedBy(): ?User
+    {
+        return $this->submittedBy;
+    }
+
+    public function setSubmittedBy(?User $user): self
+    {
+        $this->submittedBy = $user;
+
+        return $this;
+    }
+
+    public function isListedInCorpus(): bool
+    {
+        return $this->listedInCorpus;
+    }
+
+    public function setListedInCorpus(bool $listed): self
+    {
+        $this->listedInCorpus = $listed;
+
+        return $this;
     }
 
     public function getAxisAppraisingAt(): ?\DateTimeImmutable

@@ -1,0 +1,47 @@
+{% extends 'base.html.twig' %}
+{% block title %}Admin — Études proposées{% endblock %}
+{% block body %}
+    {% include 'admin/_nav.html.twig' %}
+    <h1>📥 Études proposées au corpus</h1>
+    <p class="muted" style="font-size:.85rem; max-width:75ch">
+        Études déposées par des utilisateurs (chercheurs / enseignants / élèves) via l'évaluation
+        critique, en attente d'intégration au corpus public. <strong>Acceptée</strong> → l'étude
+        devient recherchable (indexée + placée dans l'arborescence). <strong>Refusée</strong> →
+        elle reste privée à son auteur. Vérifiez la pertinence scientifique et les droits (un PDF
+        éditeur non open-access ne doit pas être exposé publiquement).
+    </p>
+    {% for msg in app.flashes('success') %}<p class="badge ok" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+    {% for msg in app.flashes('error') %}<p class="badge warn" style="display:block; padding:.6rem 1rem">{{ msg }}</p>{% endfor %}
+
+    {% if data.items is empty %}
+        <p class="muted" style="margin-top:1rem">Aucune étude en attente d'examen.</p>
+    {% else %}
+        <p class="muted" style="margin-top:1rem">{{ data.pending }} étude(s) en attente.</p>
+        <ul style="list-style:none; padding:0">
+            {% for s in data.items %}
+                <li class="card" style="margin:.6rem 0">
+                    <strong>{{ s.publication.title }}</strong>
+                    <div class="muted" style="font-size:.85rem; margin:.2rem 0">
+                        {% if s.publication.year %}{{ s.publication.year }} · {% endif %}
+                        {% if s.publication.venue %}{{ s.publication.venue }} · {% endif %}
+                        {% if s.publication.doi %}<a href="https://doi.org/{{ s.publication.doi }}" target="_blank" rel="noopener">{{ s.publication.doi }}</a>{% else %}<span class="muted">sans DOI</span>{% endif %}
+                    </div>
+                    {% if s.publication.abstract %}<p class="muted" style="font-size:.85rem; max-width:75ch">{{ s.publication.abstract }}…</p>{% endif %}
+                    <div class="muted" style="font-size:.8rem">Déposée par {{ s.submittedBy ?? 'utilisateur' }} le {{ s.submittedAt|slice(0,10) }}{% if s.note %} · « {{ s.note }} »{% endif %}</div>
+                    <div style="margin-top:.5rem; display:flex; gap:.5rem; flex-wrap:wrap">
+                        <form method="post" action="{{ path('admin_corpus_submission_review', {id: s.id}) }}" data-turbo="false" style="margin:0">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="decision" value="approve">
+                            <button type="submit" style="background:#16a34a">✅ Accepter (ajouter au corpus)</button>
+                        </form>
+                        <form method="post" action="{{ path('admin_corpus_submission_review', {id: s.id}) }}" data-turbo="false" style="margin:0">
+                            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                            <input type="hidden" name="decision" value="reject">
+                            <button type="submit" style="background:#e2e8f0; color:#475569">✕ Refuser</button>
+                        </form>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock %}
