@@ -32,6 +32,10 @@ final class AxisSerializer
                 continue;
             }
             $answer = AxisAnswer::tryFrom($answers[$key]) ?? AxisAnswer::Unclear;
+            // Compat : ancien format (string = citation) ou nouveau ({reasoning,quote,anchored}).
+            $detail = $justifications[$key] ?? null;
+            $reasoning = \is_array($detail) ? ($detail['reasoning'] ?? null) : null;
+            $quote = \is_array($detail) ? ($detail['quote'] ?? null) : (\is_string($detail) ? $detail : null);
             $items[] = [
                 'key' => $key,
                 'section' => $meta['section'],
@@ -40,7 +44,9 @@ final class AxisSerializer
                 'answerLabel' => $answer->label(),
                 'favorable' => AxisChecklist::isFavorable($key, $answer),
                 'reverse' => \in_array($key, AxisChecklist::REVERSE, true),
-                'quote' => $justifications[$key] ?? null,
+                'reasoning' => $reasoning,
+                'quote' => $quote,
+                'anchored' => \is_array($detail) ? (bool) ($detail['anchored'] ?? false) : false,
             ];
         }
 

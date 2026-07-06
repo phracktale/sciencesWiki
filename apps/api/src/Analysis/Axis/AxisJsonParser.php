@@ -88,10 +88,10 @@ final class AxisJsonParser
     }
 
     /**
-     * Mappe le bloc « items » → réponses + justifications. Tolère deux formes :
-     * { "q1": "yes" } ou { "q1": {"answer":"yes","quote":"…"} }.
+     * Mappe le bloc « items » → réponses + détails (réflexion + citation). Tolère deux
+     * formes : { "q1": "yes" } ou { "q1": {"answer":"yes","reasoning":"…","quote":"…"} }.
      *
-     * @return array{0:array<string,AxisAnswer>,1:array<string,string>}
+     * @return array{0:array<string,AxisAnswer>,1:array<string,array{reasoning:?string,quote:?string}>}
      */
     private function items(mixed $items): array
     {
@@ -107,18 +107,18 @@ final class AxisJsonParser
             }
             if (\is_array($entry)) {
                 $answer = AxisAnswer::tryFrom((string) ($entry['answer'] ?? ''));
+                $reasoning = $this->str($entry['reasoning'] ?? null);
                 $quote = $this->str($entry['quote'] ?? null);
             } else {
                 $answer = AxisAnswer::tryFrom((string) $entry);
+                $reasoning = null;
                 $quote = null;
             }
             if (null === $answer) {
                 continue;
             }
             $answers[$key] = $answer;
-            if (null !== $quote) {
-                $justifications[$key] = $quote;
-            }
+            $justifications[$key] = ['reasoning' => $reasoning, 'quote' => $quote];
         }
 
         return [$answers, $justifications];

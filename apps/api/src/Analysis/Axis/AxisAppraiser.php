@@ -116,7 +116,7 @@ final class AxisAppraiser
             return null;
         }
 
-        $model = $this->settings->lightModel();
+        $model = $this->settings->appraisalModel();
         $appraisal = (new AxisAppraisal($publication, $model))
             ->setTreeNode($node)
             ->setApplicability($parsed->applicability)
@@ -147,10 +147,14 @@ final class AxisAppraiser
     }
 
     /**
-     * Garde-fou anti-hallucination : toute réponse DÉFAVORABLE non ancrée par une
-     * citation présente dans le texte source est rétrogradée en « indéterminé ».
+     * Conserve la réponse ET la réflexion de chaque item (justification systématique,
+     * comme une revue par un expert). Le garde-fou anti-hallucination ne SUPPRIME plus
+     * la réponse : il vérifie seulement si la citation est réellement présente dans le
+     * texte (verbatim) et ne conserve alors que les citations ancrées ; la réflexion du
+     * modèle reste toujours affichée (traçabilité). « anchored » signale les items étayés
+     * par une citation exacte.
      *
-     * @return array{0:array<string,AxisAnswer>,1:array<string,string>}
+     * @return array{0:array<string,AxisAnswer>,1:array<string,array{reasoning:?string,quote:?string,anchored:bool}>}
      */
     private function applyGuardrail(ParsedAxisAppraisal $parsed, string $sourceText): array
     {
@@ -160,24 +164,17 @@ final class AxisAppraiser
 
         foreach (AxisChecklist::keys() as $key) {
             $answer = $parsed->answers[$key] ?? AxisAnswer::Unclear;
-            $quote = $parsed->justifications[$key] ?? null;
+            $detail = $parsed->justifications[$key] ?? ['reasoning' => null, 'quote' => null];
+            $reasoning = \is_array($detail) ? ($detail['reasoning'] ?? null) : (\is_string($detail) ? $detail : null);
+            $quote = \is_array($detail) ? ($detail['quote'] ?? null) : null;
 
-            // Une réponse favorable (ou « indéterminé ») n'exige pas d'ancrage.
-            if (AxisAnswer::Unclear === $answer || AxisChecklist::isFavorable($key, $answer)) {
-                $answers[$key] = $answer;
-                if (null !== $quote && $this->quoteExists($quote, $haystack)) {
-                    $justifications[$key] = $quote;
-                }
-                continue;
-            }
-
-            // Réponse défavorable : sans citation probante, on rétrograde.
-            if (null === $quote || !$this->quoteExists($quote, $haystack)) {
-                $answers[$key] = AxisAnswer::Unclear;
-                continue;
-            }
+            $anchored = null !== $quote && $this->quoteExists($quote, $haystack);
             $answers[$key] = $answer;
-            $justifications[$key] = $quote;
+            $justifications[$key] = [
+                'reasoning' => $reasoning,
+                'quote' => $anchored ? $quote : null,
+                'anchored' => $anchored,
+            ];
         }
 
         return [$answers, $justifications];
@@ -228,7 +225,10 @@ final class AxisAppraiser
         $abstract = trim((string) ($publication->getAbstract() ?? $publication->getAbstractFr() ?? ''));
 
         if ($publication->isFulltextStored()) {
-            $fulltext = $this->publications->fulltextFor((int) $publication->getId());
+            // Texte intégral large (jusqu'à 50 000 car.) : les modèles ont un grand
+            // contexte, et une évaluation fiable des 20 items exige méthodes + résultats
+            // + discussion (au-delà des ~16 k = souvent tronqué au milieu des méthodes).
+            $fulltext = $this->publications->fulltextFor((int) $publication->getId(), 50000);
             if ('' !== trim($fulltext)) {
                 return [trim($abstract."\n\n".$fulltext), 'abstract+fulltext'];
             }
@@ -244,7 +244,7 @@ final class AxisAppraiser
     private function complete(Publication $publication, string $sourceText): ?ParsedAxisAppraisal
     {
         $messages = $this->promptBuilder->build($publication, $sourceText);
-        $opts = ['temperature' => 0.0, 'max_tokens' => 2000, 'model' => $this->settings->lightModel(), 'timeout' => self::LLM_TIMEOUT];
+        $opts = ['temperature' => 0.0, 'max_tokens' => 2000, 'model' => $this->settings->appraisalModel(), 'timeout' => self::LLM_TIMEOUT];
 
         $parsed = $this->parser->parse($this->llm->complete($messages, $opts)->content);
         if (null === $parsed) {

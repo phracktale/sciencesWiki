@@ -52,17 +52,19 @@ final class AxisPromptBuilder
             "yes", "no" ou "unclear" :
             $list
 
-            Règles STRICTES :
-            - N'invente RIEN. Si l'information est absente du texte fourni, réponds "unclear"
-              (c'est une réponse valide, pas un échec).
-            - Pour toute réponse DÉFAVORABLE à la qualité (un "no" sur un item normal, ou un
-              "yes" sur un item marqué « défavorable »), fournis dans "quote" une phrase
-              EXACTE (verbatim, langue d'origine) du texte qui la justifie. Sans citation
-              probante, mets "unclear".
+            Règles :
+            - Pour CHAQUE item, fournis TOUJOURS trois éléments :
+                • "answer"    : "yes", "no" ou "unclear" ;
+                • "reasoning" : ta RÉFLEXION en une phrase claire en français, expliquant
+                  pourquoi tu réponds ainsi (JAMAIS vide — c'est ta justification) ;
+                • "quote"     : une phrase EXACTE (verbatim, langue d'origine) du texte qui
+                  étaye ta réponse si elle existe, sinon null.
+            - N'invente RIEN : fonde-toi uniquement sur le texte fourni. Si l'information est
+              réellement absente, réponds "unclear" en l'expliquant dans "reasoning".
             - "study_design" : un mot-clé court en anglais (cross-sectional, rct, cohort,
               case_control, systematic_review, meta_analysis, in_vivo, in_vitro, modeling, other).
-            - "summary" : 2 à 3 phrases en français résumant forces et faiblesses
-              méthodologiques. N'attribue PAS de note chiffrée (AXIS est une checklist).
+            - "summary" : une RÉFLEXION GÉNÉRALE de 2 à 4 phrases en français (forces et
+              faiblesses méthodologiques d'ensemble). N'attribue PAS de note chiffrée.
             - Réponds UNIQUEMENT par le JSON, sans texte autour, sans bloc de code.
 
             Schéma de sortie :
@@ -70,11 +72,11 @@ final class AxisPromptBuilder
               "study_design": "cross-sectional|rct|cohort|case_control|systematic_review|meta_analysis|in_vivo|in_vitro|modeling|other",
               "applicable": true,
               "items": {
-                "q1": {"answer": "yes|no|unclear", "quote": "phrase verbatim ou null"},
-                "…": {"answer": "…", "quote": null},
-                "q20": {"answer": "yes|no|unclear", "quote": null}
+                "q1": {"answer": "yes|no|unclear", "reasoning": "ta réflexion en français", "quote": "phrase verbatim ou null"},
+                "…": {"answer": "…", "reasoning": "…", "quote": null},
+                "q20": {"answer": "yes|no|unclear", "reasoning": "…", "quote": null}
               },
-              "summary": "synthèse en 2-3 phrases"
+              "summary": "réflexion générale en 2-4 phrases"
             }
 
             Si "applicable" est false, renvoie {"study_design": "…", "applicable": false,

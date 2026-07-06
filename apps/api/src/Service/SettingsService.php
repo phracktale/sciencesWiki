@@ -37,6 +37,13 @@ final class SettingsService
      */
     public const LIGHT_MODEL = 'ai.light_model';
 
+    /**
+     * Modèle pour l'ÉVALUATION CRITIQUE (AXIS/RoB2/AMSTAR2/MMAT) : tâche de
+     * raisonnement exigeante (20 items, réflexion + justification par item) → un modèle
+     * plus capable que le light_model. Distinct pour ne pas ralentir la classification.
+     */
+    public const APPRAISAL_MODEL = 'ai.appraisal_model';
+
     // Limites d'interrogation de l'API OpenAlex (adaptables au plan/au polite pool).
     public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
     public const OPENALEX_PER_DAY = 'openalex.per_day';
@@ -122,6 +129,7 @@ final class SettingsService
         self::WIKI_MODEL => 'qwen3.6:latest',
         // Tâches légères (extraction de claims…) : petit modèle rapide par défaut.
         self::LIGHT_MODEL => 'llama3.1:8b',
+        self::APPRAISAL_MODEL => 'qwen3.6:latest',
         // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
@@ -200,6 +208,13 @@ final class SettingsService
         $v = trim((string) ($this->get(self::LIGHT_MODEL) ?? ''));
 
         return '' !== $v ? $v : self::DEFAULTS[self::LIGHT_MODEL];
+    }
+
+    public function appraisalModel(): string
+    {
+        $v = trim((string) ($this->get(self::APPRAISAL_MODEL) ?? ''));
+
+        return '' !== $v ? $v : self::DEFAULTS[self::APPRAISAL_MODEL];
     }
 
     /** Nombre maximal de requêtes OpenAlex par minute (≥ 1). */
@@ -289,6 +304,7 @@ final class SettingsService
             self::RAG_MODEL => (string) ($this->model() ?? ''),
             self::WIKI_MODEL => $this->wikiModel(),
             self::LIGHT_MODEL => $this->lightModel(),
+            self::APPRAISAL_MODEL => $this->appraisalModel(),
             self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
             self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
             self::HARVEST_SORT => $this->harvestSort(),
@@ -307,7 +323,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

@@ -338,9 +338,10 @@
                         <ul style="list-style:none; padding:0; margin:.6rem 0">
                             {% for it in result.items %}
                                 {% set icon = it.favorable ? '✅' : (it.answer == 'unclear' ? '❔' : '⚠️') %}
-                                <li style="padding:.4rem 0; border-bottom:1px solid var(--line)">
+                                <li style="padding:.5rem 0; border-bottom:1px solid var(--line)">
                                     {{ icon }} <strong>{{ it.question }}</strong>
                                     <span class="muted">— {{ it.answerLabel }}</span>
+                                    {% if it.reasoning %}<div style="font-size:.85rem; margin:.15rem 0 0 1.4rem">{{ it.reasoning }}</div>{% endif %}
                                     {% if it.quote %}<blockquote style="margin:.2rem 0 0 1.4rem; font-size:.85rem; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ it.quote }} »</blockquote>{% endif %}
                                 </li>
                             {% endfor %}
