@@ -162,11 +162,13 @@ final class PublicArticlesController
         // Hiérarchie thématique : meilleur placement → fil d'Ariane (domaine→…→rubrique).
         $hierarchy = $this->hierarchy($id);
 
-        // Évaluation AXIS : exposée publiquement UNIQUEMENT après validation comité
-        // (Confirmed). Non décisionnelle, comme controverses et plagiat.
+        // Évaluation AXIS : affichée directement (y compris auto « detected »), avec le
+        // disclaimer « Évaluation automatique générée par IA » porté par le sérialiseur.
+        // Seules les évaluations explicitement ÉCARTÉES par le comité (Dismissed) sont
+        // masquées. Non décisionnelle, comme controverses et plagiat.
         $pub = $this->publications->find($id);
         $appraisal = null !== $pub ? $this->axisAppraisals->findForPublication($pub) : null;
-        $axis = (null !== $appraisal && \App\Enum\ReviewStatus::Confirmed === $appraisal->getStatus())
+        $axis = (null !== $appraisal && \App\Enum\ReviewStatus::Dismissed !== $appraisal->getStatus())
             ? $this->axisSerializer->serialize($appraisal)
             : null;
 
