@@ -98,6 +98,7 @@ final class AdminController extends AbstractController
             'rag.model' => (string) $r->request->get('model'),
             'wiki.model' => (string) $r->request->get('wiki_model'),
             'ai.light_model' => (string) $r->request->get('light_model'),
+            'ai.appraisal_model' => (string) $r->request->get('appraisal_model'),
         ], withModels: true);
     }
 

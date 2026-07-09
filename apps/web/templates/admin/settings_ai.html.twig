@@ -38,6 +38,18 @@
                 {% else %}<input type="text" name="light_model" value="{{ settings['ai.light_model'] }}" placeholder="ex. llama3.1:8b">{% endif %}
                 <span class="muted" style="font-size:.78rem; display:block">Petit modèle rapide pour les tâches peu exigeantes (extraction de claims).</span>
             </div>
+            <div>
+                <label>4 — Évaluation critique (AXIS, RoB2…)</label>
+                {# Champ libre AVEC suggestions : accepte un modèle local OU distant (« :cloud »)
+                   qui n'apparaît pas dans « ollama list ». #}
+                <input type="text" name="appraisal_model" list="appraisalModels" value="{{ settings['ai.appraisal_model'] }}" placeholder="ex. glm-5.2:cloud" autocomplete="off">
+                {% if models.models is not empty %}
+                    <datalist id="appraisalModels">
+                        {% for m in models.models %}<option value="{{ m }}">{% endfor %}
+                    </datalist>
+                {% endif %}
+                <span class="muted" style="font-size:.78rem; display:block">Modèle de raisonnement pour les grilles (20 items) : plus capable que le modèle léger. ⚠️ Un modèle « :cloud » envoie le texte de l'étude hors du homelab.</span>
+            </div>
         </div>
 
         <h2 style="margin-top:1.4rem">Configuration de la génération (Q/R)</h2>
