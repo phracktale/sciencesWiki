@@ -206,19 +206,21 @@ final class WikiController extends AbstractController
 
         $tool = $request->request->get('tool', 'axis');
         $tool = \in_array($tool, ['axis', 'rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis';
+        // « Refaire l'évaluation » : purge et recalcul (nouveau modèle…).
+        $force = '1' === $request->request->get('force');
 
         if ($request->isMethod('POST')) {
             if (!$this->csrf->isValid($request)) {
                 $error = 'Jeton de sécurité invalide.';
             } elseif ($id > 0) {
                 // Étude déposée (privée) évaluée par son id.
-                $this->triggerAppraisalById($id, $tool, $result, $pending, $error);
+                $this->triggerAppraisalById($id, $tool, $result, $pending, $error, $force);
                 if ('1' === $request->request->get('private')) {
                     $privateStudy = ['id' => $id];
                 }
             } elseif ('' !== $doi) {
                 // Clic sur un résultat (ou DOI fourni) → mise en file / résultat caché.
-                $this->triggerAppraisal($doi, $tool, $result, $pending, $error);
+                $this->triggerAppraisal($doi, $tool, $result, $pending, $error, $force);
             } elseif ('' !== $query) {
                 if (1 === preg_match('#10\.\d{4,9}/\S+#', $query, $m)) {
                     // L'utilisateur a collé un DOI : on évalue directement.
@@ -347,10 +349,10 @@ final class WikiController extends AbstractController
      * @param array<string,mixed>|null $result
      * @param array<string,mixed>|null $pending
      */
-    private function triggerAppraisal(string $doi, string $tool, ?array &$result, ?array &$pending, ?string &$error): void
+    private function triggerAppraisal(string $doi, string $tool, ?array &$result, ?array &$pending, ?string &$error, bool $force = false): void
     {
         $path = \in_array($tool, ['rob2', 'amstar2', 'mmat'], true) ? '/api/me/'.$tool : '/api/me/axis';
-        $res = $this->user->send('POST', $path, ['doi' => $doi]);
+        $res = $this->user->send('POST', $path.($force ? '?force=1' : ''), ['doi' => $doi]);
         $data = $res['data'];
         switch ($data['status'] ?? null) {
             case 'ready':
@@ -373,10 +375,10 @@ final class WikiController extends AbstractController
      * @param array<string,mixed>|null $result
      * @param array<string,mixed>|null $pending
      */
-    private function triggerAppraisalById(int $id, string $tool, ?array &$result, ?array &$pending, ?string &$error): void
+    private function triggerAppraisalById(int $id, string $tool, ?array &$result, ?array &$pending, ?string &$error, bool $force = false): void
     {
         $path = '/api/me/'.(\in_array($tool, ['rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis').'/'.$id;
-        $res = $this->user->send('POST', $path);
+        $res = $this->user->send('POST', $path.($force ? '?force=1' : ''));
         $data = $res['data'];
         switch ($data['status'] ?? null) {
             case 'ready':

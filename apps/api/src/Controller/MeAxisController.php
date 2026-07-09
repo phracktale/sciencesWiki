@@ -48,7 +48,7 @@ final class MeAxisController
     #[Route('/api/me/axis', name: 'me_axis_appraise_doi', methods: ['POST'])]
     public function byDoi(Request $request): JsonResponse
     {
-        return $this->dispatch($this->resolveByDoi($request->getContent()));
+        return $this->dispatch($this->resolveByDoi($request->getContent()), $request->query->getBoolean('force'));
     }
 
     /** Polling : l'outil interroge l'état jusqu'à ready (puis affiche le résultat). */

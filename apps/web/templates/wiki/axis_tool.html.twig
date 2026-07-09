@@ -350,6 +350,20 @@
                 {% endif %}
             {% endif %}{% endif %}{% endif %}
 
+            {% if result.tool == 'axis' or result.tool is not defined %}
+                {# Refaire l'évaluation : purge + recalcul (utile après changement de modèle).
+                   Repart en « pending » → le polling existant récupère le nouveau résultat. #}
+                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin-top:1rem">
+                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                    <input type="hidden" name="tool" value="axis">
+                    <input type="hidden" name="force" value="1">
+                    {% if result.publication.id %}<input type="hidden" name="id" value="{{ result.publication.id }}">{% endif %}
+                    {% if result.publication.doi %}<input type="hidden" name="doi" value="{{ result.publication.doi }}">{% endif %}
+                    {% if privateStudy %}<input type="hidden" name="private" value="1">{% endif %}
+                    <button type="submit" title="Purge et relance l'évaluation avec le modèle configuré (~1 min)">↻ Refaire l'évaluation</button>
+                </form>
+            {% endif %}
+
             <p class="muted" style="font-size:.78rem; margin-top:1rem; border-top:1px dashed var(--line); padding-top:.6rem">{{ result.disclaimer }}</p>
         </article>
     {% endif %}
