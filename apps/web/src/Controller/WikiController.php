@@ -236,23 +236,16 @@ final class WikiController extends AbstractController
                     // L'utilisateur a collé un DOI : on évalue directement.
                     $this->triggerAppraisal($m[0], $tool, $result, $pending, $error);
                 } else {
-                    // Recherche par titre / mots-clés → liste de candidats à évaluer
-                    // (sémantique : meilleur rappel que le lexical sur des mots-clés).
-                    $res = $this->user->send('GET', '/api/search?type=publications&limit=15&q='.rawurlencode($query));
-                    $candidates = $res['ok'] ? ($res['data']['results'] ?? []) : [];
-                    if ([] === $candidates) {
-                        $error = 'Aucune étude trouvée pour « '.$query.' ».';
-                    } else {
-                        // Outils d'évaluation applicables par étude (classe en asynchrone si besoin).
-                        $dois = array_values(array_filter(array_map(static fn (array $c): ?string => $c['doi'] ?? null, $candidates)));
-                        if ([] !== $dois) {
-                            $toolStates = $this->user->appraisalTools($dois)['results'] ?? [];
-                        }
-                    }
+                    $this->searchCandidates($query, $candidates, $toolStates, $error);
                 }
             } else {
                 $error = 'Saisissez un titre, des mots-clés ou un DOI.';
             }
+        } elseif ('' !== ($gq = trim((string) $request->query->get('q', '')))) {
+            // Arrivée via le bouton « Analyser » (GET ?q=DOI|titre) : on affiche l'étude
+            // et ses boutons d'analyse. Le déclenchement, lui, reste en POST + CSRF.
+            $query = $gq;
+            $this->searchCandidates($query, $candidates, $toolStates, $error);
         }
 
         return $this->render('wiki/axis_tool.html.twig', [
@@ -359,6 +352,28 @@ final class WikiController extends AbstractController
      * @param array<string,mixed>|null $result
      * @param array<string,mixed>|null $pending
      */
+    /**
+     * Recherche d'études candidates (titre/mots-clés/DOI) + pré-détection des outils
+     * d'évaluation applicables par DOI (devis classé en asynchrone si besoin).
+     *
+     * @param array<int,mixed>|null   $candidates
+     * @param array<string,mixed>     $toolStates
+     */
+    private function searchCandidates(string $query, ?array &$candidates, array &$toolStates, ?string &$error): void
+    {
+        $res = $this->user->send('GET', '/api/search?type=publications&limit=15&q='.rawurlencode($query));
+        $candidates = $res['ok'] ? ($res['data']['results'] ?? []) : [];
+        if ([] === $candidates) {
+            $error = 'Aucune étude trouvée pour « '.$query.' ».';
+
+            return;
+        }
+        $dois = array_values(array_filter(array_map(static fn (array $c): ?string => $c['doi'] ?? null, $candidates)));
+        if ([] !== $dois) {
+            $toolStates = $this->user->appraisalTools($dois)['results'] ?? [];
+        }
+    }
+
     private function triggerAppraisal(string $doi, string $tool, ?array &$result, ?array &$pending, ?string &$error, bool $force = false): void
     {
         $path = \in_array($tool, ['rob2', 'amstar2', 'mmat'], true) ? '/api/me/'.$tool : '/api/me/axis';

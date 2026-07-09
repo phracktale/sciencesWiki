@@ -67,7 +67,8 @@
             return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(iso);
         }
         // Carte unifiée (partagée avec l'explorer et /fr/analyses).
-        function row(it){ return window.scwCard(it, { mode: 'link' }); }
+        var RS_CAN_ANALYZE = {{ current_user.canUseAxis ? 'true' : 'false' }};
+        function row(it){ return window.scwCard(it, { mode: 'link', canAnalyze: RS_CAN_ANALYZE }); }
         function pageBtn(label, disabled, onClick){
             var b = document.createElement('button');
             b.textContent = label; b.disabled = disabled;

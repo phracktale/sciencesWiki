@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Entity\Publication;
 use App\Entity\TreeNode;
 use App\Harvester\Ai\EmbeddingClientFactory;
+use App\Repository\AxisAppraisalRepository;
 use App\Repository\PublicationRepository;
 use App\Repository\TreeNodeRepository;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -23,7 +24,27 @@ final class SearchController
         private readonly EmbeddingClientFactory $embeddingFactory,
         private readonly PublicationRepository $publications,
         private readonly TreeNodeRepository $nodes,
+        private readonly AxisAppraisalRepository $axisAppraisals,
     ) {
+    }
+
+    /**
+     * Attache la bande de fiabilité AXIS (badge des cartes) à un lot de résultats,
+     * en UNE requête. Appelé après pagination pour ne charger que la page visible.
+     *
+     * @param list<array<string,mixed>> $rows
+     *
+     * @return list<array<string,mixed>>
+     */
+    private function attachBands(array $rows): array
+    {
+        $ids = array_values(array_filter(array_map(static fn (array $r): int => (int) ($r['id'] ?? 0), $rows)));
+        $bands = $this->axisAppraisals->bandsFor($ids);
+        foreach ($rows as &$row) {
+            $row['axisBand'] = $bands[(int) ($row['id'] ?? 0)] ?? null;
+        }
+
+        return $rows;
     }
 
     #[Route('/api/search', name: 'api_search', methods: ['GET'])]
@@ -112,7 +133,7 @@ final class SearchController
 
         $total = \count($rows);
         $offset = ($page - 1) * $perPage;
-        $pageRows = \array_slice($rows, $offset, $perPage);
+        $pageRows = $this->attachBands(\array_slice($rows, $offset, $perPage));
 
         return [
             'results' => $pageRows,
@@ -129,10 +150,10 @@ final class SearchController
      */
     private function textPublications(string $query, int $limit): array
     {
-        return array_map(
+        return $this->attachBands(array_map(
             fn (Publication $p): array => ['score' => null] + $this->publicationSummary($p),
             $this->publications->textSearch($query, $limit),
-        );
+        ));
     }
 
     /**

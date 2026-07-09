@@ -15,6 +15,9 @@
     .scw-meta a { color:var(--accent); }
     .scw-enrich { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; }
     .scw-pill { display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.72rem; background:#f1f5f9; color:#334155; }
+    .scw-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
+    .scw-analyze { display:inline-block; text-decoration:none; font-size:.8rem; font-weight:600; color:#fff; background:var(--accent); border-radius:7px; padding:.2rem .7rem; }
+    .scw-analyze:hover { filter:brightness(1.08); }
 </style>
 <script nonce="{{ csp_nonce.value }}">
 (function () {
@@ -67,10 +70,18 @@
             titleHtml = '<h3 class="scw-title"><a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(it.title || '(sans titre)') + '</a></h3>';
         }
 
+        // Bouton « Analyser » (rôles outils) → /fr/analyses pré-chargé sur cette étude.
+        var actions = '';
+        if (opts.canAnalyze && (doi || it.title)) {
+            var qy = encodeURIComponent(doi || it.title || '');
+            actions = '<div class="scw-actions"><a class="scw-analyze" href="/fr/analyses?q=' + qy + '" onclick="event.stopPropagation()">🔬 Analyser</a></div>';
+        }
+
         return '<div class="scw-card' + (opts.mode === 'select' ? ' scw-selectable' : '') + '" data-id="' + esc(it.id || '') + '">'
             + '<div class="scw-head">' + titleHtml + window.scwAccessBadge(oa) + '</div>'
             + (meta.length ? '<div class="scw-meta muted">' + meta.join(' · ') + '</div>' : '')
             + (enrich.length ? '<div class="scw-enrich">' + enrich.join(' ') + '</div>' : '')
+            + actions
             + '</div>';
     };
 })();
