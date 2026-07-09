@@ -164,8 +164,18 @@ final class AdminHarvestController
 
         $used = (int) ($s['openalex.count.'.$today] ?? 0);
         $perDay = $this->settings->openalexPerDay();
-        $apiLimit = $num('openalex.rl.limit');       // limite quotidienne réelle d'OpenAlex (nb requêtes)
-        $apiRemaining = $num('openalex.rl.remaining');
+        // Les en-têtes X-RateLimit-* d'OpenAlex portent sur le jour UTC courant (reset
+        // à minuit UTC). Une valeur enregistrée un jour UTC ANTÉRIEUR est périmée : on
+        // ne s'y fie plus (sinon un « remaining=0 » de la veille laisse le panneau
+        // « limite atteinte » collé jusqu'à ce qu'une requête le rafraîchisse). Dans ce
+        // cas, repli sur le compteur interne openalex.count.<jour> (remis à zéro par date).
+        $creditAt = $s['openalex.credit.updated_at'] ?? null;
+        $rlDayUtc = null !== $creditAt
+            ? (new \DateTimeImmutable((string) $creditAt))->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d')
+            : null;
+        $rlFresh = null !== $rlDayUtc && $rlDayUtc === gmdate('Y-m-d');
+        $apiLimit = $rlFresh ? $num('openalex.rl.limit') : null;       // limite quotidienne réelle d'OpenAlex (nb requêtes), si datée du jour
+        $apiRemaining = $rlFresh ? $num('openalex.rl.remaining') : null;
         $limitUsd = $num('openalex.credit.limit_usd');
         $remainingUsd = $num('openalex.credit.remaining_usd');
 
