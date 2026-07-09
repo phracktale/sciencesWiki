@@ -36,7 +36,7 @@ final class AppraisePublicationHandler
         }
 
         try {
-            $this->appraiser->appraiseForPublication($publication, null, false);
+            $this->appraiser->appraiseForPublication($publication, null, $message->reappraise);
         } finally {
             $publication->setAxisAppraisingAt(null);
             $this->em->flush();

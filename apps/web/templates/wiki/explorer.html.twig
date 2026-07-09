@@ -212,6 +212,7 @@
         // déjà calculées, même non validées comité (avec marqueur). Le public, lui, ne
         // voit que les analyses validées (exposées par /api/articles).
         var XP_CAN_APPRAISE = {{ current_user.canUseAxis ? 'true' : 'false' }};
+        var XP_CSRF = '{{ admin_csrf.token }}';
         function apprStatusNote(d) {
             if (!d.status) return '';
             return d.status === 'confirmed'
@@ -294,11 +295,54 @@
             return h;
         }
 
-        // Panneau « Évaluation méthodologique (AXIS) » de la fiche article.
-        function axisHtml(ax) {
+        // Bouton « Refaire l'évaluation » (rôles outils uniquement) — pubId fourni.
+        function reapprBtn(pubId) {
+            if (!pubId) return '';
+            return ' <button class="xp-reappr" data-id="' + pubId + '" title="Purge et relance l\'évaluation avec le modèle configuré (~1 min)" style="background:var(--accent); color:#fff; border:0; border-radius:7px; padding:.15rem .6rem; cursor:pointer; font-size:.76rem">↻ Refaire l\'évaluation</button>';
+        }
+
+        // Clic sur « Refaire » : POST de ré-évaluation forcée, puis attente du nouveau résultat.
+        function wireReappraise(pubId) {
+            var btn = detail.querySelector('.xp-reappr');
+            if (!btn) return;
+            btn.addEventListener('click', function () {
+                if (!confirm('Relancer une évaluation AXIS avec le modèle configuré ? (~1 min)')) return;
+                btn.disabled = true; btn.textContent = '⏳ Ré-évaluation…';
+                var body = new URLSearchParams(); body.set('_csrf', XP_CSRF);
+                fetch('/{{ app.request.locale }}/etude/' + pubId + '/reevaluer', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-CSRF-Token': XP_CSRF },
+                    body: body.toString(), credentials: 'same-origin'
+                })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.status === 'pending' || d.status === 'ready') { pollReappraisal(pubId, 0); }
+                    else { btn.disabled = false; btn.textContent = '↻ Réessayer'; }
+                })
+                .catch(function () { btn.disabled = false; btn.textContent = '↻ Réessayer'; });
+            });
+        }
+
+        // Attend la nouvelle évaluation (l'ancienne a été purgée) puis recharge la fiche.
+        function pollReappraisal(pubId, tries) {
+            if (tries > 45) return; // garde-fou ~3 min
+            setTimeout(function () {
+                fetch('/{{ app.request.locale }}/etude/' + pubId + '/analyses')
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) {
+                        if ((d.appraisals || {}).axis) { if (String(state.selected) === String(pubId)) select(pubId); }
+                        else { pollReappraisal(pubId, tries + 1); }
+                    })
+                    .catch(function () { pollReappraisal(pubId, tries + 1); });
+            }, 4000);
+        }
+
+        // Panneau « Évaluation méthodologique (AXIS) » de la fiche article. rerunId (facultatif)
+        // = id de publication : ajoute le bouton « Refaire » (rôles outils).
+        function axisHtml(ax, rerunId) {
             var bands = { high: 'Fiabilité élevée', moderate: 'Fiabilité modérée', low: 'Fiabilité faible', insufficient: 'Information insuffisante' };
             var icons = { yes: ['✓', 'ax-yes'], no: ['✗', 'ax-no'], unclear: ['?', 'ax-unclear'] };
-            var h = '<hr class="sep"><div class="meta"><b>Évaluation méthodologique (AXIS)</b>' + apprStatusNote(ax) + '<br>';
+            var h = '<hr class="sep"><div class="meta"><b>Évaluation méthodologique (AXIS)</b>' + apprStatusNote(ax) + reapprBtn(rerunId) + '<br>';
             // Verrou d'applicabilité : pour un design non transversal, AXIS est hors-sujet.
             if (ax.applicability === 'not_applicable') {
                 h += '<span class="muted">' + esc(ax.applicabilityLabel) +
@@ -380,8 +424,8 @@
                     .then(function (r) { return r.json(); })
                     .then(function (d) {
                         var ap = d.appraisals || {};
-                        var html = (ap.axis ? axisHtml(ap.axis) : '') + (ap.rob2 ? rob2Html(ap.rob2) : '') + (ap.amstar2 ? amstar2Html(ap.amstar2) : '') + (ap.mmat ? mmatHtml(ap.mmat) : '');
-                        if (html) { var box = document.createElement('div'); box.innerHTML = html; detail.appendChild(box); }
+                        var html = (ap.axis ? axisHtml(ap.axis, a.id) : '') + (ap.rob2 ? rob2Html(ap.rob2) : '') + (ap.amstar2 ? amstar2Html(ap.amstar2) : '') + (ap.mmat ? mmatHtml(ap.mmat) : '');
+                        if (html) { var box = document.createElement('div'); box.innerHTML = html; detail.appendChild(box); wireReappraise(a.id); }
                     })
                     .catch(function () {});
             }

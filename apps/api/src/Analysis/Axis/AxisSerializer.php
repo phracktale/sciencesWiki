@@ -66,7 +66,8 @@ final class AxisSerializer
             'model' => $appraisal->getAppraisalModel(),
             'createdAt' => $appraisal->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'items' => $items,
-            'disclaimer' => self::DISCLAIMER,
+            // Disclaimer + modèle réellement utilisé (traçabilité, comparaison de modèles).
+            'disclaimer' => self::DISCLAIMER.' Modèle : '.($appraisal->getAppraisalModel() ?: 'non précisé').'.',
         ];
     }
 }

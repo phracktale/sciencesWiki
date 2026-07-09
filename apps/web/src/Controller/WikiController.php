@@ -426,6 +426,24 @@ final class WikiController extends AbstractController
         return new JsonResponse(['appraisals' => $this->user->existingAppraisals($id) ?: new \stdClass(), 'role' => true]);
     }
 
+    /**
+     * Ré-évaluation forcée d'une étude (bouton « Refaire l'évaluation »). Purge et
+     * recalcule côté API (utile après changement de modèle). RÉSERVÉ aux rôles outils.
+     */
+    #[Route('/{_locale}/etude/{id}/reevaluer', name: 'study_reappraise', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['POST'])]
+    public function studyReappraise(int $id, Request $request): JsonResponse
+    {
+        if (!$this->user->isLogged() || !$this->user->canUseAxis()) {
+            return new JsonResponse(['status' => 'denied'], 403);
+        }
+        if (!$this->csrf->isValid($request)) {
+            return new JsonResponse(['status' => 'csrf'], 403);
+        }
+        $res = $this->user->send('POST', '/api/me/axis/'.$id.'?force=1');
+
+        return new JsonResponse(['status' => (string) ($res['data']['status'] ?? 'unknown')]);
+    }
+
     /** Export PDF d'une revue ad hoc (depuis la page de génération). */
     #[Route('/{_locale}/chercheur/revue-litterature/pdf', name: 'literature_review_pdf', requirements: ['_locale' => 'fr'], methods: ['POST'])]
     public function literatureReviewPdf(Request $request): Response

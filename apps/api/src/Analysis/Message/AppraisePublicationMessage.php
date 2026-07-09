@@ -12,7 +12,10 @@ namespace App\Analysis\Message;
  */
 final class AppraisePublicationMessage
 {
-    public function __construct(public readonly int $publicationId)
-    {
+    public function __construct(
+        public readonly int $publicationId,
+        // true = ré-évaluation forcée (purge l'existant et recalcule) — bouton « Refaire ».
+        public readonly bool $reappraise = false,
+    ) {
     }
 }

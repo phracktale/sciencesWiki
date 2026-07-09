@@ -38,9 +38,10 @@ final class MeAxisController
     }
 
     #[Route('/api/me/axis/{id}', name: 'me_axis_appraise', methods: ['POST'], requirements: ['id' => '\d+'])]
-    public function byId(int $id): JsonResponse
+    public function byId(int $id, Request $request): JsonResponse
     {
-        return $this->dispatch($this->access->accessible($this->publications->find($id)));
+        // ?force=1 : bouton « Refaire l'évaluation » → purge et recalcul (nouveau modèle…).
+        return $this->dispatch($this->access->accessible($this->publications->find($id)), $request->query->getBoolean('force'));
     }
 
     /** Par DOI (le plus naturel : le chercheur a le DOI du papier). Body : {doi}. */
@@ -64,10 +65,27 @@ final class MeAxisController
     }
 
     /** POST : renvoie le résultat s'il existe (cache), sinon met en file et renvoie « pending ». */
-    private function dispatch(?Publication $publication): JsonResponse
+    private function dispatch(?Publication $publication, bool $force = false): JsonResponse
     {
         if (null === $publication) {
             return new JsonResponse(['status' => 'not_found', 'error' => 'Étude introuvable dans le corpus.'], 404);
+        }
+
+        // Ré-évaluation forcée : on purge l'évaluation existante AVANT de dispatcher, pour
+        // que le polling reparte en « pending » (sinon l'ancien résultat serait renvoyé).
+        if ($force) {
+            $this->appraisals->deleteForPublication($publication);
+            if (null === $publication->getAxisAppraisingAt()) {
+                $publication->setAxisAppraisingAt(new \DateTimeImmutable());
+            }
+            $this->em->flush();
+            $this->bus->dispatch(new AppraisePublicationMessage((int) $publication->getId(), true));
+
+            return new JsonResponse([
+                'status' => 'pending',
+                'publication' => $this->pubInfo($publication),
+                'message' => 'Ré-évaluation lancée. Le nouveau résultat apparaîtra dans environ une minute.',
+            ], 202);
         }
 
         // Déjà évaluée → résultat immédiat (cache).
