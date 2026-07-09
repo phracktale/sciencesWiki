@@ -57,18 +57,19 @@
 
     <div class="xp-wrap">
         <div>
-            <table class="xp">
-                <thead>
-                    <tr>
-                        <th data-sort="titre">Titre <span class="arr" data-for="titre"></span></th>
-                        <th data-sort="auteurs">Auteurs <span class="arr" data-for="auteurs"></span></th>
-                        <th data-sort="annee">Année <span class="arr" data-for="annee"></span></th>
-                        <th data-sort="revue">Revue <span class="arr" data-for="revue"></span></th>
-                        <th>Accès</th>
-                    </tr>
-                </thead>
-                <tbody id="xp-rows"></tbody>
-            </table>
+            <div style="display:flex; gap:.5rem; align-items:center; margin-bottom:.4rem">
+                <label class="muted" style="font-size:.82rem">Trier :
+                    <select id="xp-sort2" style="font:inherit">
+                        <option value="">Pertinence</option>
+                        <option value="annee">Année</option>
+                        <option value="titre">Titre</option>
+                        <option value="auteurs">Auteurs</option>
+                        <option value="revue">Revue</option>
+                    </select>
+                </label>
+                <button type="button" id="xp-dir" title="Sens du tri" style="border:1px solid var(--line); border-radius:6px; background:#fff; cursor:pointer; padding:.15rem .5rem">▲</button>
+            </div>
+            <div id="xp-rows" class="scw-list"></div>
             <p id="xp-pager" style="margin-top:1rem; display:flex; gap:1rem; align-items:center"></p>
         </div>
 
@@ -77,6 +78,7 @@
         </aside>
     </div>
 
+    {% include 'wiki/_articlecard.html.twig' %}
     <script nonce="{{ csp_nonce.value }}">
     (function () {
         var SLUG = {{ slug|json_js }};
@@ -99,7 +101,7 @@
         }
 
         function load() {
-            rows.innerHTML = '<tr><td colspan="5" class="muted" style="padding:1rem">Chargement…</td></tr>';
+            rows.innerHTML = '<p class="muted" style="padding:1rem">Chargement…</p>';
             var u = '/api/nodes/' + encodeURIComponent(SLUG) + '/articles?'
                 + 'q=' + encodeURIComponent(state.q)
                 + '&page=' + state.page
@@ -167,19 +169,13 @@
         }
 
         function renderRows(d) {
-            if (!d.items.length) { rows.innerHTML = '<tr><td colspan="5" class="xp-empty">Aucun article.</td></tr>'; return; }
-            rows.innerHTML = '';
-            d.items.forEach(function (it) {
-                var tr = document.createElement('tr');
-                tr.className = 'row' + (state.selected === it.id ? ' sel' : '');
-                tr.innerHTML =
-                    '<td><strong>' + esc(it.title || '(sans titre)') + '</strong>' + axisBandBadge(it.axisBand) + '</td>' +
-                    '<td class="muted">' + esc((it.authors || '').slice(0, 60)) + '</td>' +
-                    '<td class="muted">' + esc(it.year || '') + '</td>' +
-                    '<td class="muted">' + esc((it.venue || '').slice(0, 30)) + '</td>' +
-                    '<td>' + accessBadge(it) + '</td>';
-                tr.addEventListener('click', function () { select(it.id, tr); });
-                rows.appendChild(tr);
+            if (!d.items.length) { rows.innerHTML = '<p class="xp-empty muted" style="padding:1rem">Aucun article.</p>'; return; }
+            // Carte unifiée (partagée avec le chercheur et /fr/analyses). Sélectionnable :
+            // clic → chargement de la fiche dans le panneau latéral.
+            rows.innerHTML = d.items.map(function (it) { return window.scwCard(it, { mode: 'select' }); }).join('');
+            rows.querySelectorAll('.scw-card').forEach(function (card) {
+                if (String(state.selected) === card.dataset.id) card.classList.add('sel');
+                card.addEventListener('click', function () { select(card.dataset.id, card); });
             });
         }
 
@@ -200,10 +196,10 @@
             });
         }
 
-        function select(id, tr) {
+        function select(id, cardEl) {
             state.selected = id;
-            document.querySelectorAll('table.xp tr.row').forEach(function (r) { r.classList.remove('sel'); });
-            if (tr) tr.classList.add('sel');
+            document.querySelectorAll('#xp-rows .scw-card.sel').forEach(function (r) { r.classList.remove('sel'); });
+            if (cardEl) cardEl.classList.add('sel');
             detail.innerHTML = '<div class="xp-empty">Chargement…</div>';
             fetch('/api/articles/' + id).then(function (r) { return r.json(); }).then(renderDetail);
         }
@@ -445,16 +441,17 @@
             }
         }
 
-        // Tri par en-tête
-        document.querySelectorAll('th[data-sort]').forEach(function (th) {
-            th.addEventListener('click', function () {
-                var s = th.dataset.sort;
-                if (state.sort === s) { state.dir = (state.dir === 'asc') ? 'desc' : 'asc'; }
-                else { state.sort = s; state.dir = 'asc'; }
-                // Un tri colonne reprend la main sur le classement sémantique.
-                if (state.semantic) { state.semantic = false; document.getElementById('xp-sem').checked = false; }
-                state.page = 1; load();
-            });
+        // Tri (menu déroulant + sens). Un tri colonne reprend la main sur le sémantique.
+        var sortSel = document.getElementById('xp-sort2'), dirBtn = document.getElementById('xp-dir');
+        sortSel.addEventListener('change', function () {
+            state.sort = sortSel.value;
+            if (state.semantic) { state.semantic = false; document.getElementById('xp-sem').checked = false; }
+            state.page = 1; load();
+        });
+        dirBtn.addEventListener('click', function () {
+            state.dir = (state.dir === 'asc') ? 'desc' : 'asc';
+            dirBtn.textContent = state.dir === 'asc' ? '▲' : '▼';
+            state.page = 1; load();
         });
         document.getElementById('xp-go').addEventListener('click', function () {
             state.q = document.getElementById('xp-q').value.trim();

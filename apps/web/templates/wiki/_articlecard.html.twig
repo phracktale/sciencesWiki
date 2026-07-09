@@ -1,0 +1,77 @@
+{# Carte d'article UNIFIÉE (recherche chercheur, explorer, analyses). Définit des
+   fonctions JS globales (scwCard, scwAccessBadge, scwAxisBadge) + les styles .scw-*.
+   À inclure UNE fois par page, avant le script qui l'utilise. #}
+<style>
+    .scw-list { display:flex; flex-direction:column; }
+    .scw-card { padding:.7rem .85rem; border:1px solid var(--line); border-radius:10px; margin:.55rem 0; display:flex; flex-direction:column; gap:.35rem; background:#fff; }
+    .scw-selectable { cursor:pointer; }
+    .scw-selectable:hover { border-color:var(--accent); }
+    .scw-card.sel { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
+    .scw-head { display:flex; justify-content:space-between; gap:.6rem; align-items:flex-start; flex-wrap:wrap; }
+    .scw-title { margin:0; font-size:1rem; flex:1; min-width:220px; line-height:1.3; }
+    .scw-title a { text-decoration:none; color:inherit; }
+    .scw-title a:hover { text-decoration:underline; }
+    .scw-meta { font-size:.85rem; }
+    .scw-meta a { color:var(--accent); }
+    .scw-enrich { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; }
+    .scw-pill { display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.72rem; background:#f1f5f9; color:#334155; }
+</style>
+<script nonce="{{ csp_nonce.value }}">
+(function () {
+    function esc(s) { var d = document.createElement('div'); d.textContent = (s == null ? '' : String(s)); return d.innerHTML; }
+    function frDate(iso) { var p = String(iso).split('-'); return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(iso); }
+
+    window.scwAccessBadge = function (oa) {
+        var m = { diamond: ['Diamond OA', '#7c3aed'], gold: ['Gold OA', '#d97706'], green: ['Green OA', '#16a34a'], hybrid: ['Hybrid OA', '#0891b2'], bronze: ['Bronze OA', '#b45309'], closed: ['Accès fermé', '#64748b'], unknown: ['Accès inconnu', '#94a3b8'] };
+        var b = m[oa] || m.unknown;
+        return '<button type="button" class="access-badge" data-oa="' + esc(oa || 'unknown') + '" title="Type d\'accès — voir la légende" style="display:inline-block;padding:.12rem .55rem;border:0;border-radius:999px;font-size:.72rem;font-weight:700;color:#fff;background:' + b[1] + ';cursor:pointer">' + b[0] + ' ⓘ</button>';
+    };
+
+    window.scwAxisBadge = function (band) {
+        var m = { high: ['Fiabilité élevée', '#065f46'], moderate: ['Fiabilité modérée', '#b45309'], low: ['Fiabilité faible', '#b91c1c'], insufficient: ['Éval. limitée', '#6b7280'] };
+        var b = m[band]; if (!b) return '';
+        return '<span title="Évaluation critique AXIS (IA)" style="display:inline-block;padding:.1rem .5rem;border-radius:999px;font-size:.72rem;font-weight:700;color:#fff;background:' + b[1] + '">' + b[0] + '</span>';
+    };
+
+    // it : { id, title, oaStatus|openAccess, leadAuthor|authors, date|year, journal|venue,
+    //        doi, url, citedByCount, relevance|score, fwci, axisBand, retractionStatus }
+    // opts.mode : 'select' (carte cliquable, titre en texte) | 'link' (titre = lien, défaut).
+    window.scwCard = function (it, opts) {
+        opts = opts || {};
+        var oa = it.oaStatus || (it.openAccess === false ? 'closed' : (it.openAccess === true ? 'gold' : 'unknown'));
+        var lead = it.leadAuthor || (Array.isArray(it.authors) ? it.authors[0] : (typeof it.authors === 'string' ? it.authors : ''));
+        var etAl = (Array.isArray(it.authors) && it.authors.length > 1) ? ' et al.' : '';
+        var venue = it.journal || it.venue || '';
+        var dval = it.date ? frDate(it.date) : (it.year || '');
+        var doi = it.doi || '';
+
+        var meta = [];
+        if (lead) meta.push(esc(lead + etAl));
+        if (dval) meta.push(esc(String(dval)));
+        if (venue) meta.push(esc(venue));
+        if (doi) meta.push('<a href="https://doi.org/' + esc(doi) + '" target="_blank" rel="noopener" onclick="event.stopPropagation()">' + esc(doi) + '</a>');
+        if (it.citedByCount) meta.push('📈 ' + Number(it.citedByCount).toLocaleString('fr-FR') + ' cit.');
+
+        var enrich = [];
+        if (it.axisBand) enrich.push(window.scwAxisBadge(it.axisBand));
+        if (it.retractionStatus && it.retractionStatus !== 'none') enrich.push('<span class="scw-pill" style="background:#b91c1c;color:#fff">⛔ ' + (it.retractionStatus === 'retracted' ? 'Rétractée' : 'Préoccupation') + '</span>');
+        var rel = (it.relevance != null) ? it.relevance : it.score;
+        if (rel != null) enrich.push('<span class="scw-pill" title="Pertinence">🎯 ' + Math.round(rel * 100) + ' %</span>');
+        if (it.fwci != null && it.fwci > 0) enrich.push('<span class="scw-pill" title="Impact relatif (FWCI)">FWCI ' + (Math.round(it.fwci * 100) / 100) + '</span>');
+
+        var titleHtml;
+        if (opts.mode === 'select') {
+            titleHtml = '<h3 class="scw-title">' + esc(it.title || '(sans titre)') + '</h3>';
+        } else {
+            var url = it.url || (doi ? 'https://doi.org/' + doi : '#');
+            titleHtml = '<h3 class="scw-title"><a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(it.title || '(sans titre)') + '</a></h3>';
+        }
+
+        return '<div class="scw-card' + (opts.mode === 'select' ? ' scw-selectable' : '') + '" data-id="' + esc(it.id || '') + '">'
+            + '<div class="scw-head">' + titleHtml + window.scwAccessBadge(oa) + '</div>'
+            + (meta.length ? '<div class="scw-meta muted">' + meta.join(' · ') + '</div>' : '')
+            + (enrich.length ? '<div class="scw-enrich">' + enrich.join(' ') + '</div>' : '')
+            + '</div>';
+    };
+})();
+</script>

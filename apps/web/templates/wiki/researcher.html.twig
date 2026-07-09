@@ -52,6 +52,7 @@
         <div class="rs-card"><span class="rs-soon">à venir</span><h3>⚙️ Profil &amp; e-mails</h3><p class="muted" style="font-size:.88rem">Domaines d'expertise, préférences de réception d'e-mails.</p></div>
     </div>
 
+    {% include 'wiki/_articlecard.html.twig' %}
     <script nonce="{{ csp_nonce.value }}">
     (function () {
         var q = document.getElementById('rs-q'), go = document.getElementById('rs-go'),
@@ -64,25 +65,8 @@
             var p = String(iso).split('-');
             return p.length === 3 ? (p[2] + '/' + p[1] + '/' + p[0]) : String(iso);
         }
-        function row(it){
-            var url = it.url || (it.doi ? 'https://doi.org/' + it.doi : '#');
-            var lead = it.leadAuthor || (it.authors && it.authors[0]) || '';
-            var metaArr = [];
-            if (lead) metaArr.push('✍️ ' + lead);
-            if (it.journal || it.venue) metaArr.push(it.journal || it.venue);
-            var dval = it.date ? frDate(it.date) : it.year;
-            if (dval) metaArr.push('📅 ' + dval);
-            var rel = (it.relevance != null) ? it.relevance : it.score; // 0–1
-            var badges = '';
-            if (it.citedByCount != null) badges += '<span class="pill" title="Citations">📊 ' + (it.citedByCount||0).toLocaleString('fr-FR') + ' citations</span> ';
-            if (rel != null) badges += '<span class="pill" title="Pertinence">🎯 ' + Math.round(rel * 100) + ' %</span> ';
-            if (it.fwci != null && it.fwci > 0) badges += '<span class="pill" title="Impact relatif (FWCI)">FWCI ' + (Math.round(it.fwci * 100) / 100) + '</span>';
-            return '<div style="padding:.6rem 0; border-bottom:1px solid var(--line)">'
-                + '<a class="q-title" href="' + url + '" target="_blank" rel="noopener">' + esc(it.title) + '</a>'
-                + (metaArr.length ? '<div class="muted" style="font-size:.85rem">' + esc(metaArr.join(' · ')) + '</div>' : '')
-                + (badges ? '<div style="margin-top:.25rem">' + badges + '</div>' : '')
-                + '</div>';
-        }
+        // Carte unifiée (partagée avec l'explorer et /fr/analyses).
+        function row(it){ return window.scwCard(it, { mode: 'link' }); }
         function pageBtn(label, disabled, onClick){
             var b = document.createElement('button');
             b.textContent = label; b.disabled = disabled;
