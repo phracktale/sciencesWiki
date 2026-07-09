@@ -38,7 +38,9 @@ final class AnswerDrafter
     {
         $sources = $this->retrieveSources($question, $k);
         // Respecte le modèle Q/R choisi en back-office (rag.model) ; sinon LLM_MODEL.
-        $opts = ['temperature' => 0.2, 'max_tokens' => 1200];
+        // Budget large : l'article 5 sections (vulgarisation ~1500 signes/sous-partie +
+        // aller plus loin + idées reçues + académique) dépasse largement 1200 tokens.
+        $opts = ['temperature' => 0.2, 'max_tokens' => 4000];
         if (null !== ($m = $this->settings->model())) {
             $opts['model'] = $m;
         }
@@ -133,6 +135,17 @@ final class AnswerDrafter
         $vulgarization = trim($sections['vulgarisation'] ?? '');
         $academic = trim($sections['academique'] ?? '');
 
+        // Les sections « grand public » ALLER PLUS LOIN et IDEES RECUES sont repliées dans la
+        // vulgarisation (en sous-titres markdown) : pas de champ dédié en base ni au front.
+        $allerPlusLoin = trim($sections['aller plus loin'] ?? '');
+        $ideesRecues = trim($sections['idees recues'] ?? '');
+        if ('' !== $allerPlusLoin) {
+            $vulgarization .= "\n\n## Aller plus loin\n\n".$allerPlusLoin;
+        }
+        if ('' !== $ideesRecues) {
+            $vulgarization .= "\n\n## Idées reçues\n\n".$ideesRecues;
+        }
+
         // Aucune section reconnue (ex. LLM stub) : tout en vulgarisation.
         if ('' === $vulgarization && '' === $academic && '' === $title) {
             $vulgarization = trim($content);
@@ -162,15 +175,15 @@ final class AnswerDrafter
     {
         $content = (string) preg_replace('/^```[a-z]*|```$/mi', '', trim($content));
         $sections = [];
-        // Découpe sur les en-têtes « ## XXX » (insensible à la casse/accents simples).
-        $parts = preg_split('/^\s*#{1,3}\s*(TITRE|VULGARISATION|ACAD[EÉ]MIQUE)\s*$/mui', $content, -1, \PREG_SPLIT_DELIM_CAPTURE);
+        // Découpe sur les 5 en-têtes « ## XXX » (insensible à la casse/accents simples).
+        $parts = preg_split('/^\s*#{1,3}\s*(TITRE|VULGARISATION|ALLER PLUS LOIN|ID[EÉ]ES RE[CÇ]UES|ACAD[EÉ]MIQUE)\s*$/mui', $content, -1, \PREG_SPLIT_DELIM_CAPTURE);
         if (false === $parts || \count($parts) < 3) {
             return [];
         }
 
         for ($i = 1; $i < \count($parts); $i += 2) {
             $key = mb_strtolower((string) $parts[$i]);
-            $key = str_replace(['é', 'è'], 'e', $key);
+            $key = str_replace(['é', 'è', 'ç'], ['e', 'e', 'c'], $key); // clés : titre | vulgarisation | aller plus loin | idees recues | academique
             $sections[$key] = (string) ($parts[$i + 1] ?? '');
         }
 
