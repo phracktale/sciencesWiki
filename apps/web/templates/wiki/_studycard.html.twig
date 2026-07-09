@@ -1,0 +1,19 @@
+{# Composants réutilisables des cartes d'étude (analyses, chercheur, explorer).
+   accessBadge : pastille colorée du type d'accès, cliquable → légende (popin gérée par
+   le JS partagé qui écoute .access-badge). #}
+
+{% macro accessBadge(oa) %}
+    {% set map = {
+        diamond: ['Diamond OA', '#7c3aed'],
+        gold:    ['Gold OA', '#d97706'],
+        green:   ['Green OA', '#16a34a'],
+        hybrid:  ['Hybrid OA', '#0891b2'],
+        bronze:  ['Bronze OA', '#b45309'],
+        closed:  ['Accès fermé', '#64748b'],
+        unknown: ['Accès inconnu', '#94a3b8']
+    } %}
+    {% set b = map[oa] ?? map['unknown'] %}
+    <button type="button" class="access-badge" data-oa="{{ oa|default('unknown') }}"
+            title="Type d'accès — voir la légende"
+            style="display:inline-block; padding:.12rem .55rem; border:0; border-radius:999px; font-size:.72rem; font-weight:700; color:#fff; background:{{ b[1] }}; cursor:pointer">{{ b[0] }} ⓘ</button>
+{% endmacro %}

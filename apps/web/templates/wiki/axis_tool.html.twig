@@ -1,7 +1,8 @@
 {% extends 'base.html.twig' %}
-{% block title %}Évaluation critique — SciencesWiki{% endblock %}
+{% block title %}Analyses — Évaluation critique — SciencesWiki{% endblock %}
 {% block body %}
-    <h1>Évaluation critique des études 🔬</h1>
+    {% import 'wiki/_studycard.html.twig' as cards %}
+    <h1>Analyses des études 🔬</h1>
     <p class="muted">Cherchez une étude par <strong>titre, mots-clés ou DOI</strong>. Selon le devis détecté, l'IA propose l'outil adapté : <strong>AXIS</strong> (études transversales), <strong>RoB 2</strong> (essais randomisés) ou <strong>AMSTAR-2</strong> (revues systématiques). <strong>Ce ne sont pas des notes</strong> — des signaux pour vous aider à juger, jamais un verdict.</p>
     <p style="font-size:.9rem"><a href="{{ path('my_studies') }}">📄 Mes études déposées →</a></p>
 
@@ -42,70 +43,56 @@
     </details>
 
     {% if candidates is not empty and candidates is not null %}
-        <h2 style="margin-top:1.4rem">Choisissez l'étude à évaluer</h2>
-        <ul style="list-style:none; padding:0">
-            {% for c in candidates %}
-                <li class="card" style="margin:.5rem 0; display:flex; justify-content:space-between; gap:1rem; align-items:center; flex-wrap:wrap">
-                    <div style="flex:1; min-width:260px">
-                        <strong>{{ c.title }}</strong>
-                        <div class="muted" style="font-size:.85rem">
-                            {% if c.leadAuthor %}{{ c.leadAuthor }}{% if c.authors|length > 1 %} et al.{% endif %} · {% endif %}
-                            {% if c.year %}{{ c.year }} · {% endif %}{{ c.venue }}
-                            {% if c.citedByCount %} · 📈 {{ c.citedByCount }} cit.{% endif %}
-                        </div>
-                        {% if c.id %}
-                            <div style="margin-top:.2rem">
-                                <button type="button" class="js-abs-toggle" data-id="{{ c.id }}" style="background:none; border:0; color:var(--accent); cursor:pointer; font-size:.78rem; padding:0">▸ Résumé</button>
-                                <div class="abs-detail" hidden style="margin-top:.3rem; font-size:.85rem; max-width:640px"></div>
-                            </div>
-                        {% endif %}
+        <h2 style="margin-top:1.4rem">Choisissez l'étude à analyser</h2>
+        {% for c in candidates %}
+            <div class="card" style="margin:.6rem 0; display:flex; flex-direction:column; gap:.4rem">
+                <div style="display:flex; justify-content:space-between; gap:.8rem; align-items:flex-start; flex-wrap:wrap">
+                    <h3 style="margin:0; font-size:1.02rem; flex:1; min-width:240px">{{ c.title }}</h3>
+                    {{ cards.accessBadge(c.oaStatus) }}
+                </div>
+                <div class="muted" style="font-size:.85rem; display:flex; gap:.5rem; flex-wrap:wrap; align-items:center">
+                    {% if c.leadAuthor %}<span>{{ c.leadAuthor }}{% if c.authors|length > 1 %} et al.{% endif %}</span>{% endif %}
+                    {% if c.year %}<span>· {{ c.year }}</span>{% endif %}
+                    {% if c.venue %}<span>· {{ c.venue }}</span>{% endif %}
+                    {% if c.doi %}<span>· <a href="https://doi.org/{{ c.doi }}" target="_blank" rel="noopener">{{ c.doi }}</a></span>{% endif %}
+                    {% if c.citedByCount %}<span>· 📈 {{ c.citedByCount }} cit.</span>{% endif %}
+                </div>
+                {% if c.id %}
+                    <div>
+                        <button type="button" class="js-abs-toggle" data-id="{{ c.id }}" style="background:none; border:0; color:var(--accent); cursor:pointer; font-size:.78rem; padding:0">▸ Résumé</button>
+                        <div class="abs-detail" hidden style="margin-top:.3rem; font-size:.85rem; max-width:680px"></div>
                     </div>
-                    {% if not c.doi %}
-                        <span class="muted" style="font-size:.8rem">DOI manquant — non évaluable</span>
-                    {% else %}
-                        {% set st = toolStates[c.doi]|default(null) %}
-                        {% set recoAxis = st and st.classified and st.axisApplicable %}
-                        {% set recoRob2 = st and st.classified and st.rob2Applicable %}
-                        {% set recoAmstar2 = st and st.classified and st.amstar2Applicable %}
-                        {% set recoMmat = st and st.classified and st.mmatApplicable %}
-                        <div style="text-align:right; min-width:220px">
-                            {% if st is null or not st.classified %}
-                                <div class="muted" style="font-size:.74rem; margin-bottom:.3rem">🔎 détection du type d'étude…</div>
-                            {% else %}
-                                <div class="muted" style="font-size:.74rem">Devis probable : <strong>{{ st.designLabel }}</strong></div>
-                                {% for t in st.tools %}{% if not t.implemented %}<span class="badge" style="font-size:.7rem; background:#eef2ff; color:#3730a3; margin:.1rem 0 0 .2rem">{{ t.name }} · à venir</span>{% endif %}{% endfor %}
-                            {% endif %}
-                            <div style="margin-top:.35rem; display:flex; gap:.3rem; flex-wrap:wrap; justify-content:flex-end">
-                                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
-                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-                                    <input type="hidden" name="doi" value="{{ c.doi }}">
-                                    <input type="hidden" name="tool" value="axis">
-                                    <button type="submit"{% if not recoAxis %} style="background:#e2e8f0; color:#475569"{% endif %}>AXIS{% if recoAxis %} ✓{% endif %}</button>
-                                </form>
-                                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
-                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-                                    <input type="hidden" name="doi" value="{{ c.doi }}">
-                                    <input type="hidden" name="tool" value="rob2">
-                                    <button type="submit"{% if not recoRob2 %} style="background:#e2e8f0; color:#475569"{% endif %}>RoB 2{% if recoRob2 %} ✓{% endif %}</button>
-                                </form>
-                                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
-                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-                                    <input type="hidden" name="doi" value="{{ c.doi }}">
-                                    <input type="hidden" name="tool" value="amstar2">
-                                    <button type="submit"{% if not recoAmstar2 %} style="background:#e2e8f0; color:#475569"{% endif %}>AMSTAR-2{% if recoAmstar2 %} ✓{% endif %}</button>
-                                </form>
-                                <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
-                                    <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
-                                    <input type="hidden" name="doi" value="{{ c.doi }}">
-                                    <input type="hidden" name="tool" value="mmat">
-                                    <button type="submit"{% if not recoMmat %} style="background:#e2e8f0; color:#475569"{% endif %}>MMAT{% if recoMmat %} ✓{% endif %}</button>
-                                </form>
-                            </div>
-                        </div>
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
+                {% endif %}
+                {% if not c.doi %}
+                    <div class="muted" style="font-size:.8rem; border-top:1px solid var(--line); padding-top:.4rem">DOI manquant — non analysable automatiquement.</div>
+                {% else %}
+                    {% set st = toolStates[c.doi]|default(null) %}
+                    {% set reco = {
+                        axis: st and st.classified and st.axisApplicable,
+                        rob2: st and st.classified and st.rob2Applicable,
+                        amstar2: st and st.classified and st.amstar2Applicable,
+                        mmat: st and st.classified and st.mmatApplicable
+                    } %}
+                    <div style="display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; border-top:1px solid var(--line); padding-top:.45rem">
+                        {% if st is null or not st.classified %}
+                            <span class="muted" style="font-size:.76rem">🔎 détection du type d'étude…</span>
+                        {% else %}
+                            <span class="muted" style="font-size:.78rem">Devis probable : <strong>{{ st.designLabel }}</strong></span>
+                            {% for t in st.tools %}{% if not t.implemented %}<span class="badge" style="font-size:.68rem; background:#eef2ff; color:#3730a3">{{ t.name }} · à venir</span>{% endif %}{% endfor %}
+                        {% endif %}
+                        <span style="flex:1; min-width:.5rem"></span>
+                        {% for tk in [['axis', 'AXIS'], ['rob2', 'RoB 2'], ['amstar2', 'AMSTAR-2'], ['mmat', 'MMAT']] %}
+                            <form method="post" action="{{ path('axis_tool') }}" data-turbo="false" style="margin:0" class="js-axis-run">
+                                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                <input type="hidden" name="doi" value="{{ c.doi }}">
+                                <input type="hidden" name="tool" value="{{ tk[0] }}">
+                                <button type="submit"{% if not reco[tk[0]] %} style="background:#e2e8f0; color:#475569"{% endif %} title="{{ reco[tk[0]] ? 'Recommandé pour le devis détecté' : 'Applicable sur demande' }}">{{ tk[1] }}{% if reco[tk[0]] %} ✓{% endif %}</button>
+                            </form>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        {% endfor %}
         <p class="muted" style="font-size:.82rem">✓ = outil recommandé pour le devis détecté. L'analyse IA (~1 min) se lance <strong>en arrière-plan</strong> et le résultat <strong>s'affiche automatiquement</strong>.</p>
     {% endif %}
 

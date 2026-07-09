@@ -182,11 +182,21 @@ final class WikiController extends AbstractController
      * (chercheur / enseignant / élève). Saisie de l'identifiant de l'étude →
      * appel API → affichage du résultat (ou du verrou d'applicabilité).
      */
-    #[Route('/{_locale}/outils/axis', name: 'axis_tool', requirements: ['_locale' => 'fr'], methods: ['GET', 'POST'])]
+    // Page unifiée des analyses (recherche + upload + pré-diag du devis + un bouton par
+    // grille applicable). Nom de route conservé (`axis_tool`) pour ne pas casser les
+    // nombreux path('axis_tool') ; l'URL publique est désormais /fr/analyses.
+    /** Ancienne URL de l'outil → redirection permanente vers /fr/analyses (marque-pages). */
+    #[Route('/{_locale}/outils/axis', name: 'axis_tool_legacy', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function axisToolLegacy(): Response
+    {
+        return $this->redirectToRoute('axis_tool', ['_locale' => 'fr'], Response::HTTP_MOVED_PERMANENTLY);
+    }
+
+    #[Route('/{_locale}/analyses', name: 'axis_tool', requirements: ['_locale' => 'fr'], methods: ['GET', 'POST'])]
     public function axisTool(Request $request): Response
     {
         if (!$this->user->isLogged()) {
-            return $this->redirectToRoute('login', ['back' => '/fr/outils/axis']);
+            return $this->redirectToRoute('login', ['back' => '/fr/analyses']);
         }
         if (!$this->user->canUseAxis()) {
             $this->addFlash('error', 'Outil réservé aux espaces recherche / pédagogie.');
