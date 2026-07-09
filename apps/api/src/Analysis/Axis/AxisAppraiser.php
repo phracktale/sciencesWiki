@@ -152,14 +152,15 @@ final class AxisAppraiser
     }
 
     /**
-     * Conserve la réponse ET la réflexion de chaque item (justification systématique,
-     * comme une revue par un expert). Le garde-fou anti-hallucination ne SUPPRIME plus
-     * la réponse : il vérifie seulement si la citation est réellement présente dans le
-     * texte (verbatim) et ne conserve alors que les citations ancrées ; la réflexion du
-     * modèle reste toujours affichée (traçabilité). « anchored » signale les items étayés
-     * par une citation exacte.
+     * Garde-fou STRICT (anti-hallucination + sévérité). Une réponse AFFIRMÉE (yes/partial/no)
+     * n'est conservée que si elle est étayée par une citation verbatim réellement présente
+     * dans le texte, OU si elle repose sur une absence vérifiable (evidence_type =
+     * "absence_from_text"). Sinon la réponse est RÉTROGRADÉE en « indéterminé » (unclear) et
+     * ne pèse donc pas sur le score. La réflexion du modèle reste toujours conservée
+     * (traçabilité) ; « anchored » signale une citation exacte, « downgraded » une
+     * rétrogradation.
      *
-     * @return array{0:array<string,AxisAnswer>,1:array<string,array{reasoning:?string,quote:?string,anchored:bool}>}
+     * @return array{0:array<string,AxisAnswer>,1:array<string,array{verdict:?string,evidence_type:?string,confidence:?string,reasoning:?string,quote:?string,anchored:bool,downgraded:bool}>}
      */
     private function applyGuardrail(ParsedAxisAppraisal $parsed, string $sourceText): array
     {
@@ -171,16 +172,35 @@ final class AxisAppraiser
             $answer = $parsed->answers[$key] ?? AxisAnswer::Unclear;
             $detail = $parsed->justifications[$key] ?? [];
             $verdict = \is_array($detail) ? ($detail['verdict'] ?? null) : null;
+            $evidenceType = \is_array($detail) ? ($detail['evidence_type'] ?? null) : null;
+            $confidence = \is_array($detail) ? ($detail['confidence'] ?? null) : null;
             $reasoning = \is_array($detail) ? ($detail['reasoning'] ?? null) : (\is_string($detail) ? $detail : null);
             $quote = \is_array($detail) ? ($detail['quote'] ?? null) : null;
 
             $anchored = null !== $quote && $this->quoteExists($quote, $haystack);
+
+            // Garde-fou STRICT : une réponse AFFIRMÉE (yes/partial/no) doit être étayée soit par
+            // une citation réellement présente dans le texte, soit par une ABSENCE vérifiable
+            // (evidence_type = "absence_from_text"). À défaut, on rétrograde en « indéterminé » :
+            // une justification non sourcée ne doit pas peser sur le score (anti-hallucination +
+            // sévérité, cf. doctrine du prompt). La réflexion du modèle reste conservée.
+            $affirmed = \in_array($answer, [AxisAnswer::Yes, AxisAnswer::Partial, AxisAnswer::No], true);
+            $downgraded = false;
+            if ($affirmed && !$anchored && 'absence_from_text' !== $evidenceType) {
+                $answer = AxisAnswer::Unclear;
+                $verdict = null; // le libellé retombe sur « Indéterminé »
+                $downgraded = true;
+            }
+
             $answers[$key] = $answer;
             $justifications[$key] = [
                 'verdict' => $verdict,
+                'evidence_type' => $evidenceType,
+                'confidence' => $confidence,
                 'reasoning' => $reasoning,
                 'quote' => $anchored ? $quote : null,
                 'anchored' => $anchored,
+                'downgraded' => $downgraded,
             ];
         }
 

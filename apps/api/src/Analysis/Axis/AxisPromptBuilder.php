@@ -59,28 +59,57 @@ final class AxisPromptBuilder
             sont identiques (recensement exhaustif), les items q5, q6 et q7 ne s'appliquent en
             théorie pas → réponds "na" pour ces trois items (sauf si le recrutement reste flou).
 
-            Règles :
-            - Pour CHAQUE item, fournis TOUJOURS quatre éléments :
-                • "answer"    : une modalité CANONIQUE parmi :
-                    "yes"     = critère clairement rempli ;
-                    "partial" = partiellement rempli / rempli avec réserve ;
-                    "no"      = non rempli ;
-                    "na"      = non applicable à CE type d'étude (item hors-sujet) ;
-                    "unclear" = information réellement absente du texte.
-                • "verdict"   : un LIBELLÉ court et NUANCÉ en français reflétant ta réponse,
-                  à la manière d'un relecteur — ex. « Oui », « Oui, avec réserve »,
-                  « Oui, avec prudence », « Partiellement », « Partiellement clair »,
-                  « Non », « Non applicable », « Indéterminé ». Sois précis et nuancé.
-                • "reasoning" : ta RÉFLEXION en une phrase claire en français expliquant
-                  pourquoi (JAMAIS vide) ;
-                • "quote"     : une phrase EXACTE (verbatim, langue d'origine) du texte qui
-                  étaye ta réponse si elle existe, sinon null.
-            - N'invente RIEN : fonde-toi uniquement sur le texte fourni. Si l'information est
-              réellement absente, réponds "unclear".
-            - "study_design" : un mot-clé court en anglais (cross-sectional, rct, cohort,
+            DOCTRINE DE DÉCISION (sévérité) — une revue critique doit être EXIGEANTE. Ne coche
+            pas « yes » simplement parce que l'article paraît sérieux : une simple DESCRIPTION
+            n'est pas une JUSTIFICATION. En cas de doute entre deux niveaux, retiens le plus
+            sévère JUSTIFIABLE (ne surévalue jamais). Règles spécifiques :
+            - q3 (taille d'échantillon) : "yes" UNIQUEMENT si calcul de puissance / justification
+              statistique / justification a priori explicite ; "partial" si justification pragmatique
+              explicite mais sans calcul ; "no" ou "unclear" si simple description du nombre inclus.
+              Décrire « N patients » n'est PAS justifier la taille.
+            - q11 (méthodes reproductibles) : "yes" UNIQUEMENT si méthodes, instruments, seuils ET
+              analyses sont assez décrits pour une réplication ; "partial" si les analyses sont
+              décrites mais qu'un composant clinique/protocolaire est propriétaire ou indisponible
+              (ex. entretien « semi-structuré propriétaire ») ; sinon "no"/"unclear".
+            - q13 (non-réponse — INVERSÉ) : si l'étude N'EST PAS une enquête avec taux de réponse,
+              N'INVENTE PAS de taux de réponse. Évalue les exclusions/pertes comme un biais de
+              SÉLECTION : des exclusions importantes non décrites de façon comparative → "unclear"
+              (ou "na") en signalant le risque de biais de sélection dans "reasoning" ; ne coche pas
+              un « oui d'inquiétude » fondé sur un taux de réponse inexistant.
+            - q16 (analyses rapportées) : "yes" UNIQUEMENT si TOUTES les analyses annoncées ont des
+              résultats chiffrés ; "partial" si certaines ne sont rapportées que narrativement
+              (« non significatif ») sans statistiques complètes.
+            - q19 (financement / conflits — INVERSÉ) : ne CONFONDS JAMAIS « absence de conflit
+              déclaré » et « absence de déclaration ». Si les conflits sont déclarés absents mais le
+              financement n'est pas mentionné → "partial" ou "unclear" (conflits ok, financement non
+              documenté), et surtout PAS un « oui » de conflit.
+            - q2 (plan d'étude) : un devis transversal EST adapté à une question d'ASSOCIATION
+              (« Oui, avec prudence ») ; ne pénalise pas les mots « predictor/effect » tant que les
+              auteurs ne revendiquent pas une CAUSALITÉ.
+            - q4 (population cible) : une population de référence CLINIQUE clairement décrite (ex.
+              « adultes référés pour évaluation d'un TDAH ») suffit pour "yes".
+
+            Règles de sortie :
+            - Pour CHAQUE item, fournis TOUJOURS :
+                • "answer"        : "yes" | "partial" | "no" | "na" | "unclear" (selon la doctrine).
+                • "verdict"       : libellé court nuancé en français (« Oui », « Oui, avec prudence »,
+                  « Partiellement », « Non », « Non applicable », « Indéterminé »…).
+                • "evidence_type" : "explicit_quote" (le texte AFFIRME explicitement, citation à l'appui)
+                  | "absence_from_text" (ta réponse repose sur le fait que le texte NE MENTIONNE PAS
+                  l'élément — absence vérifiable) | "inference" (tu DÉDUIS d'un élément du texte, sans
+                  phrase explicite).
+                • "confidence"    : "high" | "medium" | "low" ("high" est INTERDIT si evidence_type
+                  vaut "inference").
+                • "reasoning"     : ta réflexion en une phrase claire en français (JAMAIS vide).
+                • "quote"         : phrase EXACTE (verbatim, langue d'origine) du texte étayant ta
+                  réponse — OBLIGATOIRE si evidence_type="explicit_quote" ; sinon null.
+            - ANCRAGE STRICT : toute réponse "yes"/"partial"/"no" doit être étayée soit par une
+              citation verbatim réellement présente dans le texte, soit par une absence vérifiable
+              (evidence_type="absence_from_text"). À défaut, réponds "unclear" — une justification
+              non sourcée ne doit JAMAIS faire pencher la balance.
+            - N'invente RIEN. "study_design" : mot-clé anglais (cross-sectional, rct, cohort,
               case_control, systematic_review, meta_analysis, in_vivo, in_vitro, modeling, other).
-            - "summary" : une RÉFLEXION GÉNÉRALE de 2 à 4 phrases en français (forces et
-              faiblesses méthodologiques d'ensemble). N'attribue PAS de note chiffrée.
+            - "summary" : réflexion générale de 2 à 4 phrases (forces/faiblesses). PAS de note chiffrée.
             - Réponds UNIQUEMENT par le JSON, sans texte autour, sans bloc de code.
 
             Schéma de sortie :
@@ -88,9 +117,9 @@ final class AxisPromptBuilder
               "study_design": "cross-sectional|rct|cohort|case_control|systematic_review|meta_analysis|in_vivo|in_vitro|modeling|other",
               "applicable": true,
               "items": {
-                "q1": {"answer": "yes|partial|no|na|unclear", "verdict": "libellé nuancé en français", "reasoning": "ta réflexion", "quote": "phrase verbatim ou null"},
-                "…": {"answer": "…", "verdict": "…", "reasoning": "…", "quote": null},
-                "q20": {"answer": "yes|partial|no|na|unclear", "verdict": "…", "reasoning": "…", "quote": null}
+                "q1": {"answer": "yes|partial|no|na|unclear", "verdict": "…", "evidence_type": "explicit_quote|absence_from_text|inference", "confidence": "high|medium|low", "reasoning": "…", "quote": "verbatim ou null"},
+                "…": {"answer": "…", "verdict": "…", "evidence_type": "…", "confidence": "…", "reasoning": "…", "quote": null},
+                "q20": {"answer": "…", "verdict": "…", "evidence_type": "…", "confidence": "…", "reasoning": "…", "quote": null}
               },
               "summary": "réflexion générale en 2-4 phrases"
             }

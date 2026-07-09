@@ -32,7 +32,7 @@ final class AxisSerializer
                 continue;
             }
             $answer = AxisAnswer::tryFrom($answers[$key]) ?? AxisAnswer::Unclear;
-            // Compat : ancien format (string = citation) ou nouveau ({verdict,reasoning,quote,anchored}).
+            // Compat : ancien format (string = citation) ou nouveau ({verdict,evidence_type,…}).
             $detail = $justifications[$key] ?? null;
             $verdict = \is_array($detail) ? ($detail['verdict'] ?? null) : null;
             $reasoning = \is_array($detail) ? ($detail['reasoning'] ?? null) : null;
@@ -49,6 +49,10 @@ final class AxisSerializer
                 'reasoning' => $reasoning,
                 'quote' => $quote,
                 'anchored' => \is_array($detail) ? (bool) ($detail['anchored'] ?? false) : false,
+                // Traçabilité de la décision (nature de la preuve + rétrogradation du garde-fou).
+                'evidenceType' => \is_array($detail) ? ($detail['evidence_type'] ?? null) : null,
+                'confidence' => \is_array($detail) ? ($detail['confidence'] ?? null) : null,
+                'downgraded' => \is_array($detail) ? (bool) ($detail['downgraded'] ?? false) : false,
             ];
         }
 
