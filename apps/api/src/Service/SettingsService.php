@@ -44,6 +44,14 @@ final class SettingsService
      */
     public const APPRAISAL_MODEL = 'ai.appraisal_model';
 
+    /**
+     * Modèle OCR / vision dédié à la LECTURE DES TABLEAUX ET FIGURES en image (pages PDF
+     * rendues). Alimente le futur « visual evidence pack » de l'évaluation critique — les
+     * items qui dépendent d'un tableau/figure (données de base, résultats, cohérence) ne
+     * sont fiables que si ces éléments visuels ont été transcrits. Vide = OCR désactivé.
+     */
+    public const OCR_MODEL = 'ai.ocr_model';
+
     // Limites d'interrogation de l'API OpenAlex (adaptables au plan/au polite pool).
     public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
     public const OPENALEX_PER_DAY = 'openalex.per_day';
@@ -130,6 +138,9 @@ final class SettingsService
         // Tâches légères (extraction de claims…) : petit modèle rapide par défaut.
         self::LIGHT_MODEL => 'llama3.1:8b',
         self::APPRAISAL_MODEL => 'glm-5.2:cloud',
+        // Vide par défaut : l'OCR/vision des tableaux-figures est optionnel (activé quand un
+        // modèle OCR — ex. glm-ocr — est installé et sélectionné en back-office).
+        self::OCR_MODEL => '',
         // Polite pool OpenAlex : 10 req/s max → 540/min (marge), et limite quotidienne
         // de crédits ~10000/jour. Plafond interne large par défaut, abaissable ici.
         self::OPENALEX_PER_MINUTE => '540',
@@ -215,6 +226,12 @@ final class SettingsService
         $v = trim((string) ($this->get(self::APPRAISAL_MODEL) ?? ''));
 
         return '' !== $v ? $v : self::DEFAULTS[self::APPRAISAL_MODEL];
+    }
+
+    /** Modèle OCR/vision pour la lecture des tableaux-figures (vide = OCR désactivé). */
+    public function ocrModel(): string
+    {
+        return trim((string) ($this->get(self::OCR_MODEL) ?? ''));
     }
 
     /** Nombre maximal de requêtes OpenAlex par minute (≥ 1). */
@@ -305,6 +322,7 @@ final class SettingsService
             self::WIKI_MODEL => $this->wikiModel(),
             self::LIGHT_MODEL => $this->lightModel(),
             self::APPRAISAL_MODEL => $this->appraisalModel(),
+            self::OCR_MODEL => $this->ocrModel(),
             self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
             self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
             self::HARVEST_SORT => $this->harvestSort(),
@@ -323,7 +341,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OCR_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

@@ -3,12 +3,12 @@
 
 {# Sélecteur de modèle réutilisable : options construites en amont (locaux + cloud),
    valeur courante toujours sélectionnable (même si absente des listes). #}
-{% macro modelSelect(name, current, models, allowDefault, defaultModel) %}
+{% macro modelSelect(name, current, models, allowDefault, defaultModel, emptyLabel) %}
     {% set locals = models.models|default([]) %}
     {% set cloud = models.cloud|default([]) %}
     {% set known = locals|merge(cloud) %}
     <select name="{{ name }}" style="min-width:16rem">
-        {% if allowDefault %}<option value="" {{ current == '' ? 'selected' }}>Défaut serveur{% if defaultModel %} ({{ defaultModel }}){% endif %}</option>{% endif %}
+        {% if allowDefault %}<option value="" {{ current == '' ? 'selected' }}>{{ emptyLabel|default('Défaut serveur') }}{% if defaultModel %} ({{ defaultModel }}){% endif %}</option>{% endif %}
         {% if current is not empty and current not in known %}<option value="{{ current }}" selected>{{ current }} (personnalisé)</option>{% endif %}
         {% if locals is not empty %}
             <optgroup label="Local (homelab)">
@@ -52,8 +52,12 @@
                 <label style="margin:0">4 — Évaluation critique (AXIS, RoB2…)</label>
                 {{ ui.modelSelect('appraisal_model', settings['ai.appraisal_model'], models, false, '') }}
             </div>
+            <div style="display:grid; grid-template-columns:14rem 1fr; align-items:center; gap:.8rem">
+                <label style="margin:0">5 — OCR / lecture tableaux &amp; figures</label>
+                {{ ui.modelSelect('ocr_model', settings['ai.ocr_model'], models, true, '', '— désactivé (texte seul) —') }}
+            </div>
         </div>
-        <p class="muted" style="font-size:.78rem; margin-top:.4rem">Objet 4 = modèle de raisonnement des grilles (20 items) — le plus capable. Objet 3 = petit modèle rapide (extraction de claims).</p>
+        <p class="muted" style="font-size:.78rem; margin-top:.4rem">Objet 4 = modèle de raisonnement des grilles (20 items) — le plus capable. Objet 3 = petit modèle rapide (extraction de claims). Objet 5 = modèle <strong>vision/OCR</strong> (ex. glm-ocr) pour transcrire les tableaux et figures en image des PDF ; vide = désactivé (l'évaluation reste sur le texte extrait).</p>
 
         <h2 style="margin-top:1.4rem">Configuration de la génération (Q/R)</h2>
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem">
