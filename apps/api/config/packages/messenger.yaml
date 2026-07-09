@@ -27,6 +27,16 @@ framework:
                 retry_strategy:
                     max_retries: 1
                     delay: 10000
+            # File dédiée aux ÉVALUATIONS À LA DEMANDE (AXIS/RoB2/AMSTAR-2/MMAT + détection
+            # de devis). Interactives : l'utilisateur attend le résultat. SÉPARÉE d'« analysis »
+            # (mono-worker, monopolisée par un AnalyzeNodeMessage multi-heures) pour ne JAMAIS
+            # être affamée derrière une analyse de nœud. redeliver_timeout court (30 min) : un
+            # appraisal dure ~1-10 min, on re-livre vite si un worker meurt en cours.
+            appraisal:
+                dsn: 'doctrine://default?queue_name=appraisal&redeliver_timeout=1800'
+                retry_strategy:
+                    max_retries: 1
+                    delay: 10000
             # File dédiée à la détection plagiat/doublons (empreintes MinHash/LSH + scan).
             # Isolée comme analysis : un scan lourd ne doit ni affamer la moisson ni l'inverse.
             plagiarism:
@@ -48,18 +58,13 @@ framework:
             # (Re)génération d'article wiki à la demande (bouton admin du wiki public) :
             # tâche LLM longue au niveau nœud → même file isolée que l'analyse.
             App\Harvester\Message\GenerateNodeArticle: analysis
-            # Évaluation AXIS d'une publication à la demande (outil recherche/pédagogie) :
-            # appel LLM ~1 min → asynchrone sur la même file isolée.
-            App\Analysis\Message\AppraisePublicationMessage: analysis
-            # Détection du devis d'une étude (→ outils d'évaluation applicables) : appel
-            # LLM léger, asynchrone, pour préparer les boutons d'outils à la recherche.
-            App\Analysis\Message\ClassifyStudyMessage: analysis
-            # Évaluation RoB 2 (risque de biais d'un essai randomisé) à la demande.
-            App\Analysis\Message\AppraiseRob2Message: analysis
-            # Évaluation AMSTAR-2 (confiance dans une revue systématique) à la demande.
-            App\Analysis\Message\AppraiseAmstar2Message: analysis
-            # Évaluation MMAT (qualité méthodologique d'une étude empirique) à la demande.
-            App\Analysis\Message\AppraiseMmatMessage: analysis
+            # Évaluations à la demande + détection de devis → file « appraisal » DÉDIÉE
+            # (interactives, jamais affamées derrière un AnalyzeNodeMessage de « analysis »).
+            App\Analysis\Message\AppraisePublicationMessage: appraisal
+            App\Analysis\Message\ClassifyStudyMessage: appraisal
+            App\Analysis\Message\AppraiseRob2Message: appraisal
+            App\Analysis\Message\AppraiseAmstar2Message: appraisal
+            App\Analysis\Message\AppraiseMmatMessage: appraisal
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism
