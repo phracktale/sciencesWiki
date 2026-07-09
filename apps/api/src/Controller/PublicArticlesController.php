@@ -100,7 +100,11 @@ final class PublicArticlesController
         }
         $appliedTypes = \App\Catalog\PublicationType::searchTypes($types);
 
-        $items = array_map(function (array $r): array {
+        // Bande de fiabilité AXIS de la page en UNE requête (badge liste).
+        $ids = array_map(static fn (array $r): int => (int) $r['id'], $res['items']);
+        $bands = $this->axisAppraisals->bandsFor($ids);
+
+        $items = array_map(function (array $r) use ($bands): array {
             $status = (string) $r['oa_status'];
 
             return [
@@ -112,6 +116,7 @@ final class PublicArticlesController
                 'openAccess' => \in_array($status, self::OPEN, true),
                 'oaStatus' => $status,
                 'fulltext' => (int) $r['chunks'] > 0,
+                'axisBand' => $bands[(int) $r['id']] ?? null,
             ];
         }, $res['items']);
 

@@ -87,6 +87,39 @@ class AxisAppraisalRepository extends ServiceEntityRepository
             ->getResult();
     }
 
+    /**
+     * Bandes de fiabilité AXIS pour un LOT de publications (badge dans la liste de
+     * recherche) — une seule requête. Exclut les évaluations écartées par le comité
+     * (Dismissed) et celles sans bande (non applicable / non évaluées).
+     *
+     * @param list<int> $ids
+     *
+     * @return array<int,string> publicationId → bande (high|moderate|low|insufficient)
+     */
+    public function bandsFor(array $ids): array
+    {
+        if ([] === $ids) {
+            return [];
+        }
+
+        $rows = $this->createQueryBuilder('a')
+            ->select('IDENTITY(a.publication) AS pid', 'a.reliabilityBand AS band')
+            ->andWhere('a.publication IN (:ids)')
+            ->andWhere('a.status != :dismissed')
+            ->andWhere('a.reliabilityBand IS NOT NULL')
+            ->setParameter('ids', $ids)
+            ->setParameter('dismissed', ReviewStatus::Dismissed->value)
+            ->getQuery()
+            ->getArrayResult();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $map[(int) $row['pid']] = (string) $row['band'];
+        }
+
+        return $map;
+    }
+
     public function countPending(): int
     {
         return (int) $this->createQueryBuilder('a')

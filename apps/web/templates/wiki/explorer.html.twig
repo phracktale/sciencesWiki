@@ -153,6 +153,19 @@
             });
         }
 
+        // Badge compact de fiabilité AXIS (évaluation critique IA) affiché dans la liste.
+        function axisBandBadge(band) {
+            var map = {
+                high: ['Fiabilité élevée', 'axis-high'],
+                moderate: ['Fiabilité modérée', 'axis-moderate'],
+                low: ['Fiabilité faible', 'axis-low'],
+                insufficient: ['Éval. limitée', 'axis-insufficient']
+            };
+            var b = map[band];
+            if (!b) return '';
+            return ' <span class="axis-band ' + b[1] + '" title="Évaluation critique AXIS (générée par IA) — voir le détail de l\'article">' + b[0] + '</span>';
+        }
+
         function renderRows(d) {
             if (!d.items.length) { rows.innerHTML = '<tr><td colspan="5" class="xp-empty">Aucun article.</td></tr>'; return; }
             rows.innerHTML = '';
@@ -160,7 +173,7 @@
                 var tr = document.createElement('tr');
                 tr.className = 'row' + (state.selected === it.id ? ' sel' : '');
                 tr.innerHTML =
-                    '<td><strong>' + esc(it.title || '(sans titre)') + '</strong></td>' +
+                    '<td><strong>' + esc(it.title || '(sans titre)') + '</strong>' + axisBandBadge(it.axisBand) + '</td>' +
                     '<td class="muted">' + esc((it.authors || '').slice(0, 60)) + '</td>' +
                     '<td class="muted">' + esc(it.year || '') + '</td>' +
                     '<td class="muted">' + esc((it.venue || '').slice(0, 30)) + '</td>' +
