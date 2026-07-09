@@ -33,7 +33,9 @@ final class AxisPromptBuilder
         $questions = [];
         foreach (AxisChecklist::ITEMS as $key => $item) {
             $flag = \in_array($key, AxisChecklist::REVERSE, true) ? ' [un « oui » est DÉFAVORABLE]' : '';
-            $questions[] = \sprintf('- %s (%s) : %s%s', $key, $item['section'], $item['text'], $flag);
+            // Intitulé + texte d'aide OFFICIEL (annexe explicative AXIS) : le modèle
+            // applique chaque critère selon la définition des auteurs.
+            $questions[] = \sprintf("- %s (%s) : %s%s\n  Aide : %s", $key, $item['section'], $item['text'], $flag, $item['help']);
         }
         $list = implode("\n", $questions);
 
@@ -48,8 +50,14 @@ final class AxisPromptBuilder
             systématique, méta-analyse, in vivo/in vitro, modélisation), réponds
             "applicable": false et N'évalue PAS les 20 items (AXIS serait hors-sujet).
 
-            ÉTAPE 1 — Si l'étude est transversale, évalue les 20 items ci-dessous :
+            ÉTAPE 1 — Si l'étude est transversale, évalue les 20 items ci-dessous. Chaque item
+            est accompagné de son texte d'aide OFFICIEL (« Aide : ») : appuie-toi dessus pour
+            décider, comme un relecteur qui aurait le manuel AXIS sous les yeux.
             $list
+
+            Cas particulier — RECENSEMENT (census) : si la population cible ET les participants
+            sont identiques (recensement exhaustif), les items q5, q6 et q7 ne s'appliquent en
+            théorie pas → réponds "na" pour ces trois items (sauf si le recrutement reste flou).
 
             Règles :
             - Pour CHAQUE item, fournis TOUJOURS quatre éléments :
