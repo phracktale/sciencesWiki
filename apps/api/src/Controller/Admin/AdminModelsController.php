@@ -16,6 +16,21 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
  */
 final class AdminModelsController
 {
+    /**
+     * Modèles CLOUD d'Ollama importants (ollama.com/cloud), proposés en plus des
+     * modèles locaux. Frontier, mais l'inférence tourne HORS du homelab (le texte
+     * de l'étude sort de l'infra). Limité à 5, éditable ici.
+     *
+     * @var list<string>
+     */
+    private const CLOUD_MODELS = [
+        'glm-5.2:cloud',
+        'deepseek-v3.1:671b-cloud',
+        'gpt-oss:120b-cloud',
+        'kimi-k2:1t-cloud',
+        'qwen3-coder:480b-cloud',
+    ];
+
     public function __construct(
         private readonly HttpClientInterface $httpClient,
         #[Autowire(env: 'LLM_BASE_URL')]
@@ -57,6 +72,7 @@ final class AdminModelsController
 
         return new JsonResponse([
             'models' => array_values(array_unique($models)),
+            'cloud' => self::CLOUD_MODELS,
             'default' => $this->defaultModel,
             'error' => $error,
         ]);

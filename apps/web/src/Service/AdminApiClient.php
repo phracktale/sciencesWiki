@@ -214,7 +214,7 @@ final class AdminApiClient
     {
         $res = $this->send('GET', '/api/admin/models', null);
 
-        return $res['ok'] ? $res['data'] : ['models' => [], 'default' => '', 'error' => 'Indisponible.'];
+        return $res['ok'] ? $res['data'] : ['models' => [], 'cloud' => [], 'default' => '', 'error' => 'Indisponible.'];
     }
 
     /** @return array<string,mixed> journal d'audit paginé */

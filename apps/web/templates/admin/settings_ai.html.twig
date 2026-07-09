@@ -1,6 +1,30 @@
 {% extends 'base.html.twig' %}
 {% block title %}Admin — Paramètres › IA{% endblock %}
+
+{# Sélecteur de modèle réutilisable : options construites en amont (locaux + cloud),
+   valeur courante toujours sélectionnable (même si absente des listes). #}
+{% macro modelSelect(name, current, models, allowDefault, defaultModel) %}
+    {% set locals = models.models|default([]) %}
+    {% set cloud = models.cloud|default([]) %}
+    {% set known = locals|merge(cloud) %}
+    <select name="{{ name }}" style="min-width:16rem">
+        {% if allowDefault %}<option value="" {{ current == '' ? 'selected' }}>Défaut serveur{% if defaultModel %} ({{ defaultModel }}){% endif %}</option>{% endif %}
+        {% if current is not empty and current not in known %}<option value="{{ current }}" selected>{{ current }} (personnalisé)</option>{% endif %}
+        {% if locals is not empty %}
+            <optgroup label="Local (homelab)">
+                {% for m in locals %}<option value="{{ m }}" {{ current == m ? 'selected' }}>{{ m }}</option>{% endfor %}
+            </optgroup>
+        {% endif %}
+        {% if cloud is not empty %}
+            <optgroup label="Cloud Ollama — ⚠️ hors homelab">
+                {% for m in cloud %}<option value="{{ m }}" {{ current == m ? 'selected' }}>{{ m }}</option>{% endfor %}
+            </optgroup>
+        {% endif %}
+    </select>
+{% endmacro %}
+
 {% block body %}
+    {% import _self as ui %}
     {% include 'admin/_nav.html.twig' %}
     <h1>Paramètres › Configuration IA</h1>
     {% for msg in app.flashes('success') %}<p class="badge ok">{{ msg }}</p>{% endfor %}
@@ -9,48 +33,27 @@
     <form class="ask" method="post" action="{{ path('admin_settings_ai') }}">
         <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
 
-        <h2 style="margin-top:0">Modèles de rédaction (Ollama)</h2>
-        <p class="muted" style="font-size:.85rem">Un modèle par objet rédactionnel.{% if models.error %} <span class="badge warn">serveur de modèles injoignable</span>{% endif %}</p>
-        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:.8rem">
-            <div>
-                <label>1 — Articles WIKI</label>
-                {% if models.models is not empty %}
-                    <select name="wiki_model">
-                        {% for m in models.models %}<option value="{{ m }}" {{ settings['wiki.model'] == m ? 'selected' }}>{{ m }}</option>{% endfor %}
-                    </select>
-                {% else %}<input type="text" name="wiki_model" value="{{ settings['wiki.model'] }}" placeholder="ex. qwen3.6:latest">{% endif %}
+        <h2 style="margin-top:0">Modèles par objet</h2>
+        <p class="muted" style="font-size:.85rem">Un modèle par objet ; modèles locaux et cloud disponibles pour chacun. Les modèles « cloud » sont plus puissants mais envoient le texte <strong>hors du homelab</strong>.{% if models.error %} <span class="badge warn">serveur local injoignable</span>{% endif %}</p>
+        <div style="display:flex; flex-direction:column; gap:.7rem; max-width:660px">
+            <div style="display:grid; grid-template-columns:14rem 1fr; align-items:center; gap:.8rem">
+                <label style="margin:0">1 — Articles WIKI</label>
+                {{ ui.modelSelect('wiki_model', settings['wiki.model'], models, false, '') }}
             </div>
-            <div>
-                <label>2 — Questions / Réponses</label>
-                {% if models.models is not empty %}
-                    <select name="model">
-                        <option value="">Défaut serveur{% if models.default %} ({{ models.default }}){% endif %}</option>
-                        {% for m in models.models %}<option value="{{ m }}" {{ settings['rag.model'] == m ? 'selected' }}>{{ m }}</option>{% endfor %}
-                    </select>
-                {% else %}<input type="text" name="model" value="{{ settings['rag.model'] }}" placeholder="ex. gemma4:latest">{% endif %}
+            <div style="display:grid; grid-template-columns:14rem 1fr; align-items:center; gap:.8rem">
+                <label style="margin:0">2 — Questions / Réponses (chat)</label>
+                {{ ui.modelSelect('model', settings['rag.model'], models, true, models.default) }}
             </div>
-            <div>
-                <label>3 — Tâches légères (extraction…)</label>
-                {% if models.models is not empty %}
-                    <select name="light_model">
-                        {% for m in models.models %}<option value="{{ m }}" {{ settings['ai.light_model'] == m ? 'selected' }}>{{ m }}</option>{% endfor %}
-                    </select>
-                {% else %}<input type="text" name="light_model" value="{{ settings['ai.light_model'] }}" placeholder="ex. llama3.1:8b">{% endif %}
-                <span class="muted" style="font-size:.78rem; display:block">Petit modèle rapide pour les tâches peu exigeantes (extraction de claims).</span>
+            <div style="display:grid; grid-template-columns:14rem 1fr; align-items:center; gap:.8rem">
+                <label style="margin:0">3 — Tâches légères (extraction…)</label>
+                {{ ui.modelSelect('light_model', settings['ai.light_model'], models, false, '') }}
             </div>
-            <div>
-                <label>4 — Évaluation critique (AXIS, RoB2…)</label>
-                {# Champ libre AVEC suggestions : accepte un modèle local OU distant (« :cloud »)
-                   qui n'apparaît pas dans « ollama list ». #}
-                <input type="text" name="appraisal_model" list="appraisalModels" value="{{ settings['ai.appraisal_model'] }}" placeholder="ex. glm-5.2:cloud" autocomplete="off">
-                {% if models.models is not empty %}
-                    <datalist id="appraisalModels">
-                        {% for m in models.models %}<option value="{{ m }}">{% endfor %}
-                    </datalist>
-                {% endif %}
-                <span class="muted" style="font-size:.78rem; display:block">Modèle de raisonnement pour les grilles (20 items) : plus capable que le modèle léger. ⚠️ Un modèle « :cloud » envoie le texte de l'étude hors du homelab.</span>
+            <div style="display:grid; grid-template-columns:14rem 1fr; align-items:center; gap:.8rem">
+                <label style="margin:0">4 — Évaluation critique (AXIS, RoB2…)</label>
+                {{ ui.modelSelect('appraisal_model', settings['ai.appraisal_model'], models, false, '') }}
             </div>
         </div>
+        <p class="muted" style="font-size:.78rem; margin-top:.4rem">Objet 4 = modèle de raisonnement des grilles (20 items) — le plus capable. Objet 3 = petit modèle rapide (extraction de claims).</p>
 
         <h2 style="margin-top:1.4rem">Configuration de la génération (Q/R)</h2>
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.8rem">
