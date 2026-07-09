@@ -114,14 +114,36 @@ final class AxisJsonParser
                 $analysis = $this->str($entry['analysis'] ?? ($entry['reasoning'] ?? null));
                 $limitations = $this->str($entry['limitations'] ?? null);
                 $evidence = $this->evidenceList($entry['evidence'] ?? null);
-                $evidenceType = $this->str($entry['evidence_type'] ?? null);
                 $confidence = $this->str($entry['confidence'] ?? null);
                 $requiresVisual = (bool) ($entry['requires_visual_check'] ?? false);
-                // Citation « à plat » (compat front actuel) : quote explicite sinon 1re preuve.
-                $quote = $this->str($entry['quote'] ?? null) ?? ($evidence[0]['quote'] ?? null);
+                // Nouveau format : evidence_type est porté PAR PREUVE ; le niveau item expose un
+                // « overall_evidence_type » (ex. mixed_explicit_and_absence). On en dérive un
+                // evidence_type « effectif » pour le garde-fou (qui accepte une absence vérifiée
+                // sur tout le texte). Compat : l'ancien evidence_type au niveau item est prioritaire.
+                $overallEvidenceType = $this->str($entry['overall_evidence_type'] ?? null);
+                $evidenceType = $this->str($entry['evidence_type'] ?? null);
+                if (null === $evidenceType) {
+                    if (null !== $overallEvidenceType && str_contains($overallEvidenceType, 'absence_from_full_text')) {
+                        $evidenceType = 'absence_from_full_text';
+                    } elseif (null !== $overallEvidenceType) {
+                        $evidenceType = $overallEvidenceType;
+                    } else {
+                        $evidenceType = $evidence[0]['evidence_type'] ?? null;
+                    }
+                }
+                // Citation « à plat » (compat front) : quote explicite sinon 1re preuve citée.
+                $quote = $this->str($entry['quote'] ?? null);
+                if (null === $quote) {
+                    foreach ($evidence as $e) {
+                        if (null !== $e['quote']) {
+                            $quote = $e['quote'];
+                            break;
+                        }
+                    }
+                }
             } else {
                 $answer = AxisAnswer::tryFrom((string) $entry);
-                $verdict = $expected = $evidenceFound = $analysis = $limitations = $evidenceType = $confidence = $quote = null;
+                $verdict = $expected = $evidenceFound = $analysis = $limitations = $evidenceType = $overallEvidenceType = $confidence = $quote = null;
                 $evidence = [];
                 $requiresVisual = false;
             }
@@ -137,6 +159,7 @@ final class AxisJsonParser
                 'limitations' => $limitations,
                 'evidence' => $evidence,
                 'evidence_type' => $evidenceType,
+                'overall_evidence_type' => $overallEvidenceType,
                 'confidence' => $confidence,
                 'requires_visual_check' => $requiresVisual,
                 'reasoning' => $analysis, // compat (le front actuel lit « reasoning »)
@@ -148,9 +171,11 @@ final class AxisJsonParser
     }
 
     /**
-     * Normalise la liste de preuves (0 à 5), ne gardant que les entrées avec citation.
+     * Normalise la liste de preuves (0 à 5). Chaque preuve porte son propre evidence_type ;
+     * on garde une entrée dès qu'elle a une CITATION ou un evidence_type (une preuve
+     * d'absence a `quote: null` + evidence_type = "absence_from_full_text").
      *
-     * @return list<array{source_type:?string,section:?string,quote:string}>
+     * @return list<array{source_type:?string,section:?string,quote:?string,evidence_type:?string}>
      */
     private function evidenceList(mixed $raw): array
     {
@@ -163,13 +188,15 @@ final class AxisJsonParser
                 continue;
             }
             $quote = $this->str($e['quote'] ?? null);
-            if (null === $quote) {
+            $etype = $this->str($e['evidence_type'] ?? null);
+            if (null === $quote && null === $etype) {
                 continue;
             }
             $out[] = [
                 'source_type' => $this->str($e['source_type'] ?? null),
                 'section' => $this->str($e['section'] ?? null),
                 'quote' => $quote,
+                'evidence_type' => $etype,
             ];
             if (\count($out) >= 5) {
                 break;

@@ -178,6 +178,7 @@ final class AxisAppraiser
             $analysis = $detail['analysis'] ?? ($detail['reasoning'] ?? (\is_string($detail) ? $detail : null));
             $limitations = $detail['limitations'] ?? null;
             $evidenceType = $detail['evidence_type'] ?? null;
+            $overallEvidenceType = $detail['overall_evidence_type'] ?? null;
             $confidence = $detail['confidence'] ?? null;
             $requiresVisual = (bool) ($detail['requires_visual_check'] ?? false);
             $flatQuote = $detail['quote'] ?? null;
@@ -224,6 +225,7 @@ final class AxisAppraiser
                 'limitations' => $limitations,
                 'evidence' => $evidenceOut,
                 'evidence_type' => $evidenceType,
+                'overall_evidence_type' => $overallEvidenceType,
                 'confidence' => $confidence,
                 'requires_visual_check' => $requiresVisual,
                 'anchored' => $anchored,

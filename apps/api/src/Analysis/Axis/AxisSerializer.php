@@ -56,6 +56,7 @@ final class AxisSerializer
                 'limitations' => \is_array($detail) ? ($detail['limitations'] ?? null) : null,
                 'evidence' => \is_array($detail) && \is_array($detail['evidence'] ?? null) ? array_values($detail['evidence']) : [],
                 'evidenceType' => \is_array($detail) ? ($detail['evidence_type'] ?? null) : null,
+                'overallEvidenceType' => \is_array($detail) ? ($detail['overall_evidence_type'] ?? null) : null,
                 'confidence' => \is_array($detail) ? ($detail['confidence'] ?? null) : null,
                 'requiresVisualCheck' => \is_array($detail) ? (bool) ($detail['requires_visual_check'] ?? false) : false,
                 'downgraded' => \is_array($detail) ? (bool) ($detail['downgraded'] ?? false) : false,

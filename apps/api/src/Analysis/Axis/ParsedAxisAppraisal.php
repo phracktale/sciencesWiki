@@ -14,8 +14,21 @@ use App\Enum\AxisApplicability;
 final class ParsedAxisAppraisal
 {
     /**
-     * @param array<string,AxisAnswer> $answers       q1…q20 → réponse
-     * @param array<string,string>     $justifications q → citation verbatim (le cas échéant)
+     * @param array<string,AxisAnswer> $answers        q1…q20 → réponse
+     * @param array<string,array{
+     *     verdict:?string,
+     *     expected:?string,
+     *     evidence_found:?string,
+     *     analysis:?string,
+     *     limitations:?string,
+     *     evidence:list<array{source_type:?string,section:?string,quote:?string,evidence_type:?string}>,
+     *     evidence_type:?string,
+     *     overall_evidence_type:?string,
+     *     confidence:?string,
+     *     requires_visual_check:bool,
+     *     reasoning:?string,
+     *     quote:?string
+     * }> $justifications  q → analyse structurée par item (avant garde-fou)
      */
     public function __construct(
         public readonly AxisApplicability $applicability,
