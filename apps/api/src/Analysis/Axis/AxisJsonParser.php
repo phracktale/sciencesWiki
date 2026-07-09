@@ -108,26 +108,75 @@ final class AxisJsonParser
             if (\is_array($entry)) {
                 $answer = AxisAnswer::tryFrom((string) ($entry['answer'] ?? ''));
                 $verdict = $this->str($entry['verdict'] ?? null);
+                $expected = $this->str($entry['expected'] ?? null);
+                $evidenceFound = $this->str($entry['evidence_found'] ?? null);
+                // Compat : « analysis » (nouveau) sinon « reasoning » (ancien format).
+                $analysis = $this->str($entry['analysis'] ?? ($entry['reasoning'] ?? null));
+                $limitations = $this->str($entry['limitations'] ?? null);
+                $evidence = $this->evidenceList($entry['evidence'] ?? null);
                 $evidenceType = $this->str($entry['evidence_type'] ?? null);
                 $confidence = $this->str($entry['confidence'] ?? null);
-                $reasoning = $this->str($entry['reasoning'] ?? null);
-                $quote = $this->str($entry['quote'] ?? null);
+                $requiresVisual = (bool) ($entry['requires_visual_check'] ?? false);
+                // Citation « à plat » (compat front actuel) : quote explicite sinon 1re preuve.
+                $quote = $this->str($entry['quote'] ?? null) ?? ($evidence[0]['quote'] ?? null);
             } else {
                 $answer = AxisAnswer::tryFrom((string) $entry);
-                $verdict = null;
-                $evidenceType = null;
-                $confidence = null;
-                $reasoning = null;
-                $quote = null;
+                $verdict = $expected = $evidenceFound = $analysis = $limitations = $evidenceType = $confidence = $quote = null;
+                $evidence = [];
+                $requiresVisual = false;
             }
             if (null === $answer) {
                 continue;
             }
             $answers[$key] = $answer;
-            $justifications[$key] = ['verdict' => $verdict, 'evidence_type' => $evidenceType, 'confidence' => $confidence, 'reasoning' => $reasoning, 'quote' => $quote];
+            $justifications[$key] = [
+                'verdict' => $verdict,
+                'expected' => $expected,
+                'evidence_found' => $evidenceFound,
+                'analysis' => $analysis,
+                'limitations' => $limitations,
+                'evidence' => $evidence,
+                'evidence_type' => $evidenceType,
+                'confidence' => $confidence,
+                'requires_visual_check' => $requiresVisual,
+                'reasoning' => $analysis, // compat (le front actuel lit « reasoning »)
+                'quote' => $quote,        // compat
+            ];
         }
 
         return [$answers, $justifications];
+    }
+
+    /**
+     * Normalise la liste de preuves (0 à 5), ne gardant que les entrées avec citation.
+     *
+     * @return list<array{source_type:?string,section:?string,quote:string}>
+     */
+    private function evidenceList(mixed $raw): array
+    {
+        if (!\is_array($raw)) {
+            return [];
+        }
+        $out = [];
+        foreach ($raw as $e) {
+            if (!\is_array($e)) {
+                continue;
+            }
+            $quote = $this->str($e['quote'] ?? null);
+            if (null === $quote) {
+                continue;
+            }
+            $out[] = [
+                'source_type' => $this->str($e['source_type'] ?? null),
+                'section' => $this->str($e['section'] ?? null),
+                'quote' => $quote,
+            ];
+            if (\count($out) >= 5) {
+                break;
+            }
+        }
+
+        return $out;
     }
 
     private function stripFences(string $raw): string

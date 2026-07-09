@@ -89,37 +89,62 @@ final class AxisPromptBuilder
             - q4 (population cible) : une population de référence CLINIQUE clairement décrite (ex.
               « adultes référés pour évaluation d'un TDAH ») suffit pour "yes".
 
-            Règles de sortie :
-            - Pour CHAQUE item, fournis TOUJOURS :
+            SOURCES DISPONIBLES : tu ne reçois que le TEXTE extrait de l'article (résumé + texte
+            intégral quand disponible). Tu N'AS PAS de rendu image des pages : tableaux, figures et
+            notes de tableau ne te sont accessibles QUE s'ils ont été transcrits dans le texte.
+            Avant de conclure « absent », cherche dans TOUTES les sections fournies (résumé,
+            méthodes, résultats, tableaux transcrits, discussion, limites, déclarations éthiques et
+            de financement).
+
+            Règles de sortie — pour CHAQUE item, fournis une ANALYSE STRUCTURÉE (JAMAIS un simple
+            résumé du verdict) :
                 • "answer"        : "yes" | "partial" | "no" | "na" | "unclear" (selon la doctrine).
-                • "verdict"       : libellé court nuancé en français (« Oui », « Oui, avec prudence »,
-                  « Partiellement », « Non », « Non applicable », « Indéterminé »…).
-                • "evidence_type" : "explicit_quote" (le texte AFFIRME explicitement, citation à l'appui)
-                  | "absence_from_text" (ta réponse repose sur le fait que le texte NE MENTIONNE PAS
-                  l'élément — absence vérifiable) | "inference" (tu DÉDUIS d'un élément du texte, sans
-                  phrase explicite).
-                • "confidence"    : "high" | "medium" | "low" ("high" est INTERDIT si evidence_type
-                  vaut "inference").
-                • "reasoning"     : ta réflexion en une phrase claire en français (JAMAIS vide).
-                • "quote"         : phrase EXACTE (verbatim, langue d'origine) du texte étayant ta
-                  réponse — OBLIGATOIRE si evidence_type="explicit_quote" ; sinon null.
-            - ANCRAGE STRICT : toute réponse "yes"/"partial"/"no" doit être étayée soit par une
-              citation verbatim réellement présente dans le texte, soit par une absence vérifiable
-              (evidence_type="absence_from_text"). À défaut, réponds "unclear" — une justification
-              non sourcée ne doit JAMAIS faire pencher la balance.
+                • "verdict"       : libellé court nuancé en français (« Oui, avec prudence »…).
+                • "expected"      : ce que la grille AXIS EXIGE pour répondre « yes » à CET item
+                  (énonce la règle AVANT de juger).
+                • "evidence_found": ce que l'article fournit RÉELLEMENT sur ce point, ou « rien trouvé ».
+                • "analysis"      : la COMPARAISON explicite entre l'attendu et le trouvé (le motif
+                  de ta réponse). JAMAIS vide.
+                • "limitations"   : ce qui manque, est ambigu, ou repose sur une inférence.
+                • "evidence"      : liste de 0 à 5 preuves, chacune
+                  { "source_type": "text|table|figure", "section": "ex. Methods/Participants",
+                    "quote": "phrase verbatim (langue d'origine) ou transcription courte" }.
+                • "evidence_type" : "explicit_quote" (le texte l'affirme, citation à l'appui) |
+                  "visual_table" | "visual_figure" (transcription d'un tableau/figure présente dans le
+                  texte) | "absence_from_full_text" (tu as vérifié TOUT le texte fourni et l'info n'y
+                  est pas) | "absence_from_extracted_text_only" (non trouvé dans le texte extrait, mais
+                  pourrait figurer dans un tableau/figure image non analysé → PRUDENCE) | "inference".
+                • "confidence"    : "high" | "medium" | "low" ("high" INTERDIT si evidence_type vaut
+                  "inference" ou "absence_from_extracted_text_only").
+                • "requires_visual_check" : true si la réponse dépend probablement d'un tableau/figure
+                  non transcrit (typiquement q12, q15, q16 ; parfois q10, q19).
+            - ANCRAGE STRICT (3 niveaux) : une réponse "yes"/"partial"/"no" n'est valable que si
+              (1) une preuve verbatim est réellement présente dans le texte, OU (2) elle repose sur
+              une absence VÉRIFIÉE sur tout le texte ("absence_from_full_text"). Une simple
+              "absence_from_extracted_text_only" ou une "inference" NE SUFFIT PAS : réponds "unclear".
+              Une justification non sourcée ne doit JAMAIS faire pencher la balance.
             - N'invente RIEN. "study_design" : mot-clé anglais (cross-sectional, rct, cohort,
               case_control, systematic_review, meta_analysis, in_vivo, in_vitro, modeling, other).
             - "summary" : réflexion générale de 2 à 4 phrases (forces/faiblesses). PAS de note chiffrée.
             - Réponds UNIQUEMENT par le JSON, sans texte autour, sans bloc de code.
 
-            Schéma de sortie :
+            Schéma de sortie (par item) :
             {
               "study_design": "cross-sectional|rct|cohort|case_control|systematic_review|meta_analysis|in_vivo|in_vitro|modeling|other",
               "applicable": true,
               "items": {
-                "q1": {"answer": "yes|partial|no|na|unclear", "verdict": "…", "evidence_type": "explicit_quote|absence_from_text|inference", "confidence": "high|medium|low", "reasoning": "…", "quote": "verbatim ou null"},
-                "…": {"answer": "…", "verdict": "…", "evidence_type": "…", "confidence": "…", "reasoning": "…", "quote": null},
-                "q20": {"answer": "…", "verdict": "…", "evidence_type": "…", "confidence": "…", "reasoning": "…", "quote": null}
+                "q1": {
+                  "answer": "yes|partial|no|na|unclear", "verdict": "…",
+                  "expected": "ce qu'AXIS exige pour un oui",
+                  "evidence_found": "ce que l'article fournit",
+                  "analysis": "comparaison attendu vs trouvé",
+                  "limitations": "ce qui manque / ambigu / inféré",
+                  "evidence": [{"source_type": "text", "section": "Methods", "quote": "verbatim"}],
+                  "evidence_type": "explicit_quote|visual_table|visual_figure|absence_from_full_text|absence_from_extracted_text_only|inference",
+                  "confidence": "high|medium|low",
+                  "requires_visual_check": false
+                },
+                "…": { … }, "q20": { … }
               },
               "summary": "réflexion générale en 2-4 phrases"
             }

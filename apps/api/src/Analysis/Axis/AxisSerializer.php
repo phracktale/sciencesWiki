@@ -49,9 +49,15 @@ final class AxisSerializer
                 'reasoning' => $reasoning,
                 'quote' => $quote,
                 'anchored' => \is_array($detail) ? (bool) ($detail['anchored'] ?? false) : false,
-                // Traçabilité de la décision (nature de la preuve + rétrogradation du garde-fou).
+                // Analyse structurée (vue « audit ») + traçabilité de la décision.
+                'expected' => \is_array($detail) ? ($detail['expected'] ?? null) : null,
+                'evidenceFound' => \is_array($detail) ? ($detail['evidence_found'] ?? null) : null,
+                'analysis' => \is_array($detail) ? ($detail['analysis'] ?? $reasoning) : $reasoning,
+                'limitations' => \is_array($detail) ? ($detail['limitations'] ?? null) : null,
+                'evidence' => \is_array($detail) && \is_array($detail['evidence'] ?? null) ? array_values($detail['evidence']) : [],
                 'evidenceType' => \is_array($detail) ? ($detail['evidence_type'] ?? null) : null,
                 'confidence' => \is_array($detail) ? ($detail['confidence'] ?? null) : null,
+                'requiresVisualCheck' => \is_array($detail) ? (bool) ($detail['requires_visual_check'] ?? false) : false,
                 'downgraded' => \is_array($detail) ? (bool) ($detail['downgraded'] ?? false) : false,
             ];
         }
@@ -65,6 +71,7 @@ final class AxisSerializer
             'favorableCount' => $appraisal->getFavorableCount(),
             'assessableCount' => $appraisal->getAssessableCount(),
             'sourceScope' => $appraisal->getSourceScope(),
+            'sourceCoverage' => $this->sourceCoverage((string) $appraisal->getSourceScope()),
             'summary' => $appraisal->getSummary(),
             'status' => $appraisal->getStatus()->value,
             'model' => $appraisal->getAppraisalModel(),
@@ -72,6 +79,31 @@ final class AxisSerializer
             'items' => $items,
             // Disclaimer + modèle réellement utilisé (traçabilité, comparaison de modèles).
             'disclaimer' => self::DISCLAIMER.' Modèle : '.($appraisal->getAppraisalModel() ?: 'non précisé').'.',
+        ];
+    }
+
+    /**
+     * Couverture des sources RÉELLEMENT analysées. L'évaluation ne lit que le TEXTE extrait
+     * (GROBID) : les tableaux/figures sous forme d'IMAGE ne sont pas vus (pas de pipeline
+     * visuel). Exposé honnêtement pour interpréter avec prudence les items qui dépendent
+     * d'un tableau/figure (données de base, résultats, cohérence interne).
+     *
+     * @return array<string,mixed>
+     */
+    private function sourceCoverage(string $scope): array
+    {
+        $hasFulltext = str_contains($scope, 'fulltext');
+
+        return [
+            'abstract' => true,
+            'fulltext' => $hasFulltext,
+            'tablesTextExtracted' => $hasFulltext, // GROBID capture une PARTIE du texte des tableaux
+            'figuresExtracted' => false,
+            'pageImagesAvailable' => false,
+            'visualReviewPerformed' => false,
+            'coverageWarning' => $hasFulltext
+                ? "Les tableaux et figures sous forme d'image n'ont pas été analysés visuellement : les items qui en dépendent (données de base, résultats, cohérence interne) peuvent être incomplets."
+                : 'Évaluation fondée sur le RÉSUMÉ seul : la plupart des items ne peuvent pas être vérifiés en profondeur.',
         ];
     }
 }

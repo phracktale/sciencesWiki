@@ -316,10 +316,14 @@
                     {% set band = result.reliabilityBand %}
                     {% set bandLabel = {'high':'élevée','moderate':'modérée','low':'faible','insufficient':'insuffisante (texte trop limité)'} %}
                     <p>Fiabilité indicative : <strong>{{ bandLabel[band] ?? band }}</strong>
-                       — {{ result.favorableCount }}/{{ result.assessableCount }} critères favorables
-                       <span class="muted">(source : {{ result.sourceScope == 'abstract+fulltext' ? 'résumé + texte intégral' : 'résumé seul' }})</span></p>
+                       <span class="muted">— {{ result.favorableCount }} critère(s) favorable(s) sur {{ result.assessableCount }} évaluable(s) ·
+                       repère indicatif, <strong>pas un score</strong> · source : {{ result.sourceScope == 'abstract+fulltext' ? 'résumé + texte intégral' : 'résumé seul' }}</span></p>
 
                     {% if result.summary %}<p>{{ result.summary }}</p>{% endif %}
+
+                    {% if result.sourceCoverage.coverageWarning is defined %}
+                        <p class="badge warn" style="font-size:.8rem; display:block; padding:.4rem .6rem">🖼 {{ result.sourceCoverage.coverageWarning }}</p>
+                    {% endif %}
 
                     <details style="margin-top:.8rem">
                         <summary style="cursor:pointer; font-weight:600">Les 20 critères en détail</summary>
@@ -329,8 +333,28 @@
                                 <li style="padding:.5rem 0; border-bottom:1px solid var(--line)">
                                     {{ icon }} <strong>{{ it.question }}</strong>
                                     <span class="muted">— {{ it.answerLabel }}</span>
-                                    {% if it.reasoning %}<div style="font-size:.85rem; margin:.15rem 0 0 1.4rem">{{ it.reasoning }}</div>{% endif %}
-                                    {% if it.quote %}<blockquote style="margin:.2rem 0 0 1.4rem; font-size:.85rem; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ it.quote }} »</blockquote>{% endif %}
+                                    {% if it.confidence %}<span class="muted" style="font-size:.72rem"> · confiance {{ it.confidence }}</span>{% endif %}
+                                    {% if it.downgraded %}<span title="Réponse rétrogradée : non étayée par une preuve ancrée" style="font-size:.72rem; color:#b45309"> · ⚠ non étayé</span>{% endif %}
+                                    {% if it.requiresVisualCheck %}<span title="Dépend d'un tableau/figure non analysé visuellement" style="font-size:.72rem; color:#6b7280"> · 🖼 tableau/figure</span>{% endif %}
+                                    {% if it.analysis %}<div style="font-size:.85rem; margin:.15rem 0 0 1.4rem">{{ it.analysis }}</div>{% endif %}
+                                    {% if it.expected or it.evidenceFound or it.limitations or it.evidence %}
+                                        <details style="margin:.25rem 0 0 1.4rem">
+                                            <summary class="muted" style="cursor:pointer; font-size:.78rem">Analyse détaillée</summary>
+                                            <div style="font-size:.82rem; margin-top:.3rem; display:grid; gap:.25rem">
+                                                {% if it.expected %}<div><strong>Attendu (AXIS) :</strong> {{ it.expected }}</div>{% endif %}
+                                                {% if it.evidenceFound %}<div><strong>Trouvé :</strong> {{ it.evidenceFound }}</div>{% endif %}
+                                                {% if it.limitations %}<div><strong>Limites :</strong> {{ it.limitations }}</div>{% endif %}
+                                                {% if it.evidenceType %}<div class="muted">Nature de la preuve : {{ it.evidenceType }}</div>{% endif %}
+                                                {% for e in it.evidence %}
+                                                    <blockquote style="margin:.1rem 0 0; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ e.quote }} »
+                                                        <span class="muted" style="font-size:.72rem">— {{ e.section ?: e.source_type }}{% if e.anchored %} · ✓ ancrée{% else %} · non retrouvée{% endif %}</span>
+                                                    </blockquote>
+                                                {% endfor %}
+                                            </div>
+                                        </details>
+                                    {% elseif it.quote %}
+                                        <blockquote style="margin:.2rem 0 0 1.4rem; font-size:.85rem; color:#475569; border-left:2px solid var(--line); padding-left:.6rem">« {{ it.quote }} »</blockquote>
+                                    {% endif %}
                                 </li>
                             {% endfor %}
                         </ul>

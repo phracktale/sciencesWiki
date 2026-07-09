@@ -170,23 +170,46 @@ final class AxisAppraiser
 
         foreach (AxisChecklist::keys() as $key) {
             $answer = $parsed->answers[$key] ?? AxisAnswer::Unclear;
-            $detail = $parsed->justifications[$key] ?? [];
-            $verdict = \is_array($detail) ? ($detail['verdict'] ?? null) : null;
-            $evidenceType = \is_array($detail) ? ($detail['evidence_type'] ?? null) : null;
-            $confidence = \is_array($detail) ? ($detail['confidence'] ?? null) : null;
-            $reasoning = \is_array($detail) ? ($detail['reasoning'] ?? null) : (\is_string($detail) ? $detail : null);
-            $quote = \is_array($detail) ? ($detail['quote'] ?? null) : null;
+            $detail = \is_array($parsed->justifications[$key] ?? null) ? $parsed->justifications[$key] : [];
 
-            $anchored = null !== $quote && $this->quoteExists($quote, $haystack);
+            $verdict = $detail['verdict'] ?? null;
+            $expected = $detail['expected'] ?? null;
+            $evidenceFound = $detail['evidence_found'] ?? null;
+            $analysis = $detail['analysis'] ?? ($detail['reasoning'] ?? (\is_string($detail) ? $detail : null));
+            $limitations = $detail['limitations'] ?? null;
+            $evidenceType = $detail['evidence_type'] ?? null;
+            $confidence = $detail['confidence'] ?? null;
+            $requiresVisual = (bool) ($detail['requires_visual_check'] ?? false);
+            $flatQuote = $detail['quote'] ?? null;
 
-            // Garde-fou STRICT : une réponse AFFIRMÉE (yes/partial/no) doit être étayée soit par
-            // une citation réellement présente dans le texte, soit par une ABSENCE vérifiable
-            // (evidence_type = "absence_from_text"). À défaut, on rétrograde en « indéterminé » :
-            // une justification non sourcée ne doit pas peser sur le score (anti-hallucination +
-            // sévérité, cf. doctrine du prompt). La réflexion du modèle reste conservée.
+            // Ancrage : on marque chaque preuve dont la citation est réellement présente
+            // (verbatim) dans le texte source ; « anchored » = au moins une preuve ancrée.
+            $evidenceOut = [];
+            $anchoredCount = 0;
+            $firstAnchoredQuote = null;
+            foreach (\is_array($detail['evidence'] ?? null) ? $detail['evidence'] : [] as $e) {
+                if (!\is_array($e)) {
+                    continue;
+                }
+                $q = $e['quote'] ?? null;
+                $e['anchored'] = null !== $q && $this->quoteExists((string) $q, $haystack);
+                if ($e['anchored']) {
+                    ++$anchoredCount;
+                    $firstAnchoredQuote ??= (string) $q;
+                }
+                $evidenceOut[] = $e;
+            }
+            $flatAnchored = null !== $flatQuote && $this->quoteExists((string) $flatQuote, $haystack);
+            $anchored = $anchoredCount > 0 || $flatAnchored;
+
+            // Garde-fou À 3 NIVEAUX (cf. doctrine du prompt) : une réponse AFFIRMÉE (yes/partial/
+            // no) n'est conservée que si (1) une preuve est ancrée dans le texte, ou (2) elle
+            // repose sur une absence vérifiée sur TOUT le texte ("absence_from_full_text"). Sinon
+            // (absence extraite seule, inférence, citation non retrouvée) → rétrogradée en
+            // « indéterminé » : elle ne pèse pas sur le score. La réflexion reste conservée.
             $affirmed = \in_array($answer, [AxisAnswer::Yes, AxisAnswer::Partial, AxisAnswer::No], true);
             $downgraded = false;
-            if ($affirmed && !$anchored && 'absence_from_text' !== $evidenceType) {
+            if ($affirmed && !$anchored && 'absence_from_full_text' !== $evidenceType) {
                 $answer = AxisAnswer::Unclear;
                 $verdict = null; // le libellé retombe sur « Indéterminé »
                 $downgraded = true;
@@ -195,12 +218,19 @@ final class AxisAppraiser
             $answers[$key] = $answer;
             $justifications[$key] = [
                 'verdict' => $verdict,
+                'expected' => $expected,
+                'evidence_found' => $evidenceFound,
+                'analysis' => $analysis,
+                'limitations' => $limitations,
+                'evidence' => $evidenceOut,
                 'evidence_type' => $evidenceType,
                 'confidence' => $confidence,
-                'reasoning' => $reasoning,
-                'quote' => $anchored ? $quote : null,
+                'requires_visual_check' => $requiresVisual,
                 'anchored' => $anchored,
                 'downgraded' => $downgraded,
+                // Compat front actuel : réflexion « à plat » + 1re citation ancrée.
+                'reasoning' => $analysis,
+                'quote' => $anchored ? ($firstAnchoredQuote ?? ($flatAnchored ? $flatQuote : null)) : null,
             ];
         }
 
@@ -271,7 +301,8 @@ final class AxisAppraiser
     private function complete(Publication $publication, string $sourceText): ?ParsedAxisAppraisal
     {
         $messages = $this->promptBuilder->build($publication, $sourceText);
-        $opts = ['temperature' => 0.0, 'max_tokens' => 4000, 'model' => $this->settings->appraisalModel(), 'timeout' => self::LLM_TIMEOUT, 'json' => true];
+        // Sortie riche (analyse structurée + tableau de preuves par item) → budget large.
+        $opts = ['temperature' => 0.0, 'max_tokens' => 8000, 'model' => $this->settings->appraisalModel(), 'timeout' => self::LLM_TIMEOUT, 'json' => true];
 
         $parsed = $this->parser->parse($this->llm->complete($messages, $opts)->content);
         if (null === $parsed) {
