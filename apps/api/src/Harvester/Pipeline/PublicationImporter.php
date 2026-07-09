@@ -64,6 +64,34 @@ final class PublicationImporter
         $existing = $this->deduplicator->findExisting($raw);
         $created = null === $existing;
 
+        // Concurrence (6 workers en parallèle) : une œuvre très citée appartient à
+        // plusieurs rubriques, donc deux workers peuvent importer la MÊME publication
+        // au même instant. Chacun voit findExisting() = null (l'insert de l'autre n'est
+        // pas encore commité) et crée une entité ⇒ au flush du lot, violation de la
+        // contrainte unique (doi) ⇒ TOUT le lot est annulé + EntityManager fermé ⇒ le
+        // job de moisson meurt (0 insertion). Comme pour les auteurs/revues, on
+        // revendique le DOI atomiquement (INSERT ON CONFLICT DO NOTHING) puis on recharge
+        // l'entité gérée — la nôtre si on l'a créée, celle du worker concurrent sinon.
+        if ($created) {
+            $doi = Doi::normalize($raw->doi);
+            if (null !== $doi) {
+                $inserted = (int) $this->conn->executeStatement(
+                    "INSERT INTO publication
+                        (doi, title, external_ids, oa_status, fulltext_available, fulltext_stored, processing_status, created_at, updated_at)
+                     VALUES (:doi, :title, '[]', 'unknown', false, false, 'to_process', now(), now())
+                     ON CONFLICT (doi) DO NOTHING",
+                    ['doi' => $doi, 'title' => $raw->title],
+                );
+                $reloaded = $this->deduplicator->findExisting($raw);
+                if (null !== $reloaded) {
+                    $existing = $reloaded;
+                    // Nouvelle SEULEMENT si c'est notre INSERT qui a pris (sinon le worker
+                    // concurrent rattache déjà les auteurs : on ne fait que fusionner).
+                    $created = 1 === $inserted;
+                }
+            }
+        }
+
         $publication = $existing ?? new Publication($raw->title);
 
         $this->mergeMetadata($publication, $raw, $created);
