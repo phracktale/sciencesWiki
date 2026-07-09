@@ -2,6 +2,7 @@
 {% block title %}Analyses — Évaluation critique — SciencesWiki{% endblock %}
 {% block body %}
     {% import 'wiki/_studycard.html.twig' as cards %}
+    {% include 'wiki/_accesslegend.html.twig' %}
     <h1>Analyses des études 🔬</h1>
     <p class="muted">Cherchez une étude par <strong>titre, mots-clés ou DOI</strong>. Selon le devis détecté, l'IA propose l'outil adapté : <strong>AXIS</strong> (études transversales), <strong>RoB 2</strong> (essais randomisés) ou <strong>AMSTAR-2</strong> (revues systématiques). <strong>Ce ne sont pas des notes</strong> — des signaux pour vous aider à juger, jamais un verdict.</p>
     <p style="font-size:.9rem"><a href="{{ path('my_studies') }}">📄 Mes études déposées →</a></p>

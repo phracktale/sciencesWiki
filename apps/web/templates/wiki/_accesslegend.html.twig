@@ -1,0 +1,67 @@
+{# Légende des types d'accès (open access) en popin. S'ouvre au clic sur n'importe
+   quel .access-badge (badge d'accès, macro Twig ou scwAccessBadge JS). À inclure une
+   fois par page affichant des badges d'accès. #}
+<style>
+    .oa-modal { position:fixed; inset:0; background:rgba(15,23,42,.55); display:none; align-items:center; justify-content:center; z-index:1000; padding:1rem; }
+    .oa-modal.open { display:flex; }
+    .oa-modal-box { background:#fff; color:#1e293b; border-radius:12px; max-width:900px; width:100%; max-height:88vh; overflow:auto; padding:1.2rem 1.3rem; box-shadow:0 12px 40px rgba(0,0,0,.3); }
+    .oa-modal-box h2 { margin:0 0 .2rem; font-size:1.15rem; }
+    .oa-close { float:right; border:0; background:#f1f5f9; border-radius:8px; cursor:pointer; font-size:1rem; padding:.2rem .6rem; }
+    .oa-table-wrap { overflow-x:auto; margin-top:.7rem; }
+    table.oa-legend { border-collapse:collapse; width:100%; font-size:.85rem; min-width:640px; }
+    table.oa-legend th, table.oa-legend td { text-align:left; padding:.45rem .55rem; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+    table.oa-legend th { background:#f8fafc; font-weight:700; }
+    table.oa-legend tr[data-oa].oa-hi { background:#fef9c3; }
+    table.oa-legend .oa-dot { display:inline-block; width:.7rem; height:.7rem; border-radius:50%; margin-right:.35rem; vertical-align:middle; }
+    @media (prefers-color-scheme: dark) {
+        .oa-modal-box { background:#0f172a; color:#e2e8f0; }
+        table.oa-legend th { background:#1e293b; }
+        table.oa-legend th, table.oa-legend td { border-color:#334155; }
+        table.oa-legend tr[data-oa].oa-hi { background:#3f3f1e; }
+        .oa-close { background:#1e293b; color:#e2e8f0; }
+    }
+</style>
+<div class="oa-modal" id="oa-modal" role="dialog" aria-modal="true" aria-label="Types d'accès">
+    <div class="oa-modal-box">
+        <button type="button" class="oa-close" id="oa-close" aria-label="Fermer">✕</button>
+        <h2>Types d'accès aux articles (open access)</h2>
+        <p class="muted" style="margin:.1rem 0 0; font-size:.82rem">Le type surligné correspond au badge cliqué.</p>
+        <div class="oa-table-wrap">
+            <table class="oa-legend">
+                <thead><tr><th>Type</th><th>Ce que ça veut dire</th><th>Qui paie ?</th><th>Licence / droits</th></tr></thead>
+                <tbody>
+                    <tr data-oa="closed"><td><span class="oa-dot" style="background:#64748b"></span><strong>Closed / fermé</strong></td><td>Derrière un paywall : abonnement institutionnel, achat à l'article ou éditeur.</td><td>Lecteur, bibliothèque, université.</td><td>Droits limités.</td></tr>
+                    <tr data-oa="gold"><td><span class="oa-dot" style="background:#d97706"></span><strong>Gold</strong></td><td>Publié directement dans une revue entièrement open access.</td><td>Souvent auteur/labo/financeur via APC ; parfois subvention.</td><td>En principe licence ouverte.</td></tr>
+                    <tr data-oa="green"><td><span class="oa-dot" style="background:#16a34a"></span><strong>Green</strong></td><td>Revue classique, mais une version est déposée en archive ouverte (HAL, PubMed Central, arXiv…).</td><td>Pas forcément de frais.</td><td>Dépend de la version déposée et du contrat éditeur.</td></tr>
+                    <tr data-oa="hybrid"><td><span class="oa-dot" style="background:#0891b2"></span><strong>Hybrid</strong></td><td>Revue payante, mais certains articles rendus OA au cas par cas (souvent contre APC).</td><td>Auteur / labo / financeur.</td><td>Licence ouverte pour les articles concernés.</td></tr>
+                    <tr data-oa="diamond"><td><span class="oa-dot" style="background:#7c3aed"></span><strong>Diamond / Platinum</strong></td><td>OA gratuit pour le lecteur <strong>et</strong> pour l'auteur.</td><td>Institution, société savante, subvention, fondation.</td><td>Licence ouverte en général.</td></tr>
+                    <tr data-oa="bronze"><td><span class="oa-dot" style="background:#b45309"></span><strong>Bronze</strong></td><td>Lisible gratuitement sur le site de l'éditeur, mais sans licence ouverte claire.</td><td>Variable.</td><td>Fragile : gratuit à lire, pas forcément réutilisable.</td></tr>
+                    <tr><td><strong>Delayed</strong></td><td>Fermé au départ, ouvert après embargo (6, 12, 24 mois…).</td><td>Abonnement au départ ; gratuit après délai.</td><td>Variable, souvent moins ouvert qu'un vrai OA licencié.</td></tr>
+                    <tr><td><strong>Gratis</strong></td><td>Gratuit à lire.</td><td>Variable.</td><td>Pas forcément libre à réutiliser.</td></tr>
+                    <tr><td><strong>Libre</strong></td><td>Gratuit à lire <strong>et</strong> réutilisable sous licence ouverte.</td><td>Variable.</td><td>L'open access au sens fort.</td></tr>
+                    <tr><td><strong>Black</strong></td><td>Accès via plateformes pirates ou copies non autorisées.</td><td>Personne officiellement.</td><td>Illégal / non autorisé — à ne pas confondre avec l'OA.</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script nonce="{{ csp_nonce.value }}">
+(function () {
+    var modal = document.getElementById('oa-modal');
+    if (!modal) return;
+    function open(oa) {
+        modal.querySelectorAll('tr.oa-hi').forEach(function (r) { r.classList.remove('oa-hi'); });
+        if (oa) { var row = modal.querySelector('tr[data-oa="' + oa + '"]'); if (row) row.classList.add('oa-hi'); }
+        modal.classList.add('open');
+    }
+    function close() { modal.classList.remove('open'); }
+    // Délégation : n'importe quel badge d'accès (Twig ou JS) ouvre la légende.
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('.access-badge') : null;
+        if (b) { e.preventDefault(); e.stopPropagation(); open(b.getAttribute('data-oa')); }
+    });
+    document.getElementById('oa-close').addEventListener('click', close);
+    modal.addEventListener('click', function (e) { if (e.target === modal) close(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+})();
+</script>
