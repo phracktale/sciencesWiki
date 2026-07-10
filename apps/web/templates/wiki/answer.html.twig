@@ -19,6 +19,7 @@
     {% endif %}
 
     <h1>{{ answer.title }}</h1>
+    <p style="margin:.2rem 0 .6rem"><a href="{{ path('answer_pdf', {id: answer.id}) }}" target="_blank" rel="noopener" style="text-decoration:none; color:var(--accent); font-weight:600; font-size:.9rem">📄 Voir / télécharger en PDF</a></p>
     <p class="qmeta">
         <span class="pill author">✍️ {{ answer.askerName }}</span>
         {% if answer.validationStatus == 'valide' %}

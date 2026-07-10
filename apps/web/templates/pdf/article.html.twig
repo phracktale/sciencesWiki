@@ -1,0 +1,33 @@
+{# Fragment HTML rendu par TCPDF (writeHTML) dans la zone de texte du gabarit charté.
+   PDF d'un article de vulgarisation SciencesWiki (à la volée, non stocké). #}
+<style>
+    h1 { font-size: 18pt; color: #02356c; font-weight: bold; }
+    .surtitle { font-size: 9pt; color: #019fb9; font-weight: bold; }
+    .bh { font-size: 12.5pt; color: #019fb9; font-weight: bold; }
+    p { font-size: 10.5pt; color: #1f2937; }
+    .small { font-size: 9pt; color: #4b5563; }
+    .ref { font-size: 9pt; color: #1f2937; }
+    .url { color: #02356c; }
+    h2 { font-size: 13pt; color: #019fb9; font-weight: bold; }
+    h3 { font-size: 11pt; color: #02356c; font-weight: bold; }
+</style>
+
+<div class="surtitle">ARTICLE DE VULGARISATION — SCIENCESWIKI</div>
+<h1>{{ answer.title }}</h1>
+{% if answer.questionText %}<p class="small"><b>Question :</b> {{ answer.questionText }}</p>{% endif %}
+
+{{ answer.vulgarizationContent|md }}
+
+{% if answer.academicContent %}
+    <br><div class="bh">Données issues des études citées</div>
+    {{ answer.academicContent|md }}
+{% endif %}
+
+{% if answer.sources is not empty %}
+    <br><div class="bh">Sources</div>
+    {% for s in answer.sources %}
+        <div class="ref">[{{ loop.index }}] <b>{{ s.title }}</b>{% if s.authors is not empty %} — {{ s.authors|slice(0, 6)|join(', ') }}{% if s.authors|length > 6 %} et al.{% endif %}{% endif %}{% if s.year %} ({{ s.year }}){% endif %}{% if s.venue %}. {{ s.venue }}{% endif %}.{% if s.doi %} <span class="url">https://doi.org/{{ s.doi }}</span>{% endif %}</div>
+    {% endfor %}
+{% endif %}
+
+<br><p class="small"><i>Article généré automatiquement par IA à partir des seules sources citées, à des fins de vulgarisation. Modèle : {{ answer.generationModel ?: 'non précisé' }}{% if answer.generationMs %} · {{ (answer.generationMs / 1000)|round(1) }} s{% endif %}. À vérifier auprès des sources primaires ; ne constitue pas un avis d'expert. SciencesWiki — https://scienceswiki.eu</i></p>

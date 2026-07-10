@@ -725,6 +725,19 @@ final class WikiController extends AbstractController
         ]);
     }
 
+    /** PDF (à la volée, non stocké) d'un article de vulgarisation, mis à la charte SciencesWiki. */
+    #[Route('/{_locale}/q/{id}/pdf', name: 'answer_pdf', requirements: ['id' => '\d+', '_locale' => 'fr'], methods: ['GET'])]
+    public function answerPdf(int $id): Response
+    {
+        $answer = $this->api->answer($id);
+        if (null === $answer) {
+            throw $this->createNotFoundException('Article introuvable.');
+        }
+        $html = $this->renderView('pdf/article.html.twig', ['answer' => $answer]);
+
+        return $this->stampPdf($html, (string) ($answer['title'] ?? 'Article'), 'article-'.$id, true);
+    }
+
     /** Proxy de vote (session → JWT) : le navigateur appelle cette route même origine. */
     #[Route('/{_locale}/q/{id}/vote', name: 'answer_vote', requirements: ['id' => '\d+', '_locale' => 'fr'], methods: ['POST'])]
     public function vote(int $id, Request $request): JsonResponse
