@@ -25,10 +25,14 @@ final class PromptBuilder
      *
      * @return list<LlmMessage>
      */
-    public function build(Question $question, array $sources): array
+    public function build(Question $question, array $sources, bool $forArticle = false): array
     {
+        // Prompt selon la DESTINATION : rédaction d'article (riche, 5 sections) vs chat
+        // interactif (Q/R court). Cf. SettingsService (Option C).
+        $system = $forArticle ? $this->settings->articleSystemPrompt() : $this->settings->systemPrompt();
+
         return [
-            LlmMessage::system($this->settings->systemPrompt()),
+            LlmMessage::system($system),
             LlmMessage::user($this->user($question, $sources)),
         ];
     }

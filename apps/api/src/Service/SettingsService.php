@@ -14,7 +14,13 @@ use Doctrine\ORM\EntityManagerInterface;
  */
 final class SettingsService
 {
+    // Prompt système du CHAT interactif (Q/R court, streamé). Distinct du prompt de
+    // RÉDACTION D'ARTICLE (wiki.system_prompt) : les deux destinations n'ont ni la même
+    // longueur ni les mêmes contraintes.
     public const RAG_SYSTEM_PROMPT = 'rag.system_prompt';
+
+    /** Prompt système de la RÉDACTION D'ARTICLE de vulgarisation (5 sections, riche). */
+    public const WIKI_SYSTEM_PROMPT = 'wiki.system_prompt';
     public const RAG_TEMPERATURE = 'rag.temperature';
     public const RAG_MAX_TOKENS = 'rag.max_tokens';
     public const RAG_MODEL = 'rag.model';
@@ -75,6 +81,25 @@ final class SettingsService
     public const SITE_THEME = 'site.theme';                     // 'legacy' | 'crt'
     public const SITE_FRAMED = 'site.framed';                   // '1' = mode fenêtré (cadre terminal partout)
 
+    /** Défaut du prompt CHAT (Q/R court, streamé). Court volontairement (≠ article). */
+    public const DEFAULT_CHAT_PROMPT = <<<'TXT'
+        Tu es l'assistant de SciencesWiki, une encyclopédie libre de vulgarisation en français.
+        Tu réponds à la question posée UNIQUEMENT à partir des SOURCES fournies, de façon claire
+        et concise (niveau collège). N'invente aucun fait ; si les sources sont insuffisantes,
+        dis-le explicitement. Cite les sources par un lien ancré [1](#source-1), [2](#source-2)…
+        (jamais un numéro non fourni). Indique le périmètre d'un fait quand il n'est pas universel
+        (pays, période, population, juridiction…).
+
+        Réponds EXACTEMENT avec ces trois sections, dans cet ordre, et rien d'autre :
+        ## TITRE
+        <titre court de 2 à 6 mots, sans ponctuation finale>
+        ## VULGARISATION
+        <réponse accessible et sourcée, niveau collège>
+        ## ACADEMIQUE
+        <faits établis sourcés, courts ; vide si aucune source pertinente>
+        TXT;
+
+    /** Défaut du prompt de RÉDACTION D'ARTICLE (riche, 5 sections). */
     public const DEFAULT_SYSTEM_PROMPT = <<<'TXT'
         Tu es un rédacteur de vulgarisation scientifique pour SciencesWiki, une encyclopédie
         libre d'éducation populaire en français.
@@ -274,12 +299,21 @@ final class SettingsService
     ) {
     }
 
+    /** Prompt système du CHAT interactif (Q/R court). Garde-fou périmètre toujours ajouté. */
     public function systemPrompt(): string
     {
         $v = $this->get(self::RAG_SYSTEM_PROMPT);
+        $base = null !== $v && '' !== trim($v) ? $v : self::DEFAULT_CHAT_PROMPT;
+
+        return $base."\n\n".self::GEO_SCOPE_GUARD;
+    }
+
+    /** Prompt système de la RÉDACTION D'ARTICLE (riche, 5 sections). Garde-fou toujours ajouté. */
+    public function articleSystemPrompt(): string
+    {
+        $v = $this->get(self::WIKI_SYSTEM_PROMPT);
         $base = null !== $v && '' !== trim($v) ? $v : self::DEFAULT_SYSTEM_PROMPT;
 
-        // Garde-fou périmètre toujours ajouté (inamovible, même si prompt personnalisé).
         return $base."\n\n".self::GEO_SCOPE_GUARD;
     }
 
@@ -421,7 +455,9 @@ final class SettingsService
     public function editable(): array
     {
         return [
-            self::RAG_SYSTEM_PROMPT => $this->systemPrompt(),
+            // Valeurs BRUTES éditables (sans le garde-fou périmètre, ajouté automatiquement).
+            self::RAG_SYSTEM_PROMPT => (string) ($this->get(self::RAG_SYSTEM_PROMPT) ?: self::DEFAULT_CHAT_PROMPT),
+            self::WIKI_SYSTEM_PROMPT => (string) ($this->get(self::WIKI_SYSTEM_PROMPT) ?: self::DEFAULT_SYSTEM_PROMPT),
             self::RAG_TEMPERATURE => (string) $this->temperature(),
             self::RAG_MAX_TOKENS => (string) $this->maxTokens(),
             self::RAG_NEIGHBORS => (string) $this->neighbors(),
@@ -448,7 +484,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OCR_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::WIKI_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OCR_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

@@ -65,8 +65,12 @@
             <div><label>Température (0–1)</label><input type="text" name="temperature" value="{{ settings['rag.temperature'] }}"></div>
             <div><label>Sources récupérées (kNN)</label><input type="text" name="neighbors" value="{{ settings['rag.neighbors'] }}"></div>
         </div>
-        <label style="margin-top:.6rem; display:block">Prompt système (rédaction RAG)</label>
-        <textarea name="system_prompt" style="min-height:16rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ settings['rag.system_prompt'] }}</textarea>
+        <label style="margin-top:.6rem; display:block">Prompt système — <strong>Chat / Questions-Réponses</strong> (interactif, court)</label>
+        <textarea name="system_prompt" style="min-height:12rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ settings['rag.system_prompt'] }}</textarea>
+
+        <label style="margin-top:.8rem; display:block">Prompt système — <strong>Rédaction d'article</strong> (vulgarisation, riche, 5 sections)</label>
+        <textarea name="wiki_system_prompt" style="min-height:16rem; font-family:ui-monospace,monospace; font-size:.85rem">{{ settings['wiki.system_prompt'] }}</textarea>
+        <p class="muted" style="font-size:.78rem; margin-top:.3rem">Le garde-fou « périmètre d'application » est ajouté automatiquement aux deux (inutile de le recopier).</p>
 
         <button type="submit" style="margin-top:1rem">Enregistrer</button>
     </form>

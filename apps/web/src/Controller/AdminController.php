@@ -92,6 +92,7 @@ final class AdminController extends AbstractController
     {
         return $this->saveSettingsPage($request, 'admin_settings_ai', 'admin/settings_ai.html.twig', static fn (Request $r): array => [
             'rag.system_prompt' => (string) $r->request->get('system_prompt'),
+            'wiki.system_prompt' => (string) $r->request->get('wiki_system_prompt'),
             'rag.temperature' => (string) $r->request->get('temperature'),
             'rag.max_tokens' => (string) $r->request->get('max_tokens'),
             'rag.neighbors' => (string) $r->request->get('neighbors'),

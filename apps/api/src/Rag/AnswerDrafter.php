@@ -45,7 +45,8 @@ final class AnswerDrafter
             $opts['model'] = $m;
         }
         $start = hrtime(true);
-        $completion = $this->llm->complete($this->buildMessages($question, $sources), $opts);
+        // Génération d'article → prompt système « rédaction » (riche, 5 sections).
+        $completion = $this->llm->complete($this->buildMessages($question, $sources, true), $opts);
         $ms = (int) round((hrtime(true) - $start) / 1e6);
 
         return $this->persistFromText($question, $type, $sources, $completion->content, $ms);
@@ -71,9 +72,9 @@ final class AnswerDrafter
      *
      * @return list<\App\Ai\Llm\LlmMessage>
      */
-    public function buildMessages(Question $question, array $sources): array
+    public function buildMessages(Question $question, array $sources, bool $forArticle = false): array
     {
-        return $this->promptBuilder->build($question, $sources);
+        return $this->promptBuilder->build($question, $sources, $forArticle);
     }
 
     /**
