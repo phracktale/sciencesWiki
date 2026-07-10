@@ -56,6 +56,10 @@
                 <label style="margin:0">5 — OCR / lecture tableaux &amp; figures</label>
                 {{ ui.modelSelect('ocr_model', settings['ai.ocr_model'], models, true, '', '— désactivé (texte seul) —') }}
             </div>
+            <div style="display:grid; grid-template-columns:14rem 1fr; align-items:center; gap:.8rem">
+                <label style="margin:0">6 — Extracteur de faits (article)</label>
+                {{ ui.modelSelect('extractor_model', settings['ai.extractor_model'], models, true, '', '— défaut : modèle léger —') }}
+            </div>
         </div>
         <p class="muted" style="font-size:.78rem; margin-top:.4rem">Objet 4 = modèle de raisonnement des grilles (20 items) — le plus capable. Objet 3 = petit modèle rapide (extraction de claims). Objet 5 = modèle <strong>vision/OCR</strong> (ex. glm-ocr) pour transcrire les tableaux et figures en image des PDF ; vide = désactivé (l'évaluation reste sur le texte extrait).</p>
 

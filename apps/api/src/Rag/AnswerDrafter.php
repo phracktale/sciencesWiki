@@ -31,22 +31,30 @@ final class AnswerDrafter
         private readonly \App\Service\SettingsService $settings,
         private readonly FaithfulnessChecker $faithfulness,
         private readonly WikipediaLinker $wikipedia,
+        private readonly FactExtractor $factExtractor,
     ) {
     }
 
+    /**
+     * Rédaction d'article en DEUX appels (fiabilité) : (1) un extracteur ne retient que les
+     * faits réellement sourcés (JSON) ; (2) un rédacteur écrit l'article à partir des SEULS
+     * faits extraits (jamais des résumés bruts) → forte réduction des hallucinations.
+     */
     public function draft(Question $question, AnswerType $type, int $k = 5): Answer
     {
         $sources = $this->retrieveSources($question, $k);
-        // Respecte le modèle Q/R choisi en back-office (rag.model) ; sinon LLM_MODEL.
-        // Budget large : l'article 5 sections (vulgarisation ~1500 signes/sous-partie +
-        // aller plus loin + idées reçues + académique) dépasse largement 1200 tokens.
+        $start = hrtime(true);
+
+        // Appel 1 — extraction de faits sourcés (modèle extracteur dédié).
+        $facts = $this->factExtractor->extract($question, $sources);
+
+        // Appel 2 — rédaction à partir des SEULS faits extraits. Budget large : l'article
+        // 5 sections (vulgarisation + aller plus loin + idées reçues + académique) est long.
         $opts = ['temperature' => 0.2, 'max_tokens' => 4000];
         if (null !== ($m = $this->settings->model())) {
             $opts['model'] = $m;
         }
-        $start = hrtime(true);
-        // Génération d'article → prompt système « rédaction » (riche, 5 sections).
-        $completion = $this->llm->complete($this->buildMessages($question, $sources, true), $opts);
+        $completion = $this->llm->complete($this->promptBuilder->buildFromFacts($question, $facts['block'], $sources), $opts);
         $ms = (int) round((hrtime(true) - $start) / 1e6);
 
         return $this->persistFromText($question, $type, $sources, $completion->content, $ms);

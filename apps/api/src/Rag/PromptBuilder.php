@@ -38,6 +38,51 @@ final class PromptBuilder
     }
 
     /**
+     * Rédaction d'article en 2 temps (appel 2) : le rédacteur ne reçoit QUE les faits
+     * sourcés extraits à l'étape 1 (pas les résumés bruts) + la liste des références pour la
+     * numérotation des citations. Prompt système « rédaction d'article ».
+     *
+     * @param list<Publication> $sources
+     *
+     * @return list<LlmMessage>
+     */
+    public function buildFromFacts(Question $question, string $factsBlock, array $sources): array
+    {
+        return [
+            LlmMessage::system($this->settings->articleSystemPrompt()),
+            LlmMessage::user($this->userFromFacts($question, $factsBlock, $sources)),
+        ];
+    }
+
+    /**
+     * @param list<Publication> $sources
+     */
+    private function userFromFacts(Question $question, string $factsBlock, array $sources): string
+    {
+        $lines = [
+            'QUESTION : '.$question->getText(),
+            '',
+            "FAITS SOURCÉS VÉRIFIÉS — tu ne dois utiliser QUE ces faits ; n'ajoute AUCUN fait hors de cette liste :",
+            $factsBlock,
+            '',
+            'RÉFÉRENCES (pour la numérotation des citations [n](#source-n)) :',
+        ];
+        foreach ($sources as $i => $source) {
+            $authors = implode(', ', array_map(static fn (array $a): string => $a['name'], $source->getAuthors()));
+            $lines[] = \sprintf(
+                '[%d] %s — %s (%s). DOI:%s',
+                $i + 1,
+                $source->getTitle(),
+                '' !== $authors ? $authors : 'auteurs inconnus',
+                $source->getPublicationDate()?->format('Y') ?? 's.d.',
+                $source->getDoi() ?? 'n/a',
+            );
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
      * @param list<Publication> $sources
      */
     private function user(Question $question, array $sources): string

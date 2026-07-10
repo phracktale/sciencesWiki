@@ -58,6 +58,13 @@ final class SettingsService
      */
     public const OCR_MODEL = 'ai.ocr_model';
 
+    /**
+     * Modèle de l'EXTRACTEUR de faits sourcés (1er appel du pipeline de rédaction
+     * d'article en 2 temps : extraction JSON → rédaction). Vide = repli sur le modèle
+     * léger. L'extraction structurée est bien gérée par un petit modèle rapide.
+     */
+    public const EXTRACTOR_MODEL = 'ai.extractor_model';
+
     // Limites d'interrogation de l'API OpenAlex (adaptables au plan/au polite pool).
     public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
     public const OPENALEX_PER_DAY = 'openalex.per_day';
@@ -375,6 +382,14 @@ final class SettingsService
         return trim((string) ($this->get(self::OCR_MODEL) ?? ''));
     }
 
+    /** Modèle de l'extracteur de faits (repli sur le modèle léger si non défini). */
+    public function extractorModel(): string
+    {
+        $v = trim((string) ($this->get(self::EXTRACTOR_MODEL) ?? ''));
+
+        return '' !== $v ? $v : $this->lightModel();
+    }
+
     /** Nombre maximal de requêtes OpenAlex par minute (≥ 1). */
     public function openalexPerMinute(): int
     {
@@ -466,6 +481,7 @@ final class SettingsService
             self::LIGHT_MODEL => $this->lightModel(),
             self::APPRAISAL_MODEL => $this->appraisalModel(),
             self::OCR_MODEL => $this->ocrModel(),
+            self::EXTRACTOR_MODEL => (string) ($this->get(self::EXTRACTOR_MODEL) ?? ''),
             self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
             self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
             self::HARVEST_SORT => $this->harvestSort(),
@@ -484,7 +500,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::WIKI_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OCR_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::WIKI_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OCR_MODEL, self::EXTRACTOR_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;
