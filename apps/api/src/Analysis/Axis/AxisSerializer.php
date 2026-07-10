@@ -76,6 +76,8 @@ final class AxisSerializer
             'summary' => $appraisal->getSummary(),
             'status' => $appraisal->getStatus()->value,
             'model' => $appraisal->getAppraisalModel(),
+            'generationMs' => $appraisal->getGenerationMs(),
+            'tokens' => $appraisal->getTokens(),
             'createdAt' => $appraisal->getCreatedAt()->format(\DateTimeInterface::ATOM),
             'items' => $items,
             // Disclaimer + modèle réellement utilisé (traçabilité, comparaison de modèles).

@@ -607,6 +607,59 @@ final class WikiController extends AbstractController
     /**
      * @param array<int,array<string,mixed>> $sources
      */
+    /**
+     * PDF (à la volée, non stocké) de l'évaluation critique AXIS d'une étude, mis en forme
+     * à la charte SciencesWiki. En-tête (type d'analyse + métas), résumé, méthodologie AXIS,
+     * points d'attention IA, modèle/temps/tokens, 20 items, synthèse.
+     */
+    #[Route('/{_locale}/etude/{id}/axis/pdf', name: 'axis_pdf', requirements: ['_locale' => 'fr', 'id' => '\d+'], methods: ['GET'])]
+    public function axisPdf(int $id): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/fr/etude/'.$id.'/axis/pdf']);
+        }
+        $res = $this->user->send('GET', '/api/articles/'.$id);
+        $article = $res['ok'] ? $res['data'] : null;
+        $axis = \is_array($article) ? ($article['axis'] ?? null) : null;
+        if (null === $axis) {
+            $this->addFlash('error', 'Aucune évaluation AXIS disponible pour cette étude.');
+
+            return $this->redirectToRoute('axis_tool', ['_locale' => 'fr']);
+        }
+        $html = $this->renderView('pdf/axis_analysis.html.twig', ['article' => $article, 'axis' => $axis]);
+
+        return $this->stampPdf($html, 'Évaluation AXIS — '.(string) ($article['title'] ?? 'étude'), 'axis-'.$id, true);
+    }
+
+    /**
+     * Rend un fragment HTML en PDF sur le gabarit charté (en-tête/logo/pied). Générique :
+     * réutilisé par la revue de littérature et les analyses. $inline=true → ouverture en
+     * ligne dans le navigateur ; sinon téléchargement.
+     */
+    private function stampPdf(string $html, string $title, string $filename, bool $inline = false): Response
+    {
+        $pdf = new \App\Pdf\TemplatePdf('P', 'pt', 'A4', true, 'UTF-8', false);
+        $pdf->SetCreator('SciencesWiki');
+        $pdf->SetAuthor('SciencesWiki');
+        $pdf->SetTitle($title);
+        $pdf->setPrintHeader(true);
+        $pdf->setPrintFooter(true);
+        $pdf->setHeaderMargin(0);
+        $pdf->setFooterMargin(0);
+        $pdf->SetMargins(43, 103, 42);
+        $pdf->SetAutoPageBreak(true, 59);
+        $pdf->SetFont('dejavusans', '', 10.5);
+        $pdf->setFooterDate(date('d/m/Y'));
+        $pdf->loadTemplate($this->pdfAssets->templatePath());
+        $pdf->AddPage();
+        $pdf->writeHTML($html, true, false, true, false, '');
+
+        return new Response((string) $pdf->Output($filename.'.pdf', 'S'), Response::HTTP_OK, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => ($inline ? 'inline' : 'attachment').'; filename="'.$filename.'.pdf"',
+        ]);
+    }
+
     private function reviewPdf(string $topic, string $markdown, array $sources, ?string $rubric = null): Response
     {
         // Garde-fou : CommonMark exige de l'UTF-8 valide (sinon exception).
@@ -620,28 +673,7 @@ final class WikiController extends AbstractController
             'sources' => $sources,
         ]);
 
-        // Gabarit PDF (charte/en-tête) en fond + texte stampé dans la zone définie.
-        $pdf = new \App\Pdf\TemplatePdf('P', 'pt', 'A4', true, 'UTF-8', false);
-        $pdf->SetCreator('SciencesWiki');
-        $pdf->SetAuthor('SciencesWiki');
-        $pdf->SetTitle($topic);
-        $pdf->setPrintHeader(true);
-        $pdf->setPrintFooter(true);
-        $pdf->setHeaderMargin(0);
-        $pdf->setFooterMargin(0);
-        // Zone de texte : X=43, Y=103, L=510, H=680 (pt) → marges + saut de page.
-        $pdf->SetMargins(43, 103, 42);
-        $pdf->SetAutoPageBreak(true, 59);
-        $pdf->SetFont('dejavusans', '', 10.5);
-        $pdf->setFooterDate(date('d/m/Y'));
-        $pdf->loadTemplate($this->pdfAssets->templatePath());
-        $pdf->AddPage();
-        $pdf->writeHTML($html, true, false, true, false, '');
-
-        return new Response((string) $pdf->Output('revue.pdf', 'S'), Response::HTTP_OK, [
-            'Content-Type' => 'application/pdf',
-            'Content-Disposition' => 'attachment; filename="'.$this->reviewSlug($topic).'.pdf"',
-        ]);
+        return $this->stampPdf($html, $topic, $this->reviewSlug($topic), false);
     }
 
     private function reviewSlug(string $topic): string

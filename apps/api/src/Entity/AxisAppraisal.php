@@ -93,6 +93,13 @@ class AxisAppraisal
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
+    /** Durée de génération LLM (ms) et total de tokens consommés (provenance / PDF). */
+    #[ORM\Column(nullable: true)]
+    private ?int $generationMs = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $tokens = null;
+
     #[ORM\ManyToOne(targetEntity: User::class)]
     #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
     private ?User $reviewedBy = null;
@@ -198,6 +205,24 @@ class AxisAppraisal
         $this->favorableCount = $favorableCount;
         $this->assessableCount = $assessableCount;
         $this->reliabilityBand = $reliabilityBand;
+
+        return $this;
+    }
+
+    public function getGenerationMs(): ?int
+    {
+        return $this->generationMs;
+    }
+
+    public function getTokens(): ?int
+    {
+        return $this->tokens;
+    }
+
+    public function setGeneration(?int $generationMs, ?int $tokens): self
+    {
+        $this->generationMs = $generationMs;
+        $this->tokens = $tokens;
 
         return $this;
     }

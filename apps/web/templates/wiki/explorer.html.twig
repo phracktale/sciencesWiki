@@ -301,7 +301,8 @@
         function axisHtml(ax, rerunId) {
             var bands = { high: 'Fiabilité élevée', moderate: 'Fiabilité modérée', low: 'Fiabilité faible', insufficient: 'Information insuffisante' };
             var icons = { yes: ['✓', 'ax-yes'], no: ['✗', 'ax-no'], unclear: ['?', 'ax-unclear'] };
-            var h = '<hr class="sep"><div class="meta"><b>Évaluation méthodologique (AXIS)</b>' + apprStatusNote(ax) + reapprBtn(rerunId) + '<br>';
+            var pdfLink = rerunId ? ' <a href="/{{ app.request.locale }}/etude/' + rerunId + '/axis/pdf" target="_blank" rel="noopener" style="font-size:.76rem; color:var(--accent); text-decoration:none">📄 PDF</a>' : '';
+            var h = '<hr class="sep"><div class="meta"><b>Évaluation méthodologique (AXIS)</b>' + apprStatusNote(ax) + reapprBtn(rerunId) + pdfLink + '<br>';
             // Verrou d'applicabilité : pour un design non transversal, AXIS est hors-sujet.
             if (ax.applicability === 'not_applicable') {
                 h += '<span class="muted">' + esc(ax.applicabilityLabel) +

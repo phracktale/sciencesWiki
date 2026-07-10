@@ -41,6 +41,10 @@ final class AxisAppraiser
 
     private readonly LoggerInterface $logger;
 
+    /** Provenance de la dernière génération (renseignée par complete()). */
+    private ?int $lastGenerationMs = null;
+    private ?int $lastTokens = null;
+
     public function __construct(
         private readonly LlmClient $llm,
         private readonly AxisPromptBuilder $promptBuilder,
@@ -125,7 +129,8 @@ final class AxisAppraiser
             ->setApplicability($parsed->applicability)
             ->setStudyDesign($parsed->studyDesign)
             ->setSourceScope($scope)
-            ->setSummary($parsed->summary);
+            ->setSummary($parsed->summary)
+            ->setGeneration($this->lastGenerationMs, $this->lastTokens);
 
         if (AxisApplicability::NotApplicable === $parsed->applicability) {
             // Verrou : la grille n'est pas exécutée pour un design non transversal.
@@ -306,10 +311,17 @@ final class AxisAppraiser
         // Sortie riche (analyse structurée + tableau de preuves par item) → budget large.
         $opts = ['temperature' => 0.0, 'max_tokens' => 8000, 'model' => $this->settings->appraisalModel(), 'timeout' => self::LLM_TIMEOUT, 'json' => true];
 
-        $parsed = $this->parser->parse($this->llm->complete($messages, $opts)->content);
+        $start = hrtime(true);
+        $completion = $this->llm->complete($messages, $opts);
+        $parsed = $this->parser->parse($completion->content);
         if (null === $parsed) {
-            $parsed = $this->parser->parse($this->llm->complete($messages, $opts)->content);
+            $completion = $this->llm->complete($messages, $opts);
+            $parsed = $this->parser->parse($completion->content);
         }
+        // Provenance : durée totale + tokens (pour le PDF / traçabilité).
+        $this->lastGenerationMs = (int) round((hrtime(true) - $start) / 1e6);
+        $total = ($completion->promptTokens ?? 0) + ($completion->completionTokens ?? 0);
+        $this->lastTokens = $total > 0 ? $total : null;
 
         return $parsed;
     }

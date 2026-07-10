@@ -374,6 +374,9 @@
                     {% if privateStudy %}<input type="hidden" name="private" value="1">{% endif %}
                     <button type="submit" title="Purge et relance l'évaluation avec le modèle configuré (~1 min)">↻ Refaire l'évaluation</button>
                 </form>
+                {% if result.publication.id %}
+                    <a href="{{ path('axis_pdf', {id: result.publication.id}) }}" target="_blank" rel="noopener" style="display:inline-block; margin-top:.6rem; text-decoration:none; font-weight:600; color:var(--accent)">📄 Voir / télécharger le PDF de l'analyse</a>
+                {% endif %}
             {% endif %}
 
             <p class="muted" style="font-size:.78rem; margin-top:1rem; border-top:1px dashed var(--line); padding-top:.6rem">{{ result.disclaimer }}</p>

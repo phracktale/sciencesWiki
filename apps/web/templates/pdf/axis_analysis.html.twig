@@ -1,0 +1,77 @@
+{# Fragment HTML rendu par TCPDF (writeHTML) dans la zone de texte du gabarit charté.
+   PDF d'évaluation critique AXIS d'une étude. Données : article (/api/articles) + axis. #}
+<style>
+    h1 { font-size: 18pt; color: #02356c; font-weight: bold; }
+    .surtitle { font-size: 9pt; color: #019fb9; font-weight: bold; }
+    .bh { font-size: 12.5pt; color: #019fb9; font-weight: bold; }
+    .meta { font-size: 9.5pt; color: #374151; }
+    p { font-size: 10pt; color: #1f2937; }
+    .small { font-size: 9pt; color: #4b5563; }
+    .q { font-size: 10pt; color: #02356c; font-weight: bold; }
+    .a { font-size: 9.5pt; color: #111827; }
+    .an { font-size: 9pt; color: #374151; }
+    .warn { font-size: 9pt; color: #92400e; }
+    .url { color: #02356c; }
+    .band { font-weight: bold; }
+</style>
+
+{% set bandLabel = {'high':'élevée','moderate':'modérée','low':'faible','insufficient':'insuffisante (texte trop limité)'} %}
+{% set bandColor = {'high':'#065f46','moderate':'#b45309','low':'#b91c1c','insufficient':'#6b7280'} %}
+
+<div class="surtitle">ÉVALUATION CRITIQUE MÉTHODOLOGIQUE — OUTIL AXIS</div>
+<h1>{{ article.title }}</h1>
+
+<div class="meta">
+    {% if article.authors is not empty %}<b>Auteurs :</b> {{ article.authors|join(', ') }}<br>{% endif %}
+    {% if article.year %}<b>Année :</b> {{ article.year }}{% if article.venue %} · {% endif %}{% endif %}
+    {% if article.venue %}<b>Revue :</b> {{ article.venue }}{% endif %}<br>
+    {% if article.doi %}<b>DOI :</b> <span class="url">https://doi.org/{{ article.doi }}</span><br>{% endif %}
+    <b>Devis détecté :</b> {{ axis.studyDesign ?: 'non précisé' }} — {{ axis.applicabilityLabel }}
+</div>
+
+{% if article.abstract %}
+    <br><div class="bh">Résumé de l'étude</div>
+    <p class="small">{{ article.abstract }}</p>
+{% endif %}
+
+<br><div class="bh">Méthodologie AXIS appliquée</div>
+<p class="small">AXIS (<i>Appraisal tool for Cross-Sectional Studies</i>, Downes et&nbsp;al., BMJ Open 2016) est une grille de lecture critique de <b>20 items</b> conçue pour les <b>études transversales</b>. Elle évalue la qualité de report, la qualité du design et le risque de biais. Chaque item est jugé (Oui / Partiellement / Non / Non applicable / Indéterminé) en s'appuyant sur le texte de l'étude ; les items 13 (biais de non-réponse) et 19 (conflits d'intérêts) sont à polarité inversée. <b>AXIS n'attribue pas de note</b> : la bande de fiabilité ci-dessous est un repère indicatif, pas un score.</p>
+
+<br><div class="bh">Points d'attention — analyse automatique par IA</div>
+<p class="warn">Cette évaluation a été générée automatiquement par un modèle de langage. Elle comporte des limites : (1) l'analyse porte sur le <b>texte extrait</b> de l'étude — les tableaux, figures et notes en image ne sont pas lus, donc les items qui en dépendent peuvent être incomplets ; (2) un modèle peut mal interpréter une nuance méthodologique, ou juger « indéterminé » un point pourtant présent dans une source non transcrite ; (3) le résultat est un <b>signal d'aide à la lecture critique</b>, en aucun cas un verdict de qualité ni une validation par un comité. À vérifier par un lecteur humain.</p>
+{% if axis.sourceCoverage.coverageWarning is defined %}<p class="small"><i>{{ axis.sourceCoverage.coverageWarning }}</i></p>{% endif %}
+
+<br><div class="bh">Paramètres de génération</div>
+<p class="small">
+    <b>Modèle :</b> {{ axis.model ?: 'non précisé' }}<br>
+    <b>Temps de génération :</b> {% if axis.generationMs %}{{ (axis.generationMs / 1000)|round(1) }} s{% else %}non mesuré{% endif %}<br>
+    <b>Tokens consommés :</b> {{ axis.tokens ?: 'non mesuré' }}<br>
+    <b>Source analysée :</b> {{ axis.sourceScope == 'abstract+fulltext' ? 'résumé + texte intégral' : 'résumé seul' }}
+</p>
+
+{% if axis.applicability == 'applicable' %}
+    <br><div class="bh">Résultat — fiabilité indicative</div>
+    <p><span class="band" style="color:{{ bandColor[axis.reliabilityBand] ?? '#374151' }}">{{ (bandLabel[axis.reliabilityBand] ?? axis.reliabilityBand)|capitalize }}</span>
+       <span class="small">— {{ axis.favorableCount }} critère(s) favorable(s) sur {{ axis.assessableCount }} évaluable(s) · repère indicatif, pas un score.</span></p>
+
+    <div class="bh" style="font-size:11pt">Réponses aux 20 items</div>
+    {% for it in axis.items %}
+        {% set dot = it.favorable ? '#065f46' : (it.answer == 'partial' ? '#b45309' : (it.answer == 'na' ? '#6b7280' : (it.answer == 'unclear' ? '#9ca3af' : '#b91c1c'))) %}
+        <p style="font-size:10pt; margin:0">
+            <span style="color:{{ dot }}">&#9679;</span>
+            <span class="q">{{ it.question }}</span>
+            <span class="a">— {{ it.answerLabel }}</span>{% if it.confidence %} <span class="small">(confiance {{ it.confidence }})</span>{% endif %}{% if it.downgraded %} <span class="warn">· non étayé</span>{% endif %}
+            {% if it.analysis %}<br><span class="an">{{ it.analysis }}</span>{% endif %}
+        </p>
+    {% endfor %}
+{% else %}
+    <br><div class="bh">Résultat</div>
+    <p>AXIS n'a pas été appliqué : l'étude n'est pas de type transversal ({{ axis.applicabilityLabel }}). La grille n'est pas exécutée pour ne pas produire de résultat trompeur.</p>
+{% endif %}
+
+{% if axis.summary %}
+    <br><div class="bh">Synthèse détaillée</div>
+    <p>{{ axis.summary }}</p>
+{% endif %}
+
+<br><p class="small"><i>{{ axis.disclaimer }}</i></p>
