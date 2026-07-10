@@ -44,6 +44,13 @@ framework:
                 retry_strategy:
                     max_retries: 1
                     delay: 10000
+            # Rédaction d'article de vulgarisation à la demande (pipeline 2 appels, lent) :
+            # file DÉDIÉE pour n'affamer ni la moisson ni les analyses. Notification email en fin.
+            article:
+                dsn: 'doctrine://default?queue_name=article&redeliver_timeout=3600'
+                retry_strategy:
+                    max_retries: 1
+                    delay: 10000
             failed: 'doctrine://default?queue_name=failed'
             sync: 'sync://'
 
@@ -67,6 +74,8 @@ framework:
             App\Analysis\Message\AppraiseMmatMessage: appraisal
             # Détection plagiat/doublons (cf. docs/spec-plagiat.md §7).
             App\Analysis\Plagiarism\Message\FingerprintPublication: plagiarism
+            # Rédaction d'article à la demande (2 appels LLM + email de notification).
+            App\Rag\Message\GenerateArticleMessage: article
             App\Analysis\Plagiarism\Message\ScanPublication: plagiarism
 
 # when@test:

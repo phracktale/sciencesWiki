@@ -703,6 +703,51 @@ final class WikiController extends AbstractController
         ]);
     }
 
+    /** Formulaire de génération d'article de vulgarisation (async + notification e-mail). */
+    #[Route('/{_locale}/generer-un-article', name: 'generate_article', requirements: ['_locale' => 'fr'], methods: ['GET', 'POST'])]
+    public function generateArticle(Request $request): Response
+    {
+        $isLogged = $this->user->isLogged();
+        $accountEmail = $isLogged ? (string) ($this->user->me()['email'] ?? '') : '';
+        $result = null;
+        $error = null;
+        $topic = '';
+
+        if ($request->isMethod('POST')) {
+            if (!$this->csrf->isValid($request)) {
+                $error = 'Jeton de sécurité invalide.';
+            } else {
+                $topic = trim((string) $request->request->get('topic'));
+                $node = trim((string) $request->request->get('node'));
+                $email = $isLogged ? $accountEmail : trim((string) $request->request->get('email'));
+                if (mb_strlen($topic) < 8) {
+                    $error = 'Sujet trop court (8 caractères minimum).';
+                } elseif ('' === $node) {
+                    $error = 'Choisissez un domaine.';
+                } elseif (!$isLogged && ('' === $email || false === filter_var($email, \FILTER_VALIDATE_EMAIL))) {
+                    $error = 'Un e-mail valide est obligatoire pour être averti.';
+                } else {
+                    $res = $this->user->send('POST', '/api/articles/generate', [
+                        'topic' => $topic, 'node' => $node, 'email' => $email,
+                        'name' => $isLogged ? $this->user->displayName() : '',
+                    ]);
+                    if (Response::HTTP_ACCEPTED === ($res['status'] ?? 0)) {
+                        $result = (string) ($res['data']['message'] ?? 'Rédaction lancée.');
+                    } else {
+                        $error = (string) ($res['data']['error'] ?? 'Échec du lancement de la rédaction.');
+                    }
+                }
+            }
+        }
+
+        return $this->render('wiki/generate_article.html.twig', [
+            'domains' => $this->api->domains(),
+            'accountEmail' => $accountEmail,
+            'isLogged' => $isLogged,
+            'result' => $result, 'error' => $error, 'topic' => $topic,
+        ]);
+    }
+
     #[Route('/{_locale}/q/{id}', name: 'answer', requirements: ['id' => '\d+', '_locale' => 'fr'], methods: ['GET'])]
     public function answer(int $id, Request $request): Response
     {

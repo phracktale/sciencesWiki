@@ -1,0 +1,40 @@
+{% extends 'base.html.twig' %}
+{% block title %}Générer un article — SciencesWiki{% endblock %}
+{% block body %}
+    <h1>Générer un article de vulgarisation 📝</h1>
+    <p class="muted" style="max-width:640px">Décrivez un sujet ou une question ; l'IA de SciencesWiki rédige un article <strong>sourcé</strong> à partir du corpus (pipeline en deux temps : extraction de faits puis rédaction). <strong>La rédaction n'est pas instantanée</strong> (quelques minutes) : vous serez <strong>averti par e-mail</strong> dès qu'il est prêt, avec le lien de l'article et son PDF.</p>
+
+    {% for msg in app.flashes('error') %}<p class="badge warn">{{ msg }}</p>{% endfor %}
+    {% if error %}<p class="badge warn" style="margin-top:1rem">{{ error }}</p>{% endif %}
+
+    {% if result %}
+        <article class="card" style="margin-top:1rem; background:#f0fdf4; border-color:#4ade80">
+            <p style="margin:0"><strong>✅ {{ result }}</strong></p>
+            <p class="muted" style="margin:.4rem 0 0; font-size:.88rem">Vous pouvez fermer cette page : l'e-mail arrivera automatiquement.</p>
+        </article>
+    {% else %}
+        <form class="ask card" method="post" action="{{ path('generate_article') }}" data-turbo="false" style="max-width:640px; display:grid; gap:.7rem; margin-top:1rem">
+            <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+            <div>
+                <label for="ga-topic">Sujet ou question de l'article *</label>
+                <input type="text" id="ga-topic" name="topic" required minlength="8" value="{{ topic|default('') }}" placeholder="ex. : Le sommeil influence-t-il la mémoire ?">
+            </div>
+            <div>
+                <label for="ga-node">Domaine *</label>
+                <select id="ga-node" name="node" required>
+                    <option value="">— choisir un domaine —</option>
+                    {% for d in domains %}<option value="{{ d.slug }}">{{ d.label }}</option>{% endfor %}
+                </select>
+            </div>
+            {% if isLogged %}
+                <p class="muted" style="font-size:.85rem; margin:0">📧 Vous serez averti à <strong>{{ accountEmail }}</strong> (e-mail de votre compte).</p>
+            {% else %}
+                <div>
+                    <label for="ga-email">Votre e-mail * <span class="muted">(pour vous prévenir quand l'article est prêt)</span></label>
+                    <input type="email" id="ga-email" name="email" required placeholder="vous@exemple.fr">
+                </div>
+            {% endif %}
+            <button type="submit">Lancer la rédaction</button>
+        </form>
+    {% endif %}
+{% endblock %}
