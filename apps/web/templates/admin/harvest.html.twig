@@ -71,6 +71,7 @@
             <span class="muted">$ dépensés / <span id="oa-credit-limit">—</span> $ gratuits (réinit. minuit UTC)</span>
             <p style="font-size:.9rem; margin:.4rem 0 0">💳 Solde prépayé : <strong id="oa-prepaid">—</strong> $</p>
             <p class="muted" style="font-size:.78rem; margin:.2rem 0 0">Requêtes restantes (jour OpenAlex) : <strong id="oa-api-remaining">—</strong> / <span id="oa-api-limit">—</span> · en-têtes lus <span id="oa-credit-at"></span>.</p>
+            <button type="button" id="oa-refresh" style="margin-top:.5rem; font:inherit; font-size:.8rem; cursor:pointer; padding:.25rem .7rem; border:1px solid #d1d5db; background:#fff; border-radius:6px">↻ Rafraîchir le crédit</button>
         </div>
     </div>
 
@@ -335,6 +336,19 @@
                 .then(function (res) { btn.disabled = false; alert(res.d.message || res.d.error || 'OK'); poll(); })
                 .catch(function () { btn.disabled = false; });
             });
+        });
+
+        var oaRefresh = document.getElementById('oa-refresh');
+        if (oaRefresh) oaRefresh.addEventListener('click', function () {
+            oaRefresh.disabled = true; oaRefresh.textContent = '↻ …';
+            fetch('/admin/harvest/refresh-credit', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+                body: JSON.stringify({ _csrf: CSRF }), credentials: 'same-origin'
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d && d.ok === false && d.error) alert('Échec : ' + d.error); poll(); })
+            .catch(function () {})
+            .then(function () { oaRefresh.disabled = false; oaRefresh.textContent = '↻ Rafraîchir le crédit'; });
         });
 
         function poll() {

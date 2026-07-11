@@ -46,6 +46,16 @@ final class OpenAlexConnector implements SourceConnector
         return $this->settings->openalexApiKey() ?: $this->apiKey;
     }
 
+    /**
+     * Requête minimale (1 travail) dont le seul but est de RAFRAÎCHIR les en-têtes de
+     * crédit OpenAlex (getJson enregistre limit/remaining/prepaid). Permet de consulter
+     * le solde à la demande, indépendamment d'une moisson en cours.
+     */
+    public function pingCredit(): void
+    {
+        $this->getJson($this->baseUrl.'/works', ['per-page' => 1, 'mailto' => $this->contactEmail]);
+    }
+
     public function code(): string
     {
         return OpenAlexMapper::SOURCE_CODE;

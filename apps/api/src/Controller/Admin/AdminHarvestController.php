@@ -21,6 +21,7 @@ final class AdminHarvestController
     public function __construct(
         private readonly EntityManagerInterface $em,
         private readonly SettingsService $settings,
+        private readonly \App\Harvester\Connector\OpenAlex\OpenAlexConnector $openalex,
         private readonly \Symfony\Contracts\HttpClient\HttpClientInterface $httpClient,
         #[\Symfony\Component\DependencyInjection\Attribute\Autowire(env: 'OPENALEX_API_KEY')]
         private readonly string $openalexApiKey = '',
@@ -36,6 +37,23 @@ final class AdminHarvestController
      *  - all        : supprime toutes les lignes de moisson par rubrique.
      * N'affecte JAMAIS le corpus (publications, embeddings, placements).
      */
+    /**
+     * Rafraîchit à la demande les en-têtes de crédit OpenAlex (1 requête authentifiée),
+     * indépendamment d'une moisson : permet de consulter le solde gratuit/prépayé à tout
+     * moment même si la moisson est à l'arrêt.
+     */
+    #[Route('/api/admin/harvest/refresh-credit', name: 'admin_harvest_refresh_credit', methods: ['POST'])]
+    public function refreshCredit(): JsonResponse
+    {
+        try {
+            $this->openalex->pingCredit();
+
+            return new JsonResponse(['ok' => true]);
+        } catch (\Throwable $e) {
+            return new JsonResponse(['ok' => false, 'error' => $e->getMessage()], 502);
+        }
+    }
+
     #[Route('/api/admin/harvest/cleanup', name: 'admin_harvest_cleanup', methods: ['POST'])]
     public function cleanup(\Symfony\Component\HttpFoundation\Request $request): JsonResponse
     {
@@ -202,7 +220,12 @@ final class AdminHarvestController
                 'used' => (null !== $apiLimit && null !== $apiRemaining) ? max(0, (int) $apiLimit - (int) $apiRemaining) : $used,
                 'perDay' => null !== $apiLimit ? (int) $apiLimit : $perDay,
                 'perMinute' => $this->settings->openalexPerMinute(),
-                'exhausted' => null !== $apiRemaining ? (int) $apiRemaining <= 0 : $used >= $perDay,
+                // « Épuisé » UNIQUEMENT si OpenAlex signale 0 requête restante avec des
+                // en-têtes FRAIS (du jour). Pas de repli sur le plafond INTERNE (openalex.
+                // per_day) : ce n'est pas une limite OpenAlex, et épuiser le crédit gratuit
+                // ne bloque pas la moisson (bascule prépayé/polite pool). Évite le bandeau
+                // « limite atteinte » permanent et trompeur.
+                'exhausted' => $rlFresh && null !== $apiRemaining && (int) $apiRemaining <= 0,
                 'real' => null !== $apiLimit && null !== $apiRemaining,
                 // Garde-fou interne (cadence configurable) — secondaire.
                 'internalUsed' => $used,

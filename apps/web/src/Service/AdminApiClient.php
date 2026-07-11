@@ -376,6 +376,12 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/harvest/cleanup', ['mode' => $mode]);
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} */
+    public function refreshHarvestCredit(): array
+    {
+        return $this->send('POST', '/api/admin/harvest/refresh-credit', null);
+    }
+
     /** @return array<string,mixed> état des moissons (workers, progression, quota OpenAlex) */
     public function harvestStatus(): array
     {
