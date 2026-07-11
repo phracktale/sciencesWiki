@@ -174,10 +174,13 @@ final class AdminHarvestController
             ? (new \DateTimeImmutable((string) $creditAt))->setTimezone(new \DateTimeZone('UTC'))->format('Y-m-d')
             : null;
         $rlFresh = null !== $rlDayUtc && $rlDayUtc === gmdate('Y-m-d');
+        // Toutes les valeurs OpenAlex (requêtes ET crédit USD) ne sont fiables que si les
+        // en-têtes datent du jour UTC courant. Périmées → null (le front affiche « — »)
+        // plutôt qu'un crédit obsolète : la page reflète la VÉRITÉ du moment, pas un reliquat.
         $apiLimit = $rlFresh ? $num('openalex.rl.limit') : null;       // limite quotidienne réelle d'OpenAlex (nb requêtes), si datée du jour
         $apiRemaining = $rlFresh ? $num('openalex.rl.remaining') : null;
-        $limitUsd = $num('openalex.credit.limit_usd');
-        $remainingUsd = $num('openalex.credit.remaining_usd');
+        $limitUsd = $rlFresh ? $num('openalex.credit.limit_usd') : null;
+        $remainingUsd = $rlFresh ? $num('openalex.credit.remaining_usd') : null;
 
         return new JsonResponse([
             'jobs' => $jobs,
@@ -192,7 +195,7 @@ final class AdminHarvestController
             ],
             'openalex' => [
                 'date' => $today,
-                'usesApiKey' => '' !== $this->openalexApiKey,
+                'usesApiKey' => '' !== ($this->settings->openalexApiKey() ?: $this->openalexApiKey),
                 // Stats fondées sur les requêtes RÉELLEMENT enregistrées par OpenAlex
                 // (en-têtes X-RateLimit-*) quand disponibles ; repli sur le compteur interne.
                 'used' => (null !== $apiLimit && null !== $apiRemaining) ? max(0, (int) $apiLimit - (int) $apiRemaining) : $used,
@@ -209,7 +212,7 @@ final class AdminHarvestController
                 'creditLimitUsd' => $limitUsd,
                 'creditRemainingUsd' => $remainingUsd,
                 'creditSpentUsd' => (null !== $limitUsd && null !== $remainingUsd) ? round($limitUsd - $remainingUsd, 4) : null,
-                'creditCostUsd' => $num('openalex.credit.cost_usd'),
+                'creditCostUsd' => $rlFresh ? $num('openalex.credit.cost_usd') : null,
                 'creditUpdatedAt' => $s['openalex.credit.updated_at'] ?? null,
             ],
             // Charge machines : Thor (cette instance) + Marvin (service ml).

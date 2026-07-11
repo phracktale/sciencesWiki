@@ -15,6 +15,11 @@
             <div><label>Requêtes par minute (max)</label><input type="text" name="openalex_per_minute" value="{{ settings['openalex.per_minute'] }}" placeholder="540"></div>
             <div><label>Requêtes par jour (plafond)</label><input type="text" name="openalex_per_day" value="{{ settings['openalex.per_day'] }}" placeholder="10000"></div>
         </div>
+        <div style="margin-top:.8rem; max-width:640px">
+            <label>Clé API OpenAlex <span class="muted">(plan payant / Premium — laisser vide pour le polite pool gratuit)</span></label>
+            <input type="text" name="openalex_api_key" value="{{ settings['openalex.api_key'] }}" placeholder="clé fournie par OpenAlex" autocomplete="off" style="width:100%; font-family:ui-monospace,monospace; font-size:.85rem">
+            <p class="muted" style="font-size:.78rem; margin:.25rem 0 0">Renseignée → la moisson <strong>authentifie</strong> ses requêtes (<code>api_key</code>) : quotas supérieurs et fonctions payantes (ex. moisson incrémentale par date). ⚠️ Le crédit consommé est alors facturé à ce compte OpenAlex. Vide = requêtes anonymes gratuites (aucun crédit consommé).</p>
+        </div>
 
         <h2 style="margin-top:1.4rem">Stratégie de moisson</h2>
         <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:.8rem">

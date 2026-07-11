@@ -69,6 +69,14 @@ final class SettingsService
     public const OPENALEX_PER_MINUTE = 'openalex.per_minute';
     public const OPENALEX_PER_DAY = 'openalex.per_day';
 
+    /**
+     * Clé API OpenAlex (plan payant/Premium). Vide = polite pool anonyme gratuit. Si
+     * renseignée, la moisson authentifie ses requêtes (api_key) → quotas supérieurs et
+     * accès aux fonctions payantes (ex. moisson incrémentale par date). Éditable en
+     * back-office (paramétrage moisson).
+     */
+    public const OPENALEX_API_KEY = 'openalex.api_key';
+
     // Stratégie de moisson (librement paramétrable en back-office).
     public const HARVEST_SORT = 'harvest.sort';                 // tri OpenAlex
     public const HARVEST_RECENT_YEARS = 'harvest.recent_years'; // 0 = pas de limite d'années
@@ -402,6 +410,12 @@ final class SettingsService
         return max(1, (int) ($this->get(self::OPENALEX_PER_DAY) ?? self::DEFAULTS[self::OPENALEX_PER_DAY]));
     }
 
+    /** Clé API OpenAlex (vide = polite pool anonyme gratuit). */
+    public function openalexApiKey(): string
+    {
+        return trim((string) ($this->get(self::OPENALEX_API_KEY) ?? ''));
+    }
+
     /** Tri OpenAlex de la moisson (vide = ordre par défaut de l'API). */
     public function harvestSort(): string
     {
@@ -484,6 +498,7 @@ final class SettingsService
             self::EXTRACTOR_MODEL => (string) ($this->get(self::EXTRACTOR_MODEL) ?? ''),
             self::OPENALEX_PER_MINUTE => (string) $this->openalexPerMinute(),
             self::OPENALEX_PER_DAY => (string) $this->openalexPerDay(),
+            self::OPENALEX_API_KEY => $this->openalexApiKey(),
             self::HARVEST_SORT => $this->harvestSort(),
             self::HARVEST_RECENT_YEARS => (string) $this->harvestRecentYears(),
             self::HARVEST_CAP_PER_RUBRIC => (string) $this->harvestCapPerRubric(),
@@ -500,7 +515,7 @@ final class SettingsService
     /** @param array<string,string> $values */
     public function setMany(array $values): void
     {
-        $allowed = [self::RAG_SYSTEM_PROMPT, self::WIKI_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OCR_MODEL, self::EXTRACTOR_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
+        $allowed = [self::RAG_SYSTEM_PROMPT, self::WIKI_SYSTEM_PROMPT, self::RAG_TEMPERATURE, self::RAG_MAX_TOKENS, self::RAG_NEIGHBORS, self::RAG_MODEL, self::RAG_VERIFY, self::WIKI_MODEL, self::LIGHT_MODEL, self::APPRAISAL_MODEL, self::OCR_MODEL, self::EXTRACTOR_MODEL, self::OPENALEX_PER_MINUTE, self::OPENALEX_PER_DAY, self::OPENALEX_API_KEY, self::HARVEST_SORT, self::HARVEST_RECENT_YEARS, self::HARVEST_CAP_PER_RUBRIC, self::HARVEST_MAX_PER_RUN, self::MAIL_REROUTE_ENABLED, self::MAIL_REROUTE_TO, self::MOD_NOTIFY_ENABLED, self::SITE_THEME, self::SITE_FRAMED];
         foreach ($values as $name => $value) {
             if (!\in_array($name, $allowed, true)) {
                 continue;

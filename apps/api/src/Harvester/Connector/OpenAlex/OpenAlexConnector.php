@@ -30,6 +30,7 @@ final class OpenAlexConnector implements SourceConnector
         private readonly HttpClientInterface $httpClient,
         private readonly OpenAlexMapper $mapper,
         private readonly \App\Harvester\OpenAlexThrottle $throttle,
+        private readonly \App\Service\SettingsService $settings,
         #[Autowire(env: 'HARVESTER_CONTACT_EMAIL')]
         private readonly string $contactEmail,
         #[Autowire(env: 'OPENALEX_BASE_URL')]
@@ -37,6 +38,12 @@ final class OpenAlexConnector implements SourceConnector
         #[Autowire(env: 'OPENALEX_API_KEY')]
         private readonly string $apiKey = '',
     ) {
+    }
+
+    /** Clé effective : réglage back-office (openalex.api_key) prioritaire, sinon l'env. */
+    private function resolveApiKey(): string
+    {
+        return $this->settings->openalexApiKey() ?: $this->apiKey;
     }
 
     public function code(): string
@@ -155,8 +162,9 @@ final class OpenAlexConnector implements SourceConnector
     private function getJson(string $url, array $query): array
     {
         // Clé API premium (le cas échéant) : authentifie toutes les requêtes /works.
-        if ('' !== $this->apiKey && !isset($query['api_key'])) {
-            $query['api_key'] = $this->apiKey;
+        $apiKey = $this->resolveApiKey();
+        if ('' !== $apiKey && !isset($query['api_key'])) {
+            $query['api_key'] = $apiKey;
         }
 
         for ($attempt = 1; ; ++$attempt) {

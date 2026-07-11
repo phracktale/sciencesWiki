@@ -111,6 +111,7 @@ final class AdminController extends AbstractController
         return $this->saveSettingsPage($request, 'admin_settings_harvest', 'admin/settings_harvest.html.twig', static fn (Request $r): array => [
             'openalex.per_minute' => (string) $r->request->get('openalex_per_minute'),
             'openalex.per_day' => (string) $r->request->get('openalex_per_day'),
+            'openalex.api_key' => trim((string) $r->request->get('openalex_api_key')),
             'harvest.sort' => (string) $r->request->get('harvest_sort'),
             'harvest.recent_years' => (string) $r->request->get('harvest_recent_years'),
             'harvest.cap_per_rubric' => (string) $r->request->get('harvest_cap_per_rubric'),
