@@ -159,6 +159,7 @@ final class AdminHarvestController
             'openalex.count.'.$today,
             'openalex.rl.limit', 'openalex.rl.remaining', 'openalex.rl.reset', 'openalex.rl.credits_used',
             'openalex.credit.limit_usd', 'openalex.credit.remaining_usd', 'openalex.credit.cost_usd', 'openalex.credit.updated_at',
+            'openalex.credit.prepaid_remaining_usd',
         ]);
         $num = static fn (string $k): ?float => isset($s[$k]) && is_numeric($s[$k]) ? (float) $s[$k] : null;
 
@@ -213,6 +214,9 @@ final class AdminHarvestController
                 'creditRemainingUsd' => $remainingUsd,
                 'creditSpentUsd' => (null !== $limitUsd && null !== $remainingUsd) ? round($limitUsd - $remainingUsd, 4) : null,
                 'creditCostUsd' => $rlFresh ? $num('openalex.credit.cost_usd') : null,
+                // Solde PRÉPAYÉ : balance persistante (ne se réinitialise pas chaque jour) →
+                // on montre la DERNIÈRE valeur connue (avec creditUpdatedAt pour la fraîcheur).
+                'prepaidRemainingUsd' => $num('openalex.credit.prepaid_remaining_usd'),
                 'creditUpdatedAt' => $s['openalex.credit.updated_at'] ?? null,
             ],
             // Charge machines : Thor (cette instance) + Marvin (service ml).

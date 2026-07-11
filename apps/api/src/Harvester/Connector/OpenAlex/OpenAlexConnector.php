@@ -221,10 +221,13 @@ final class OpenAlexConnector implements SourceConnector
             'openalex.rl.remaining' => $num('x-ratelimit-remaining'),
             'openalex.rl.credits_used' => $num('x-ratelimit-credits-used') ?? $num('x-ratelimit-cost-usd'),
             'openalex.rl.reset' => $num('x-ratelimit-reset'),
-            // Budget de crédits USD (le cas échéant).
+            // Crédit GRATUIT du jour (USD) : plafond quotidien et restant.
             'openalex.credit.limit_usd' => $num('x-ratelimit-limit-usd'),
             'openalex.credit.remaining_usd' => $num('x-ratelimit-remaining-usd'),
             'openalex.credit.cost_usd' => $num('x-ratelimit-cost-usd'),
+            // Solde PRÉPAYÉ restant (USD) : n'est alimenté que si la requête est
+            // authentifiée par la clé API du compte OpenAlex crédité.
+            'openalex.credit.prepaid_remaining_usd' => $num('x-ratelimit-prepaid-remaining-usd'),
         ]);
     }
 

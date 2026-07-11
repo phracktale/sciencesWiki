@@ -66,10 +66,11 @@
             <p id="oa-warn" class="badge warn" hidden style="margin-top:.4rem">⛔ Limite quotidienne OpenAlex atteinte — réinitialisation à minuit UTC.</p>
         </div>
         <div class="card">
-            <span class="muted">Crédit OpenAlex <span id="oa-key" class="pill" style="font-size:.65rem">sans clé API</span></span><br>
+            <span class="muted">Crédit gratuit du jour <span id="oa-key" class="pill" style="font-size:.65rem">sans clé API</span></span><br>
             <strong id="oa-credit-spent" style="font-size:1.6rem">—</strong>
-            <span class="muted">$ dépensés / <span id="oa-credit-limit">—</span> $ accordés</span>
-            <p class="muted" style="font-size:.78rem; margin:.3rem 0 0">Limite OpenAlex du jour : <strong id="oa-api-remaining">—</strong> / <span id="oa-api-limit">—</span> requêtes restantes. Polite pool gratuit (mailto), en-têtes lus <span id="oa-credit-at"></span>.</p>
+            <span class="muted">$ dépensés / <span id="oa-credit-limit">—</span> $ gratuits (réinit. minuit UTC)</span>
+            <p style="font-size:.9rem; margin:.4rem 0 0">💳 Solde prépayé : <strong id="oa-prepaid">—</strong> $</p>
+            <p class="muted" style="font-size:.78rem; margin:.2rem 0 0">Requêtes restantes (jour OpenAlex) : <strong id="oa-api-remaining">—</strong> / <span id="oa-api-limit">—</span> · en-têtes lus <span id="oa-credit-at"></span>.</p>
         </div>
     </div>
 
@@ -274,6 +275,8 @@
             }
             document.getElementById('oa-credit-spent').textContent = oa.creditSpentUsd != null ? oa.creditSpentUsd.toFixed(4) : '—';
             document.getElementById('oa-credit-limit').textContent = oa.creditLimitUsd != null ? oa.creditLimitUsd.toFixed(2) : '—';
+            var prepEl = document.getElementById('oa-prepaid');
+            if (prepEl) prepEl.textContent = oa.prepaidRemainingUsd != null ? oa.prepaidRemainingUsd.toFixed(4) : '—';
             document.getElementById('oa-api-remaining').textContent = oa.apiDailyRemaining != null ? oa.apiDailyRemaining.toLocaleString('fr-FR') : '—';
             document.getElementById('oa-api-limit').textContent = oa.apiDailyLimit != null ? oa.apiDailyLimit.toLocaleString('fr-FR') : '—';
             document.getElementById('oa-credit-at').textContent = oa.creditUpdatedAt ? '(' + fmtDate(oa.creditUpdatedAt) + ')' : '(jamais)';
