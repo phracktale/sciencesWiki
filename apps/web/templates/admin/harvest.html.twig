@@ -6,6 +6,21 @@
     <h1>Suivi de la moisson <span id="live" class="pill" style="font-size:.7rem; vertical-align:middle">● en direct</span></h1>
     <p class="muted">État de chaque moisson lancée depuis le back-office : en attente, en cours, terminée ou en erreur. Volume, durée et modèle d'embeddings indiqués. Les dépassements des limites OpenAlex sont signalés en rouge.</p>
 
+    <div class="card" style="margin:1rem 0">
+        <h2 style="margin:0 0 .4rem; font-size:1.05rem">Avancement de la moisson <span class="muted" style="font-size:.8rem">(par rubrique)</span></h2>
+        <div style="display:flex; gap:1.4rem; flex-wrap:wrap; align-items:baseline">
+            <span><strong id="cov-ok" style="font-size:1.6rem; color:#16a34a">—</strong> <span class="muted">moissonnées</span></span>
+            <span><strong id="cov-failed" style="font-size:1.6rem; color:#b91c1c">—</strong> <span class="muted">échouées (<span id="cov-rl">0</span> sur limite OpenAlex)</span></span>
+            <span><strong id="cov-running" style="font-size:1.6rem; color:#0891b2">—</strong> <span class="muted">en cours</span></span>
+            <span class="muted">sur <strong id="cov-total">—</strong> rubriques</span>
+        </div>
+        <div style="margin-top:.5rem; height:11px; background:var(--line); border-radius:6px; overflow:hidden; display:flex">
+            <div id="cov-bar-ok" style="height:100%; width:0%; background:#16a34a" title="Moissonnées"></div>
+            <div id="cov-bar-fail" style="height:100%; width:0%; background:#b91c1c" title="Échouées"></div>
+        </div>
+        <p id="cov-hint" class="muted" style="font-size:.82rem; margin:.5rem 0 0"></p>
+    </div>
+
     <style>
         .tabs { display:flex; gap:.3rem; border-bottom:2px solid var(--line); margin:1rem 0 1.2rem; flex-wrap:wrap }
         .tabs .tab-btn { background:none; border:none; border-bottom:3px solid transparent; margin-bottom:-2px;
@@ -257,6 +272,22 @@
 
             document.getElementById('queued').textContent = data.queued || 0;
             if (data.embeddingModel) document.getElementById('emb-model').textContent = data.embeddingModel;
+
+            var cov = data.coverage || {};
+            var covOk = cov.ok || 0, covFail = cov.failed || 0, covRun = cov.running || 0, covTot = cov.total || 0;
+            document.getElementById('cov-ok').textContent = covOk.toLocaleString('fr-FR');
+            document.getElementById('cov-failed').textContent = covFail.toLocaleString('fr-FR');
+            document.getElementById('cov-rl').textContent = (cov.rateLimited || 0).toLocaleString('fr-FR');
+            document.getElementById('cov-running').textContent = covRun.toLocaleString('fr-FR');
+            document.getElementById('cov-total').textContent = covTot.toLocaleString('fr-FR');
+            document.getElementById('cov-bar-ok').style.width = (covTot ? covOk / covTot * 100 : 0) + '%';
+            document.getElementById('cov-bar-fail').style.width = (covTot ? covFail / covTot * 100 : 0) + '%';
+            var covHint = document.getElementById('cov-hint');
+            if ((cov.rateLimited || 0) > 0) {
+                covHint.innerHTML = '⚠️ <strong>' + cov.rateLimited.toLocaleString('fr-FR') + '</strong> rubriques ont échoué sur la limite OpenAlex (429). Avec une clé API (quotas Premium), relancez-les depuis la liste par rubrique ci-dessous.';
+            } else {
+                covHint.textContent = '';
+            }
 
             var oa = data.openalex || {};
             document.getElementById('oa-used').textContent = (oa.used || 0).toLocaleString('fr-FR');

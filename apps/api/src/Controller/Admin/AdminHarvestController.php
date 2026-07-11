@@ -201,9 +201,25 @@ final class AdminHarvestController
         $limitUsd = $rlFresh ? $num('openalex.credit.limit_usd') : null;
         $remainingUsd = $rlFresh ? $num('openalex.credit.remaining_usd') : null;
 
+        // --- Couverture GLOBALE de la moisson par rubrique (où on en est / ce qui reste) ---
+        $cov = ['ok' => 0, 'failed' => 0, 'partial' => 0, 'running' => 0, 'pending' => 0, 'rateLimited' => 0, 'total' => 0];
+        foreach ($conn->executeQuery(
+            "SELECT status, count(*) AS n,
+                    count(*) FILTER (WHERE log ~* '429|rate ?limit|limite openalex') AS rl
+             FROM ingestion_job WHERE query->>'rubric' IS NOT NULL GROUP BY status"
+        )->fetchAllAssociative() as $row) {
+            $st = (string) $row['status'];
+            $cov[$st] = ($cov[$st] ?? 0) + (int) $row['n'];
+            $cov['total'] += (int) $row['n'];
+            if ('failed' === $st) {
+                $cov['rateLimited'] += (int) $row['rl'];
+            }
+        }
+
         return new JsonResponse([
             'jobs' => $jobs,
             'queued' => $queued,
+            'coverage' => $cov,
             'embeddingModel' => $_SERVER['EMBEDDING_MODEL'] ?? $_ENV['EMBEDDING_MODEL'] ?? 'sentence-transformers (Marvin)',
             // Stratégie effective : sert à calculer la progression (cumul / cible).
             'harvest' => [
