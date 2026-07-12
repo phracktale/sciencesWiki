@@ -225,6 +225,9 @@ final class AdminHarvestController
             'openalex.rl.limit', 'openalex.rl.remaining', 'openalex.rl.reset', 'openalex.rl.credits_used',
             'openalex.credit.limit_usd', 'openalex.credit.remaining_usd', 'openalex.credit.cost_usd', 'openalex.credit.updated_at',
             'openalex.credit.prepaid_remaining_usd',
+            'harvest.integrated.total', 'harvest.integrated.since2015',
+            'harvest.covered.from', 'harvest.covered.to',
+            'harvest.universe.articles', 'harvest.stats.updated_at',
         ]);
         $num = static fn (string $k): ?float => isset($s[$k]) && is_numeric($s[$k]) ? (float) $s[$k] : null;
 
