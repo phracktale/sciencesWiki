@@ -34,12 +34,19 @@ final class LlmPort
                 'prompt' => $prompt,
                 'format' => 'json',
                 'stream' => false,
+                // Désactive le mode « raisonnement » : certains modèles (glm-4.7-flash…)
+                // renvoient sinon le contenu dans « thinking » et laissent « response » vide.
+                'think' => false,
             ],
             'timeout' => $timeout,
         ]);
 
         $data = $response->toArray(false);
-        $text = (string) ($data['response'] ?? '');
+        $text = trim((string) ($data['response'] ?? ''));
+        // Repli : si le modèle a tout de même raisonné, le JSON est dans « thinking ».
+        if ('' === $text && isset($data['thinking'])) {
+            $text = trim((string) $data['thinking']);
+        }
         $parsed = json_decode($text, true);
 
         return \is_array($parsed) ? $parsed : [];
