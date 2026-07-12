@@ -140,8 +140,14 @@ final class AnalysisOrchestrator
             || (float) $fingerprint['confidence'] < $this->humanReviewThreshold
             || false === $fingerprint['fulltext_available'];
 
-        // 3) Exécution des référentiels principaux dont un analyseur est enregistré.
-        foreach ($plan['primary_frameworks'] as $frameworkId) {
+        // 3) Exécution des référentiels (principaux + risque de biais) dont un analyseur
+        // est enregistré. Un ECR route sur rct_appraisal (principal) + rob2 (risque de
+        // biais) : c'est ce dernier qui a un analyseur.
+        $frameworkIds = array_values(array_unique([
+            ...$plan['primary_frameworks'],
+            ...$plan['risk_of_bias_tools'],
+        ]));
+        foreach ($frameworkIds as $frameworkId) {
             $analyzer = $this->analyzers->get($frameworkId);
             if (null === $analyzer) {
                 continue;

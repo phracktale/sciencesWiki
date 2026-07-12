@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Analyses\Analyzer;
 
-use Analyses\Framework\Axis\AxisFramework;
+use Analyses\Framework\Rob2\Rob2Framework;
 use Analyses\Sdk\LlmPort;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Exécuteur AXIS (études transversales) : 20 critères, échelle yes/partial/no/unclear.
+ * Exécuteur RoB 2 : jugement par domaine sur l'échelle low / some_concerns / high.
  */
-final class AxisAnalyzer extends AbstractCriteriaAnalyzer
+final class Rob2Analyzer extends AbstractCriteriaAnalyzer
 {
     public function __construct(
         LlmPort $llm,
-        private readonly AxisFramework $axis = new AxisFramework(),
+        private readonly Rob2Framework $rob2 = new Rob2Framework(),
         #[Autowire(env: 'ANALYS_MODEL')]
         string $model = 'glm-5.2:cloud',
     ) {
@@ -24,17 +24,17 @@ final class AxisAnalyzer extends AbstractCriteriaAnalyzer
 
     public function frameworkId(): string
     {
-        return 'axis';
+        return 'rob2';
     }
 
     protected function criteria(): array
     {
-        return $this->axis->criteria();
+        return $this->rob2->criteria();
     }
 
     protected function validAnswers(): array
     {
-        return ['unclear', 'yes', 'partial', 'no', 'not_applicable'];
+        return ['unclear', 'low', 'some_concerns', 'high'];
     }
 
     protected function unclearAnswer(): string
@@ -44,6 +44,6 @@ final class AxisAnalyzer extends AbstractCriteriaAnalyzer
 
     protected function promptIntro(): string
     {
-        return "Tu es un évaluateur méthodologique. Évalue l'étude selon les critères AXIS (études transversales).";
+        return "Tu es un méthodologiste. Évalue le RISQUE DE BIAIS d'un essai randomisé selon RoB 2, domaine par domaine. Pour chaque domaine : low (risque faible), some_concerns (préoccupations), ou high (risque élevé).";
     }
 }

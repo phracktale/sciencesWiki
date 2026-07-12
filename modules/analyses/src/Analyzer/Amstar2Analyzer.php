@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Analyses\Analyzer;
 
-use Analyses\Framework\Axis\AxisFramework;
+use Analyses\Framework\Amstar2\Amstar2Framework;
 use Analyses\Sdk\LlmPort;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Exécuteur AXIS (études transversales) : 20 critères, échelle yes/partial/no/unclear.
+ * Exécuteur AMSTAR 2 : 16 items, échelle yes / partial_yes / no.
  */
-final class AxisAnalyzer extends AbstractCriteriaAnalyzer
+final class Amstar2Analyzer extends AbstractCriteriaAnalyzer
 {
     public function __construct(
         LlmPort $llm,
-        private readonly AxisFramework $axis = new AxisFramework(),
+        private readonly Amstar2Framework $amstar2 = new Amstar2Framework(),
         #[Autowire(env: 'ANALYS_MODEL')]
         string $model = 'glm-5.2:cloud',
     ) {
@@ -24,17 +24,17 @@ final class AxisAnalyzer extends AbstractCriteriaAnalyzer
 
     public function frameworkId(): string
     {
-        return 'axis';
+        return 'amstar2';
     }
 
     protected function criteria(): array
     {
-        return $this->axis->criteria();
+        return $this->amstar2->criteria();
     }
 
     protected function validAnswers(): array
     {
-        return ['unclear', 'yes', 'partial', 'no', 'not_applicable'];
+        return ['unclear', 'yes', 'partial_yes', 'no'];
     }
 
     protected function unclearAnswer(): string
@@ -44,6 +44,6 @@ final class AxisAnalyzer extends AbstractCriteriaAnalyzer
 
     protected function promptIntro(): string
     {
-        return "Tu es un évaluateur méthodologique. Évalue l'étude selon les critères AXIS (études transversales).";
+        return "Tu es un méthodologiste. Évalue la QUALITÉ MÉTHODOLOGIQUE d'une revue systématique selon AMSTAR 2. Pour chaque item : yes, partial_yes (partiellement satisfait), ou no.";
     }
 }

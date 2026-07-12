@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace Analyses\Analyzer;
 
-use Analyses\Framework\Axis\AxisFramework;
+use Analyses\Framework\Mmat\MmatFramework;
 use Analyses\Sdk\LlmPort;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Exécuteur AXIS (études transversales) : 20 critères, échelle yes/partial/no/unclear.
+ * Exécuteur MMAT : filtrage + critères méthodes mixtes, échelle yes / no / cant_tell.
  */
-final class AxisAnalyzer extends AbstractCriteriaAnalyzer
+final class MmatAnalyzer extends AbstractCriteriaAnalyzer
 {
     public function __construct(
         LlmPort $llm,
-        private readonly AxisFramework $axis = new AxisFramework(),
+        private readonly MmatFramework $mmat = new MmatFramework(),
         #[Autowire(env: 'ANALYS_MODEL')]
         string $model = 'glm-5.2:cloud',
     ) {
@@ -24,26 +24,26 @@ final class AxisAnalyzer extends AbstractCriteriaAnalyzer
 
     public function frameworkId(): string
     {
-        return 'axis';
+        return 'mmat';
     }
 
     protected function criteria(): array
     {
-        return $this->axis->criteria();
+        return $this->mmat->criteria();
     }
 
     protected function validAnswers(): array
     {
-        return ['unclear', 'yes', 'partial', 'no', 'not_applicable'];
+        return ['cant_tell', 'yes', 'no'];
     }
 
     protected function unclearAnswer(): string
     {
-        return 'unclear';
+        return 'cant_tell';
     }
 
     protected function promptIntro(): string
     {
-        return "Tu es un évaluateur méthodologique. Évalue l'étude selon les critères AXIS (études transversales).";
+        return "Tu es un méthodologiste. Évalue une étude à MÉTHODES MIXTES selon MMAT. Pour chaque critère : yes, no, ou cant_tell (impossible à déterminer d'après le texte).";
     }
 }
