@@ -382,6 +382,12 @@ final class AdminApiClient
         return $this->send('POST', '/api/admin/harvest/refresh-credit', null);
     }
 
+    /** @return array{ok:bool,status:int,data:array<string,mixed>} recalcul des totaux (seq-scan : timeout long) */
+    public function recomputeHarvestStats(): array
+    {
+        return $this->send('POST', '/api/admin/harvest/recompute-stats', null, 200);
+    }
+
     /** @return array<string,mixed> état des moissons (workers, progression, quota OpenAlex) */
     public function harvestStatus(): array
     {

@@ -66,6 +66,36 @@
     </div>
 
     <section class="tabpane" id="pane-harvest">
+    <div class="card" style="border:2px solid var(--accent); margin-bottom:1rem">
+        <h2 style="margin:0 0 .2rem; font-size:1.15rem">📊 Où en est la moisson SciencesWiki</h2>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(175px,1fr)); gap:1rem; margin-top:.6rem">
+            <div>
+                <span class="muted" style="font-size:.82rem">Articles moissonnés</span><br>
+                <strong id="hv-integrated" style="font-size:1.9rem; line-height:1.1">—</strong><br>
+                <span class="muted" style="font-size:.78rem">dont <strong id="hv-since">—</strong> depuis <span id="hv-from2">2015</span></span>
+            </div>
+            <div>
+                <span class="muted" style="font-size:.82rem">Plage d'années couverte</span><br>
+                <strong id="hv-range" style="font-size:1.9rem; line-height:1.1; color:var(--accent)">—</strong>
+            </div>
+            <div>
+                <span class="muted" style="font-size:.82rem">Cible réaliste <span title="Articles + reviews en anglais/français publiés depuis la borne basse — pas le volume brut tous types (datasets, thèses, chapitres…).">ⓘ</span></span><br>
+                <strong id="hv-universe" style="font-size:1.9rem; line-height:1.1">—</strong><br>
+                <span class="muted" style="font-size:.78rem">articles en/fr</span>
+            </div>
+            <div>
+                <span class="muted" style="font-size:.82rem">Reste à moissonner</span><br>
+                <strong id="hv-remaining" style="font-size:1.9rem; line-height:1.1; color:#dc2626">—</strong>
+            </div>
+        </div>
+        <div style="margin-top:.8rem; height:14px; background:var(--line); border-radius:7px; overflow:hidden">
+            <div id="hv-bar" style="height:100%; width:0%; background:var(--accent); transition:width .4s"></div>
+        </div>
+        <p class="muted" style="font-size:.78rem; margin:.45rem 0 0">
+            <strong id="hv-pct">—</strong> % de la cible réaliste atteint · totaux mis à jour <span id="hv-at">—</span>
+            <button type="button" id="hv-refresh" style="font:inherit; font-size:.75rem; cursor:pointer; padding:.12rem .55rem; border:1px solid #d1d5db; background:#fff; border-radius:6px; margin-left:.4rem">↻ recalculer</button>
+        </p>
+    </div>
     <div class="grid">
         <div class="card">
             <span class="muted">File d'attente (workers)</span><br>
@@ -289,6 +319,25 @@
                 covHint.textContent = '';
             }
 
+            // --- Synthèse « où en est la moisson » ---
+            var hv = data.harvest || {};
+            var fmt = function (n) { return (n || 0).toLocaleString('fr-FR'); };
+            var since = hv.integratedSince2015 || 0, universe = hv.universeArticles || 0;
+            var remaining = Math.max(0, universe - since);
+            var pct = universe ? Math.min(100, since / universe * 100) : 0;
+            if (document.getElementById('hv-integrated')) {
+                document.getElementById('hv-integrated').textContent = fmt(hv.integrated || 0);
+                document.getElementById('hv-since').textContent = fmt(since);
+                document.getElementById('hv-from2').textContent = hv.coveredFrom || 2015;
+                document.getElementById('hv-range').textContent = (hv.coveredFrom || '?') + ' → ' + (hv.coveredTo || '?');
+                document.getElementById('hv-universe').textContent = fmt(universe);
+                document.getElementById('hv-remaining').textContent = '≈ ' + fmt(remaining);
+                document.getElementById('hv-bar').style.width = pct + '%';
+                document.getElementById('hv-bar').style.background = pct >= 66 ? '#16a34a' : (pct >= 33 ? '#f59e0b' : 'var(--accent)');
+                document.getElementById('hv-pct').textContent = pct.toFixed(0);
+                document.getElementById('hv-at').textContent = hv.statsUpdatedAt ? hv.statsUpdatedAt.slice(0, 10) : '—';
+            }
+
             var oa = data.openalex || {};
             document.getElementById('oa-used').textContent = (oa.used || 0).toLocaleString('fr-FR');
             document.getElementById('oa-cap').textContent = (oa.perDay || 0).toLocaleString('fr-FR');
@@ -380,6 +429,19 @@
             .then(function (d) { if (d && d.ok === false && d.error) alert('Échec : ' + d.error); poll(); })
             .catch(function () {})
             .then(function () { oaRefresh.disabled = false; oaRefresh.textContent = '↻ Rafraîchir le crédit'; });
+        });
+
+        var hvRefresh = document.getElementById('hv-refresh');
+        if (hvRefresh) hvRefresh.addEventListener('click', function () {
+            hvRefresh.disabled = true; hvRefresh.textContent = '↻ calcul… (~15 s)';
+            fetch('/admin/harvest/recompute-stats', {
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': CSRF },
+                body: JSON.stringify({ _csrf: CSRF }), credentials: 'same-origin'
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (d) { if (d && d.ok === false && d.error) alert('Échec du recalcul : ' + d.error); poll(); })
+            .catch(function () {})
+            .then(function () { hvRefresh.disabled = false; hvRefresh.textContent = '↻ recalculer'; });
         });
 
         function poll() {

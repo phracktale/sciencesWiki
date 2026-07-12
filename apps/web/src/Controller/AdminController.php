@@ -794,6 +794,21 @@ final class AdminController extends AbstractController
         return new JsonResponse($result['data'], $result['ok'] ? 200 : ($result['status'] ?: 500));
     }
 
+    #[Route('/admin/harvest/recompute-stats', name: 'admin_harvest_recompute_stats', methods: ['POST'])]
+    public function harvestRecomputeStats(Request $request): JsonResponse
+    {
+        if (!$this->admin->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+        $payload = json_decode($request->getContent() ?: '[]', true) ?: [];
+        if (!\is_array($payload) || !$this->csrf->isValidToken((string) ($payload['_csrf'] ?? ''))) {
+            return new JsonResponse(['error' => 'Jeton de sécurité invalide.'], 419);
+        }
+        $result = $this->admin->recomputeHarvestStats();
+
+        return new JsonResponse($result['data'], $result['ok'] ? 200 : ($result['status'] ?: 500));
+    }
+
     #[Route('/admin/harvest/cleanup', name: 'admin_harvest_cleanup', methods: ['POST'])]
     public function harvestCleanup(Request $request): JsonResponse
     {
