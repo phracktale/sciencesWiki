@@ -121,7 +121,6 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
             // dans le texte fourni (on ne fait pas confiance à l'auto-déclaration du LLM).
             // Sinon la « citation » est une hallucination → non ancrée.
             if ($anchored && 'explicit_quote' === $evidenceType && !$this->quoteInText($quote, $text)) {
-                error_log(\sprintf('[analys][unverified] textlen=%d quote=%s', mb_strlen($text), mb_substr($quote, 0, 90)));
                 $anchored = false;
                 $evidenceType = 'unverified_quote';
             }
