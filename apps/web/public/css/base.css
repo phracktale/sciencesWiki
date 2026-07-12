@@ -47,9 +47,10 @@ header { display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; border-bot
 header .brand { color: var(--accent); text-decoration: none; font-weight: 800; font-size:1.2rem; display:inline-flex; align-items:center; }
 header .brand img { height:64px; width:auto; display:block; }
 header nav { margin-left:auto; display:flex; gap:.25rem; font-size:.92rem; align-items:flex-start; flex-wrap:wrap; }
-header nav a { color:var(--ink); text-decoration:none; font-weight:600; padding:.5rem .9rem; border-radius:9px; position:relative; transition:background .15s, color .15s; }
-header nav a:hover { background:rgba(1,159,185,.12); color:var(--accent-dark); }
-header nav a.is-active { color:var(--accent-dark); }
+header nav a, header nav .nav-dd-btn { color:var(--ink); text-decoration:none; font-weight:600; padding:.5rem .9rem; border-radius:9px; position:relative; transition:background .15s, color .15s; }
+header nav .nav-dd-btn { background:none; border:0; cursor:pointer; font-family:inherit; font-size:inherit; line-height:inherit; }
+header nav a:hover, header nav .nav-dd-btn:hover { background:rgba(1,159,185,.12); color:var(--accent-dark); }
+header nav a.is-active, header nav .nav-dd-btn.is-active { color:var(--accent-dark); }
 header nav a.is-active::after { content:''; position:absolute; left:.9rem; right:.9rem; bottom:.28rem; height:2px; background:var(--accent); border-radius:2px; }
 /* Menu déroulant « Mon compte » (front). */
 .nav-dd { position:relative; }

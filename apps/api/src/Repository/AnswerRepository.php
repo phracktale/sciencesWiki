@@ -60,8 +60,10 @@ class AnswerRepository extends ServiceEntityRepository
             ->setMaxResults($limit);
 
         if (null !== $search && '' !== trim($search)) {
-            $qb->leftJoin('a.question', 'q')
-                ->andWhere('LOWER(a.questionText) LIKE :s OR LOWER(q.title) LIKE :s')
+            // questionText n'est pas mappé (dérivé de question->getText()) : on filtre
+            // sur les champs RÉELS de la question jointe (texte complet + titre court).
+            $qb->join('a.question', 'q')
+                ->andWhere('LOWER(q.text) LIKE :s OR LOWER(q.title) LIKE :s')
                 ->setParameter('s', '%'.mb_strtolower(trim($search)).'%');
         }
 
