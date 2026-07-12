@@ -58,6 +58,16 @@ class AssessmentCriterion
     #[ORM\Column(options: ['default' => false])]
     private bool $requiresHumanReview = false;
 
+    /** Réponse corrigée par un relecteur (prime sur la réponse IA). */
+    #[ORM\Column(length: 24, nullable: true)]
+    private ?string $humanAnswer = null;
+
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $reviewedBy = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $reviewedAt = null;
+
     public function __construct(Ulid $assessmentId, string $frameworkId, string $criterionId, string $question)
     {
         $this->id = new Ulid();
@@ -172,6 +182,41 @@ class AssessmentCriterion
     public function setRequiresHumanReview(bool $requiresHumanReview): self
     {
         $this->requiresHumanReview = $requiresHumanReview;
+
+        return $this;
+    }
+
+    public function getHumanAnswer(): ?string
+    {
+        return $this->humanAnswer;
+    }
+
+    public function getReviewedBy(): ?string
+    {
+        return $this->reviewedBy;
+    }
+
+    public function getReviewedAt(): ?\DateTimeImmutable
+    {
+        return $this->reviewedAt;
+    }
+
+    /** Réponse effective : la correction humaine prime sur la réponse IA. */
+    public function effectiveAnswer(): string
+    {
+        return $this->humanAnswer ?? $this->answer;
+    }
+
+    /** Enregistre une correction humaine (relecteur), avec traçabilité. */
+    public function applyHumanReview(string $answer, ?string $analysis, string $reviewer): self
+    {
+        $this->humanAnswer = $answer;
+        if (null !== $analysis) {
+            $this->analysis = $analysis;
+        }
+        $this->reviewedBy = $reviewer;
+        $this->reviewedAt = new \DateTimeImmutable();
+        $this->requiresHumanReview = false;
 
         return $this;
     }

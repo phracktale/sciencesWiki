@@ -61,7 +61,9 @@ final class LabController extends AbstractController
             throw $this->createAccessDeniedException();
         }
 
-        return $this->render('lab/analyses.html.twig');
+        return $this->render('lab/analyses.html.twig', [
+            'canReview' => $this->user->hasRole('ROLE_COMITE'),
+        ]);
     }
 
     /**
@@ -69,7 +71,7 @@ final class LabController extends AbstractController
      * et relaie la réponse telle quelle (JSON ou PDF). L'accès de section (rôles) est
      * appliqué par le module lui-même.
      */
-    #[Route('/{_locale}/labo/analyses/{path}', name: 'lab_analyses_proxy', requirements: ['_locale' => 'fr', 'path' => '.+'], methods: ['GET', 'POST'])]
+    #[Route('/{_locale}/labo/analyses/{path}', name: 'lab_analyses_proxy', requirements: ['_locale' => 'fr', 'path' => '.+'], methods: ['GET', 'POST', 'PATCH'])]
     public function analysesProxy(string $path, Request $request): Response
     {
         if (!$this->user->isLogged()) {
@@ -82,7 +84,7 @@ final class LabController extends AbstractController
 
         $headers = ['Authorization' => 'Bearer '.$token];
         $options = ['headers' => $headers, 'timeout' => 240];
-        if ($request->isMethod('POST')) {
+        if (!$request->isMethod('GET')) {
             $headers['Content-Type'] = 'application/json';
             $options['headers'] = $headers;
             $options['body'] = $request->getContent();

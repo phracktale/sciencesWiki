@@ -63,6 +63,13 @@ class Assessment
     #[ORM\Column(length: 64, nullable: true)]
     private ?string $designOverride = null;
 
+    /** Relecteur ayant validé l'évaluation (identifiant/e-mail). */
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $validatedBy = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    private ?\DateTimeImmutable $validatedAt = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -192,6 +199,27 @@ class Assessment
     public function setDesignOverride(?string $designOverride): self
     {
         $this->designOverride = $designOverride;
+
+        return $this;
+    }
+
+    public function getValidatedBy(): ?string
+    {
+        return $this->validatedBy;
+    }
+
+    public function getValidatedAt(): ?\DateTimeImmutable
+    {
+        return $this->validatedAt;
+    }
+
+    /** Validation par un relecteur : fige l'évaluation comme relue. */
+    public function validate(string $reviewer): self
+    {
+        $this->validatedBy = $reviewer;
+        $this->validatedAt = new \DateTimeImmutable();
+        $this->status = 'validated';
+        $this->humanReview = false;
 
         return $this;
     }

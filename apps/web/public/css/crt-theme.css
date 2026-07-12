@@ -91,7 +91,7 @@ body.theme-crt .muted, body.theme-crt .qmeta time, body.theme-crt small { color:
 body.theme-crt strong, body.theme-crt b { color: var(--phos-bright); }
 body.theme-crt hr { border-color: var(--line); }
 
-body.theme-crt a.scw-analyze { color: var(--accent); }
+body.theme-crt a.scw-analyze { color: var(--phos); }
 
 /* --------------------------------- En-tête --------------------------------- */
 body.theme-crt header { border-bottom-color: var(--line); }

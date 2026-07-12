@@ -39,14 +39,15 @@
     <script nonce="{{ csp_nonce.value }}">
     (function () {
         var API = "{{ path('lab_analyses_proxy', {path: 'analyses'}) }}";
+        var CAN_REVIEW = {{ canReview ? 'true' : 'false' }};
         var form = document.getElementById('an-form');
         var statusEl = document.getElementById('an-status');
         var resultsEl = document.getElementById('an-results');
         var submit = document.getElementById('an-submit');
-        var timer = null;
+        var timer = null, current = null;
 
         function setStatus(t) { statusEl.hidden = false; statusEl.textContent = t; }
-
+        function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
         function ansColor(a) {
             if (a === 'yes' || a === 'low') return '#16a34a';
             if (a === 'no' || a === 'high') return '#dc2626';
@@ -55,62 +56,93 @@
         }
 
         function render(d) {
-            var plan = d.plan || {};
-            var fp = d.fingerprint || {};
-            var crit = d.criteria || [];
-            var banner = d.human_review_required
-                ? '<p class="badge warn">⚠️ Analyse générée par IA — validation humaine requise. Les réponses non ancrées sur une citation vérifiée ont été rétrogradées.</p>'
-                : '<p class="badge ok">✅ Analyse ancrée sur les sources du texte intégral.</p>';
+            current = d;
+            var plan = d.plan || {}, fp = d.fingerprint || {}, crit = d.criteria || [];
+            var validated = d.status === 'validated';
+            var banner = validated
+                ? '<p class="badge ok">✅ Analyse validée par ' + esc(d.validated_by) + '.</p>'
+                : (d.human_review_required
+                    ? '<p class="badge warn">⚠️ Générée par IA — validation humaine requise. Réponses non ancrées sur une citation vérifiée rétrogradées.</p>'
+                    : '<p class="badge ok">✅ Ancrée sur les sources du texte intégral.</p>');
+
             var rows = crit.map(function (c) {
+                var human = c.human_answer ? ' <span class="pill" style="font-size:.65rem">✎ ' + esc(c.reviewed_by || 'relu') + '</span>' : '';
+                var edit = CAN_REVIEW ? '<button type="button" class="an-edit" data-cid="' + esc(c.criterion_id) + '" data-ans="' + esc(c.answer) + '" style="font:inherit; font-size:.7rem; cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:5px; padding:0 .3rem">✏️</button>' : '';
                 return '<tr>'
-                    + '<td style="font-family:monospace; font-size:.75rem; white-space:nowrap">' + c.criterion_id + '</td>'
-                    + '<td style="font-weight:700; text-transform:uppercase; font-size:.72rem; color:' + ansColor(c.answer) + '">' + c.answer + '</td>'
-                    + '<td>' + (c.question || '') + '<div class="muted" style="font-size:.8rem; font-style:italic">' + (c.analysis || '') + '</div></td>'
-                    + '<td style="text-align:center; font-size:.8rem">' + (c.confidence || '') + '</td>'
+                    + '<td style="font-family:monospace; font-size:.75rem; white-space:nowrap">' + esc(c.criterion_id) + '</td>'
+                    + '<td style="font-weight:700; text-transform:uppercase; font-size:.72rem; color:' + ansColor(c.answer) + '">' + esc(c.answer) + human + '</td>'
+                    + '<td>' + esc(c.question) + '<div class="muted" style="font-size:.8rem; font-style:italic">' + esc(c.analysis) + '</div></td>'
+                    + '<td style="text-align:center; font-size:.8rem">' + esc(c.confidence) + ' ' + edit + '</td>'
                     + '</tr>';
             }).join('');
             if (!rows) rows = '<tr><td colspan="4" class="muted">Aucun critère exécuté pour ce plan.</td></tr>';
+
+            var validateBtn = (CAN_REVIEW && !validated)
+                ? '<button type="button" class="an-validate">✅ Valider l\'analyse</button>' : '';
 
             resultsEl.innerHTML = banner
                 + '<section class="side-block">'
                 + '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; align-items:center">'
                 + '<h2 style="margin:0">Résultat</h2>'
-                + '<a class="btn" href="' + API + '/' + d.id + '/pdf" target="_blank" rel="noopener">📄 PDF</a>'
+                + '<span style="display:flex; gap:.4rem">' + validateBtn
+                + '<a class="btn" href="' + API + '/' + d.id + '/pdf" target="_blank" rel="noopener">📄 PDF</a></span>'
                 + '</div>'
-                + '<p style="margin:.4rem 0"><strong>Plan :</strong> ' + (fp.design_label || d.primary_design || 'indéterminé')
-                + ' · <strong>Référentiels :</strong> ' + ((plan.primary_frameworks || []).concat(plan.risk_of_bias_tools || []).join(', ') || '—') + '</p>'
+                + '<p style="margin:.4rem 0"><strong>Plan :</strong> ' + esc(fp.design_label || d.primary_design || 'indéterminé')
+                + ' · <strong>Référentiels :</strong> ' + esc((plan.primary_frameworks || []).concat(plan.risk_of_bias_tools || []).join(', ') || '—') + '</p>'
                 + '<table style="width:100%; border-collapse:collapse; font-size:.9rem"><thead><tr>'
                 + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Critère</th>'
                 + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Réponse</th>'
                 + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Question / analyse</th>'
                 + '<th style="border-bottom:2px solid var(--line); padding:.3rem">Conf.</th>'
                 + '</tr></thead><tbody>' + rows + '</tbody></table>'
+                + (CAN_REVIEW ? '<p class="muted" style="font-size:.78rem; margin:.5rem 0 0">Relecteur : ✏️ pour corriger une réponse (la correction est tracée et prime sur l\'IA).</p>' : '')
                 + '</section>';
             resultsEl.hidden = false;
+        }
+
+        function reload(id) {
+            fetch(API + '/' + id, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+                .then(function (r) { return r.json(); }).then(render).catch(function () {});
         }
 
         function poll(id) {
             fetch(API + '/' + id, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
                 .then(function (r) { return r.json(); })
                 .then(function (d) {
-                    if (d.status === 'completed' || d.status === 'human_review_required') {
-                        clearInterval(timer); setStatus('Terminé.'); submit.disabled = false;
-                        // recharge le détail complet (critères)
-                        fetch(API + '/' + id, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
-                            .then(function (r) { return r.json(); }).then(render);
+                    if (d.status === 'completed' || d.status === 'human_review_required' || d.status === 'validated') {
+                        clearInterval(timer); setStatus('Terminé.'); submit.disabled = false; render(d);
                     } else if (d.status === 'failed') {
                         clearInterval(timer); setStatus('Échec de l\'analyse.'); submit.disabled = false;
                     } else {
-                        setStatus('Statut : ' + d.status + '… (traitement en cours, cela peut prendre 1 à 2 minutes)');
+                        setStatus('Statut : ' + d.status + '… (1 à 2 minutes)');
                     }
                 })
                 .catch(function () {});
         }
 
+        // Actions relecteur (délégation).
+        resultsEl.addEventListener('click', function (e) {
+            var ed = e.target.closest('.an-edit');
+            if (ed && current) {
+                var cid = ed.getAttribute('data-cid');
+                var ans = prompt('Réponse corrigée pour ' + cid + ' :', ed.getAttribute('data-ans'));
+                if (ans == null) return;
+                ans = ans.trim(); if (!ans) return;
+                fetch(API + '/' + current.id + '/criteria/' + encodeURIComponent(cid), {
+                    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ answer: ans })
+                }).then(function (r) { return r.json(); }).then(function () { reload(current.id); }).catch(function () {});
+                return;
+            }
+            if (e.target.closest('.an-validate') && current) {
+                if (!confirm('Valider cette analyse ?')) return;
+                fetch(API + '/' + current.id + '/validate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+                    .then(function (r) { return r.json(); }).then(function () { reload(current.id); }).catch(function () {});
+            }
+        });
+
         form.addEventListener('submit', function (e) {
             e.preventDefault();
-            resultsEl.hidden = true; resultsEl.innerHTML = '';
-            submit.disabled = true;
+            resultsEl.hidden = true; resultsEl.innerHTML = ''; submit.disabled = true;
             setStatus('Mise en file…');
             var body = { document_ref: document.getElementById('an-ref').value.trim() };
             var design = document.getElementById('an-design').value;

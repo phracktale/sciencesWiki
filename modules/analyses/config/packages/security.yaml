@@ -21,4 +21,6 @@ security:
     access_control:
         - { path: ^/health, roles: PUBLIC_ACCESS }
         - { path: ^/admin, roles: ROLE_ADMIN }              # section admin (globale)
+        # Section « review » : corriger un critère / valider → ROLE_COMITE.
+        - { path: '^/analyses/[^/]+/(validate|criteria)', roles: ROLE_COMITE, methods: [POST, PATCH] }
         - { path: ^/, roles: [ROLE_RESEARCHER, ROLE_COMITE] } # section use
