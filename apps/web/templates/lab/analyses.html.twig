@@ -1,0 +1,131 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Analyses scientifiques — Labo{% endblock %}
+
+{% block body %}
+    <p style="margin:.2rem 0"><a href="{{ path('lab_hub') }}" class="muted">← Labo</a></p>
+    <h1>🔬 Analyses scientifiques</h1>
+    <p class="muted">Évaluation méthodologique composite d'une publication (AXIS, RoB 2, AMSTAR 2, MMAT…),
+        ancrée sur le texte intégral. Le traitement n'est <strong>pas instantané</strong>.</p>
+
+    <section class="side-block" style="margin-top:1rem">
+        <form id="an-form" style="display:grid; gap:.6rem; max-width:640px">
+            <label>Publication (identifiant interne ou DOI)
+                <input type="text" id="an-ref" required placeholder="ex. 5307 ou 10.xxxx/xxxxx"
+                       style="width:100%; padding:.5rem .7rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+            </label>
+            <label>Plan d'étude
+                <select id="an-design" style="width:100%; padding:.5rem .7rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+                    <option value="">Détection automatique</option>
+                    <option value="cross_sectional">Transversale (AXIS)</option>
+                    <option value="randomized_controlled_trial">Essai randomisé (RoB 2)</option>
+                    <option value="cohort_prospective">Cohorte prospective</option>
+                    <option value="cohort_retrospective">Cohorte rétrospective</option>
+                    <option value="case_control">Cas-témoins</option>
+                    <option value="systematic_review">Revue systématique (AMSTAR 2)</option>
+                    <option value="meta_analysis">Méta-analyse (AMSTAR 2)</option>
+                    <option value="mixed_methods">Méthodes mixtes (MMAT)</option>
+                    <option value="diagnostic_accuracy">Diagnostique</option>
+                    <option value="qualitative">Qualitative</option>
+                </select>
+            </label>
+            <div><button type="submit" id="an-submit">Lancer l'analyse</button></div>
+        </form>
+        <p id="an-status" class="muted" style="margin:.8rem 0 0" hidden></p>
+    </section>
+
+    <section id="an-results" hidden style="margin-top:1rem"></section>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var API = "{{ path('lab_analyses_proxy', {path: 'analyses'}) }}";
+        var form = document.getElementById('an-form');
+        var statusEl = document.getElementById('an-status');
+        var resultsEl = document.getElementById('an-results');
+        var submit = document.getElementById('an-submit');
+        var timer = null;
+
+        function setStatus(t) { statusEl.hidden = false; statusEl.textContent = t; }
+
+        function ansColor(a) {
+            if (a === 'yes' || a === 'low') return '#16a34a';
+            if (a === 'no' || a === 'high') return '#dc2626';
+            if (a === 'unclear' || a === 'cant_tell') return '#94a3b8';
+            return '#d97706';
+        }
+
+        function render(d) {
+            var plan = d.plan || {};
+            var fp = d.fingerprint || {};
+            var crit = d.criteria || [];
+            var banner = d.human_review_required
+                ? '<p class="badge warn">⚠️ Analyse générée par IA — validation humaine requise. Les réponses non ancrées sur une citation vérifiée ont été rétrogradées.</p>'
+                : '<p class="badge ok">✅ Analyse ancrée sur les sources du texte intégral.</p>';
+            var rows = crit.map(function (c) {
+                return '<tr>'
+                    + '<td style="font-family:monospace; font-size:.75rem; white-space:nowrap">' + c.criterion_id + '</td>'
+                    + '<td style="font-weight:700; text-transform:uppercase; font-size:.72rem; color:' + ansColor(c.answer) + '">' + c.answer + '</td>'
+                    + '<td>' + (c.question || '') + '<div class="muted" style="font-size:.8rem; font-style:italic">' + (c.analysis || '') + '</div></td>'
+                    + '<td style="text-align:center; font-size:.8rem">' + (c.confidence || '') + '</td>'
+                    + '</tr>';
+            }).join('');
+            if (!rows) rows = '<tr><td colspan="4" class="muted">Aucun critère exécuté pour ce plan.</td></tr>';
+
+            resultsEl.innerHTML = banner
+                + '<section class="side-block">'
+                + '<div style="display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; align-items:center">'
+                + '<h2 style="margin:0">Résultat</h2>'
+                + '<a class="btn" href="' + API + '/' + d.id + '/pdf" target="_blank" rel="noopener">📄 PDF</a>'
+                + '</div>'
+                + '<p style="margin:.4rem 0"><strong>Plan :</strong> ' + (fp.design_label || d.primary_design || 'indéterminé')
+                + ' · <strong>Référentiels :</strong> ' + ((plan.primary_frameworks || []).concat(plan.risk_of_bias_tools || []).join(', ') || '—') + '</p>'
+                + '<table style="width:100%; border-collapse:collapse; font-size:.9rem"><thead><tr>'
+                + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Critère</th>'
+                + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Réponse</th>'
+                + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Question / analyse</th>'
+                + '<th style="border-bottom:2px solid var(--line); padding:.3rem">Conf.</th>'
+                + '</tr></thead><tbody>' + rows + '</tbody></table>'
+                + '</section>';
+            resultsEl.hidden = false;
+        }
+
+        function poll(id) {
+            fetch(API + '/' + id, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) {
+                    if (d.status === 'completed' || d.status === 'human_review_required') {
+                        clearInterval(timer); setStatus('Terminé.'); submit.disabled = false;
+                        // recharge le détail complet (critères)
+                        fetch(API + '/' + id, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+                            .then(function (r) { return r.json(); }).then(render);
+                    } else if (d.status === 'failed') {
+                        clearInterval(timer); setStatus('Échec de l\'analyse.'); submit.disabled = false;
+                    } else {
+                        setStatus('Statut : ' + d.status + '… (traitement en cours, cela peut prendre 1 à 2 minutes)');
+                    }
+                })
+                .catch(function () {});
+        }
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            resultsEl.hidden = true; resultsEl.innerHTML = '';
+            submit.disabled = true;
+            setStatus('Mise en file…');
+            var body = { document_ref: document.getElementById('an-ref').value.trim() };
+            var design = document.getElementById('an-design').value;
+            if (design) body.study_design = design;
+            fetch(API, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    if (!res.ok || !res.d.id) { setStatus('Erreur : ' + (res.d.error || 'requête invalide')); submit.disabled = false; return; }
+                    setStatus('En file (id ' + res.d.id + ')…');
+                    if (timer) clearInterval(timer);
+                    timer = setInterval(function () { poll(res.d.id); }, 5000);
+                    poll(res.d.id);
+                })
+                .catch(function () { setStatus('Erreur réseau.'); submit.disabled = false; });
+        });
+    })();
+    </script>
+{% endblock %}

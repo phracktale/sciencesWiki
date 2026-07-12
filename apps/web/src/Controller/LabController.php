@@ -43,11 +43,25 @@ final class LabController extends AbstractController
                 'name' => 'Analyses scientifiques',
                 'icon' => '🔬',
                 'description' => "Routage et évaluation méthodologique composite des publications (AXIS, RoB 2, AMSTAR 2, MMAT…).",
-                'href' => $this->generateUrl('lab_analyses_proxy', ['path' => 'frameworks']),
+                'href' => $this->generateUrl('lab_analyses_ui'),
             ];
         }
 
         return $this->render('lab/hub.html.twig', ['modules' => $modules]);
+    }
+
+    /** Interface chercheur du module analyses (formulaire + suivi + résultats). */
+    #[Route('/{_locale}/labo/analyses', name: 'lab_analyses_ui', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function analysesUi(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/labo/analyses']);
+        }
+        if (!$this->user->hasRole('ROLE_RESEARCHER') && !$this->user->hasRole('ROLE_COMITE')) {
+            throw $this->createAccessDeniedException();
+        }
+
+        return $this->render('lab/analyses.html.twig');
     }
 
     /**
@@ -55,7 +69,7 @@ final class LabController extends AbstractController
      * et relaie la réponse telle quelle (JSON ou PDF). L'accès de section (rôles) est
      * appliqué par le module lui-même.
      */
-    #[Route('/{_locale}/labo/analyses/{path}', name: 'lab_analyses_proxy', requirements: ['_locale' => 'fr', 'path' => '.*'], methods: ['GET', 'POST'])]
+    #[Route('/{_locale}/labo/analyses/{path}', name: 'lab_analyses_proxy', requirements: ['_locale' => 'fr', 'path' => '.+'], methods: ['GET', 'POST'])]
     public function analysesProxy(string $path, Request $request): Response
     {
         if (!$this->user->isLogged()) {
