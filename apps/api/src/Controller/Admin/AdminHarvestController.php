@@ -54,6 +54,53 @@ final class AdminHarvestController
         }
     }
 
+    /**
+     * Recalcule les totaux de progression (moissonnés / depuis la borne / cible OpenAlex)
+     * et les stocke en réglages pour un affichage instantané. Un seul seq-scan de la table
+     * `publication` donne les deux compteurs EXACTS ; la cible réaliste vient d'une requête
+     * OpenAlex (articles+reviews en/fr depuis la borne). Bouton manuel : quelques secondes.
+     */
+    #[Route('/api/admin/harvest/recompute-stats', name: 'admin_harvest_recompute_stats', methods: ['POST'])]
+    public function recomputeStats(): JsonResponse
+    {
+        $conn = $this->em->getConnection();
+        try {
+            $from = (int) ($conn->fetchOne("SELECT value FROM setting WHERE name = 'harvest.covered.from'") ?: 2015);
+
+            // Un seul parcours de table : total ET intégrés depuis la borne, tous deux exacts.
+            $conn->executeStatement("SET statement_timeout = '180s'");
+            $counts = $conn->fetchAssociative(
+                'SELECT count(*) AS total, count(*) FILTER (WHERE publication_date >= :d) AS since
+                 FROM publication',
+                ['d' => \sprintf('%04d-01-01', $from)]
+            ) ?: ['total' => 0, 'since' => 0];
+            $total = (int) $counts['total'];
+            $since = (int) $counts['since'];
+
+            // Cible réaliste : articles + reviews en anglais/français depuis la borne.
+            $universe = $this->openalex->countWorks(\sprintf(
+                'type:article|review,from_publication_date:%04d-01-01,language:en|fr',
+                $from
+            ));
+
+            $now = gmdate('Y-m-d\TH:i:s\Z');
+            $upsert = 'INSERT INTO setting(name, value) VALUES(:n, :v) ON CONFLICT(name) DO UPDATE SET value = EXCLUDED.value';
+            foreach ([
+                'harvest.integrated.total' => (string) $total,
+                'harvest.integrated.since2015' => (string) $since,
+                'harvest.universe.articles' => (string) ($universe ?? 0),
+                'harvest.covered.to' => gmdate('Y'),
+                'harvest.stats.updated_at' => $now,
+            ] as $n => $v) {
+                $conn->executeStatement($upsert, ['n' => $n, 'v' => $v]);
+            }
+
+            return new JsonResponse(['ok' => true, 'integrated' => $total, 'since' => $since, 'universe' => $universe]);
+        } catch (\Throwable $e) {
+            return new JsonResponse(['ok' => false, 'error' => $e->getMessage()], 502);
+        }
+    }
+
     #[Route('/api/admin/harvest/cleanup', name: 'admin_harvest_cleanup', methods: ['POST'])]
     public function cleanup(\Symfony\Component\HttpFoundation\Request $request): JsonResponse
     {
@@ -234,6 +281,16 @@ final class AdminHarvestController
                 'capPerRubric' => $this->settings->harvestCapPerRubric(),
                 'sort' => $this->settings->harvestSort(),
                 'recentYears' => $this->settings->harvestRecentYears(),
+                // Synthèse de progression (totaux coûteux pré-calculés et stockés en
+                // réglages ; bouton « recalculer » pour les rafraîchir à la demande).
+                'integrated' => (int) ($num('harvest.integrated.total') ?? 0),
+                'integratedSince2015' => (int) ($num('harvest.integrated.since2015') ?? 0),
+                'coveredFrom' => (int) ($num('harvest.covered.from') ?? 0),
+                'coveredTo' => (int) ($num('harvest.covered.to') ?? 0),
+                // Cible réaliste = articles+reviews en/fr publiés depuis la borne basse
+                // (ce que la moisson vise vraiment, pas le volume brut tous types).
+                'universeArticles' => (int) ($num('harvest.universe.articles') ?? 0),
+                'statsUpdatedAt' => $s['harvest.stats.updated_at'] ?? null,
             ],
             'openalex' => [
                 'date' => $today,
