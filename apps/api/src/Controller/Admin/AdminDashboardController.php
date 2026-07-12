@@ -102,16 +102,32 @@ final class AdminDashboardController
         $openAlexTotal = (int) $conn->executeQuery("SELECT COALESCE(SUM(value::bigint),0) FROM setting WHERE name LIKE 'openalex.total.%' AND value ~ '^[0-9]+$'")->fetchOne();
 
         // Articles RÉELLEMENT moissonnés par jour = nombre d'insertions ce jour-là
-        // (DATE(created_at)). Plus de cumul : compte réel. Série 30 jours sans trou.
-        $history = $conn->executeQuery(
-            "SELECT to_char(d.day, 'YYYY-MM-DD') AS day, COALESCE(c.n, 0) AS publications
-             FROM generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, INTERVAL '1 day') AS d(day)
-             LEFT JOIN (
-                 SELECT created_at::date AS day, count(*) AS n FROM publication
-                 WHERE created_at >= CURRENT_DATE - INTERVAL '29 days' GROUP BY created_at::date
-             ) c ON c.day = d.day
-             ORDER BY d.day"
-        )->fetchAllAssociative();
+        // (DATE(created_at)). Série 30 jours sans trou.
+        // Agréger created_at sur les 30 derniers jours peut coûter très cher lors d'une
+        // grosse ingestion (des millions de lignes insérées le même jour). On borne la
+        // requête (statement_timeout scopé par transaction) et on dégrade en série vide
+        // plutôt que de faire tomber TOUT le dashboard en timeout PHP (30 s).
+        $history = [];
+        try {
+            $conn->beginTransaction();
+            $conn->executeStatement("SET LOCAL statement_timeout = '6s'");
+            $history = $conn->executeQuery(
+                "SELECT to_char(d.day, 'YYYY-MM-DD') AS day, COALESCE(c.n, 0) AS publications
+                 FROM generate_series(CURRENT_DATE - INTERVAL '29 days', CURRENT_DATE, INTERVAL '1 day') AS d(day)
+                 LEFT JOIN (
+                     SELECT created_at::date AS day, count(*) AS n FROM publication
+                     WHERE created_at >= CURRENT_DATE - INTERVAL '29 days' GROUP BY created_at::date
+                 ) c ON c.day = d.day
+                 ORDER BY d.day"
+            )->fetchAllAssociative();
+            $conn->commit();
+        } catch (\Throwable) {
+            try {
+                $conn->rollBack();
+            } catch (\Throwable) {
+            }
+            $history = [];
+        }
 
         // Répartition par type : vue matérialisée (repli live si non peuplée).
         try {
