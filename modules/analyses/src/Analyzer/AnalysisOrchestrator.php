@@ -140,22 +140,25 @@ final class AnalysisOrchestrator
             || (float) $fingerprint['confidence'] < $this->humanReviewThreshold
             || false === $fingerprint['fulltext_available'];
 
-        // 3) Exécution des référentiels (principaux + risque de biais) dont un analyseur
-        // est enregistré. Un ECR route sur rct_appraisal (principal) + rob2 (risque de
-        // biais) : c'est ce dernier qui a un analyseur.
+        // 3) Exécution des référentiels (principaux + risque de biais + reporting) dont un
+        // analyseur est enregistré. Les identifiants de reporting spécifiques au design
+        // (strobe_cross_sectional…) sont résolus vers l'analyseur de famille (strobe).
         $frameworkIds = array_values(array_unique([
             ...$plan['primary_frameworks'],
             ...$plan['risk_of_bias_tools'],
+            ...$plan['reporting_frameworks'],
         ]));
+        $ranAnalyzers = [];
         foreach ($frameworkIds as $frameworkId) {
-            $analyzer = $this->analyzers->get($frameworkId);
-            if (null === $analyzer) {
+            $analyzer = $this->analyzers->get($frameworkId) ?? $this->analyzers->get($this->frameworkFamily($frameworkId));
+            if (null === $analyzer || isset($ranAnalyzers[$analyzer->frameworkId()])) {
                 continue;
             }
+            $ranAnalyzers[$analyzer->frameworkId()] = true;
 
             $result = $analyzer->analyze($fulltext, $pub);
             foreach ($result['criteria'] as $c) {
-                $criterion = (new AssessmentCriterion($assessment->getId(), $frameworkId, (string) $c['criterion_id'], (string) $c['question']))
+                $criterion = (new AssessmentCriterion($assessment->getId(), $analyzer->frameworkId(), (string) $c['criterion_id'], (string) $c['question']))
                     ->setDimension($c['dimension'] ?? null)
                     ->setAnswer((string) $c['answer'])
                     ->setEvidenceType($c['evidence_type'] ?? null)
@@ -184,6 +187,21 @@ final class AnalysisOrchestrator
             ->setStatus($humanReview ? 'human_review_required' : 'completed');
 
         $this->em->flush();
+    }
+
+    /**
+     * Résout un identifiant de référentiel spécifique au design vers sa famille d'analyseur
+     * (ex. strobe_cross_sectional → strobe, consort_cluster → consort).
+     */
+    private function frameworkFamily(string $id): string
+    {
+        foreach (['strobe', 'consort', 'prisma'] as $family) {
+            if (str_starts_with($id, $family)) {
+                return $family;
+            }
+        }
+
+        return $id;
     }
 
     /**
