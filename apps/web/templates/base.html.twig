@@ -250,6 +250,7 @@
         <nav>
             <a href="{{ path('home') }}"{{ route == 'home' ? ' class="is-active"' : '' }}>Accueil</a>
             <a href="{{ path('explore') }}"{{ route in ['explore','node','all_questions'] ? ' class="is-active"' : '' }}>Explorer</a>
+            {% if current_user.canResearch %}<a href="{{ path('lab_hub') }}"{{ route starts with 'lab' ? ' class="is-active"' : '' }}>🔬 Labo</a>{% endif %}
             <span class="nav-dd{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}">
                 <a tabindex="0" role="button" aria-haspopup="true" class="nav-dd-btn">Le projet</a>
                 <span class="nav-dd-menu" role="menu">

@@ -1,0 +1,27 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Labo — modules SciencesWiki{% endblock %}
+
+{% block body %}
+    <h1>Labo</h1>
+    <p class="muted">Modules et outils avancés. L'accès dépend de votre rôle.</p>
+
+    {% if modules is empty %}
+        <section class="side-block" style="margin-top:1rem">
+            <p class="muted">Aucun module n'est accessible avec votre rôle actuel.</p>
+        </section>
+    {% else %}
+        <div class="domains" style="margin-top:1rem">
+            {% for m in modules %}
+                <a class="domain-card" href="{{ m.href }}" style="background:linear-gradient(135deg,#0f172a,#1e3a8a)">
+                    <span class="d-label">{{ m.icon }} {{ m.name }}</span><br>
+                    <span class="d-sub">{{ m.description }}</span>
+                </a>
+            {% endfor %}
+        </div>
+        <p class="muted" style="font-size:.8rem; margin-top:1rem">
+            Les modules sont des applications autonomes intégrées à SciencesWiki
+            (cf. framework d'intégration). Le traitement d'une analyse n'est pas instantané.
+        </p>
+    {% endif %}
+{% endblock %}

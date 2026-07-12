@@ -346,6 +346,8 @@ services:
       DEFAULT_URI: ${PUBLIC_URL}
       # Appel server-side de l'API via le réseau interne du compose.
       API_BASE_URL: "http://api"
+      # Module « analyses » (standalone) joint en interne — façade /labo/analyses.
+      ANALYS_BASE_URL: ${ANALYS_BASE_URL:-http://analyses}
       # SSO chat : « .scienceswiki.eu » pour partager la session avec chat.scienceswiki.eu
       # (forward-auth Open WebUI). Vide = host-only (défaut). À régler au go-live.
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-}
@@ -359,6 +361,63 @@ services:
     ports:
       # Cf. api : publier sur l'IP LAN de Thor en prod (BIND_IP), pas 0.0.0.0.
       - "${BIND_IP:-0.0.0.0}:${WEB_PORT:-8080}:80"
+    restart: unless-stopped
+
+  # ── Module « analyses » (standalone) ────────────────────────────────────────
+  # Application autonome (Symfony/FrankenPHP) sur la BASE SW PARTAGÉE. Ne crée/migre
+  # que ses tables analys_*. Valide les JWT SW avec la clé PUBLIQUE (volume jwt_keys en
+  # lecture seule). Joignable en interne par le web via http://analyses. NON publié.
+  analyses:
+    <<: *app-hardening
+    build:
+      context: ../modules/analyses
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      - api
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${ANALYS_APP_SECRET:-${WEB_APP_SECRET}}
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:-database}:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      SERVER_NAME: ":80"
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES}
+      TRUSTED_HOSTS: ${TRUSTED_HOSTS:-}
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      OLLAMA_URL: ${OLLAMA_URL:-http://192.168.1.171:11434}
+      ANALYS_MODEL: ${ANALYS_MODEL:-glm-5.2:cloud}
+      ANALYS_EXTRACTOR_MODEL: ${ANALYS_EXTRACTOR_MODEL:-glm-4.7-flash:latest}
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      ANALYS_MAIL_FROM: ${HARVESTER_CONTACT_EMAIL:-noreply@scienceswiki.eu}
+      MODULE_BASE_URL: ${PUBLIC_URL:-}/labo/analyses
+      # Cette instance applique les migrations analys_* (table de suivi dédiée).
+      RUN_INIT: "1"
+    volumes:
+      - jwt_keys:/app/config/jwt:ro
+    restart: unless-stopped
+
+  # Worker du module analyses : consomme la file analys_analysis (traitement LLM async).
+  analyses-worker:
+    <<: *app-hardening
+    build:
+      context: ../modules/analyses
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      - analyses
+    environment:
+      APP_ENV: prod
+      APP_SECRET: ${ANALYS_APP_SECRET:-${WEB_APP_SECRET}}
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:-database}:5432/${POSTGRES_DB}?serverVersion=16&charset=utf8"
+      JWT_PUBLIC_KEY: "%kernel.project_dir%/config/jwt/public.pem"
+      OLLAMA_URL: ${OLLAMA_URL:-http://192.168.1.171:11434}
+      ANALYS_MODEL: ${ANALYS_MODEL:-glm-5.2:cloud}
+      ANALYS_EXTRACTOR_MODEL: ${ANALYS_EXTRACTOR_MODEL:-glm-4.7-flash:latest}
+      MAILER_DSN: ${MAILER_DSN:-null://null}
+      ANALYS_MAIL_FROM: ${HARVESTER_CONTACT_EMAIL:-noreply@scienceswiki.eu}
+      MODULE_BASE_URL: ${PUBLIC_URL:-}/labo/analyses
+      RUN_WORKER: "1"
+    volumes:
+      - jwt_keys:/app/config/jwt:ro
     restart: unless-stopped
 
   # Adminer : visualisation directe de la base (accès TOTAL → jamais public).
