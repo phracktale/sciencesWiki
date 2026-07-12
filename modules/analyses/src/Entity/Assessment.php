@@ -39,6 +39,22 @@ class Assessment
     #[ORM\Column(type: Types::FLOAT, nullable: true)]
     private ?float $routingConfidence = null;
 
+    /** Empreinte d'étude (fingerprint) sérialisée. */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $fingerprint = null;
+
+    /** Plan d'analyse composite retenu. */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $plan = null;
+
+    /** Une validation humaine est requise (SPECS §14). */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $humanReview = false;
+
+    /** Modèle LLM utilisé (traçabilité / reproductibilité, SPECS §26). */
+    #[ORM\Column(length: 120, nullable: true)]
+    private ?string $model = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -98,5 +114,53 @@ class Assessment
     public function getCreatedAt(): \DateTimeImmutable
     {
         return $this->createdAt;
+    }
+
+    public function getFingerprint(): ?array
+    {
+        return $this->fingerprint;
+    }
+
+    public function setFingerprint(?array $fingerprint): self
+    {
+        $this->fingerprint = $fingerprint;
+
+        return $this;
+    }
+
+    public function getPlan(): ?array
+    {
+        return $this->plan;
+    }
+
+    public function setPlan(?array $plan): self
+    {
+        $this->plan = $plan;
+
+        return $this;
+    }
+
+    public function isHumanReview(): bool
+    {
+        return $this->humanReview;
+    }
+
+    public function setHumanReview(bool $humanReview): self
+    {
+        $this->humanReview = $humanReview;
+
+        return $this;
+    }
+
+    public function getModel(): ?string
+    {
+        return $this->model;
+    }
+
+    public function setModel(?string $model): self
+    {
+        $this->model = $model;
+
+        return $this;
     }
 }
