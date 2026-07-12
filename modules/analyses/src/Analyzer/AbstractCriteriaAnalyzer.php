@@ -121,6 +121,7 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
             // dans le texte fourni (on ne fait pas confiance à l'auto-déclaration du LLM).
             // Sinon la « citation » est une hallucination → non ancrée.
             if ($anchored && 'explicit_quote' === $evidenceType && !$this->quoteInText($quote, $text)) {
+                error_log(\sprintf('[analys][unverified] textlen=%d quote=%s', mb_strlen($text), mb_substr($quote, 0, 90)));
                 $anchored = false;
                 $evidenceType = 'unverified_quote';
             }
@@ -161,18 +162,24 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
      */
     private function quoteInText(string $quote, string $text): bool
     {
-        $nq = $this->normalizeForMatch($quote);
-        if (mb_strlen($nq) < 15) {
+        $nt = $this->normalizeForMatch($text);
+        $words = explode(' ', $this->normalizeForMatch($quote));
+        $n = \count($words);
+        if ($n < 5) {
             return false; // trop court pour être une citation vérifiable
         }
-        $nt = $this->normalizeForMatch($text);
-        if (str_contains($nt, $nq)) {
-            return true;
-        }
 
-        $words = explode(' ', $nq);
-        if (\count($words) >= 8) {
-            return str_contains($nt, implode(' ', \array_slice($words, 0, 8)));
+        // Ancrage = au moins une SÉQUENCE contiguë de la citation existe dans le texte.
+        // Tolère la troncature/reformulation aux extrémités, mais exige un vrai passage
+        // copié (≥ 6 mots consécutifs, ou la citation entière si plus courte).
+        $window = 6;
+        if ($n <= $window) {
+            return str_contains($nt, implode(' ', $words));
+        }
+        for ($i = 0; $i + $window <= $n; ++$i) {
+            if (str_contains($nt, implode(' ', \array_slice($words, $i, $window)))) {
+                return true;
+            }
         }
 
         return false;
