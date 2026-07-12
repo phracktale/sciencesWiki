@@ -1,6 +1,13 @@
 security:
+    # Hash argon2id aux paramètres OWASP (m=19 Mo, t=2, p=1) : sûr mais ~5× plus
+    # rapide que le défaut Symfony (64 Mo / 4 passes) qui rendait le login lent sur
+    # une machine au CPU partagé (workers). Les hash existants (params encodés dans
+    # le hash) sont re-hachés automatiquement à la première connexion réussie.
     password_hashers:
-        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface: 'auto'
+        Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface:
+            algorithm: auto
+            memory_cost: 19456
+            time_cost: 2
 
     # Provider basé sur l'entité User (identifiant = email).
     providers:
