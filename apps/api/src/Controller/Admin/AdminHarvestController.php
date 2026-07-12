@@ -200,6 +200,13 @@ final class AdminHarvestController
         $apiRemaining = $rlFresh ? $num('openalex.rl.remaining') : null;
         $limitUsd = $rlFresh ? $num('openalex.credit.limit_usd') : null;
         $remainingUsd = $rlFresh ? $num('openalex.credit.remaining_usd') : null;
+        // Solde prépayé (balance persistante, non gaté par le jour).
+        $prepaidUsd = $num('openalex.credit.prepaid_remaining_usd');
+        // BLOQUÉ (bandeau rouge) UNIQUEMENT si les requêtes du jour sont épuisées
+        // (10000/10000, en-têtes frais) ET qu'il n'y a AUCUN prépayé pour prendre le relais.
+        // Tant qu'il reste du prépayé, la moisson continue → pas de bandeau.
+        $blocked = $rlFresh && null !== $apiRemaining && (int) $apiRemaining <= 0
+            && (null === $prepaidUsd || $prepaidUsd <= 0.00005);
 
         // --- Couverture GLOBALE de la moisson par rubrique (où on en est / ce qui reste) ---
         $cov = ['ok' => 0, 'failed' => 0, 'partial' => 0, 'running' => 0, 'pending' => 0, 'rateLimited' => 0, 'total' => 0];
@@ -236,12 +243,9 @@ final class AdminHarvestController
                 'used' => (null !== $apiLimit && null !== $apiRemaining) ? max(0, (int) $apiLimit - (int) $apiRemaining) : $used,
                 'perDay' => null !== $apiLimit ? (int) $apiLimit : $perDay,
                 'perMinute' => $this->settings->openalexPerMinute(),
-                // « Épuisé » UNIQUEMENT si OpenAlex signale 0 requête restante avec des
-                // en-têtes FRAIS (du jour). Pas de repli sur le plafond INTERNE (openalex.
-                // per_day) : ce n'est pas une limite OpenAlex, et épuiser le crédit gratuit
-                // ne bloque pas la moisson (bascule prépayé/polite pool). Évite le bandeau
-                // « limite atteinte » permanent et trompeur.
-                'exhausted' => $rlFresh && null !== $apiRemaining && (int) $apiRemaining <= 0,
+                // BLOQUÉ = 10000/10000 requêtes du jour épuisées ET aucun prépayé pour
+                // prendre le relais. Tant qu'il reste du prépayé, la moisson tourne → pas de bandeau.
+                'exhausted' => $blocked,
                 'real' => null !== $apiLimit && null !== $apiRemaining,
                 // Garde-fou interne (cadence configurable) — secondaire.
                 'internalUsed' => $used,
@@ -255,7 +259,7 @@ final class AdminHarvestController
                 'creditCostUsd' => $rlFresh ? $num('openalex.credit.cost_usd') : null,
                 // Solde PRÉPAYÉ : balance persistante (ne se réinitialise pas chaque jour) →
                 // on montre la DERNIÈRE valeur connue (avec creditUpdatedAt pour la fraîcheur).
-                'prepaidRemainingUsd' => $num('openalex.credit.prepaid_remaining_usd'),
+                'prepaidRemainingUsd' => $prepaidUsd,
                 'creditUpdatedAt' => $s['openalex.credit.updated_at'] ?? null,
             ],
             // Charge machines : Thor (cette instance) + Marvin (service ml).
