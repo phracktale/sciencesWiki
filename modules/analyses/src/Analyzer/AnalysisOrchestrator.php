@@ -37,10 +37,7 @@ final class AnalysisOrchestrator
         private readonly AssessmentRepository $assessments,
         private readonly MessageBusInterface $bus,
         private readonly MailerInterface $mailer,
-        #[Autowire(env: 'ANALYS_MODEL')]
-        private readonly string $model = 'glm-5.2:cloud',
-        #[Autowire(env: 'ANALYS_HUMAN_REVIEW_THRESHOLD')]
-        private readonly float $humanReviewThreshold = 0.75,
+        private readonly \Analyses\Service\SettingsService $settings,
         #[Autowire(env: 'default::ANALYS_MAIL_FROM')]
         private readonly ?string $mailFrom = null,
         #[Autowire(env: 'default::MODULE_BASE_URL')]
@@ -134,10 +131,10 @@ final class AnalysisOrchestrator
             ->setRoutingConfidence((float) $fingerprint['confidence'])
             ->setFingerprint($fingerprint)
             ->setPlan($plan)
-            ->setModel($this->model);
+            ->setModel($this->settings->analysisModel());
 
         $humanReview = $overridden
-            || (float) $fingerprint['confidence'] < $this->humanReviewThreshold
+            || (float) $fingerprint['confidence'] < $this->settings->humanReviewThreshold()
             || false === $fingerprint['fulltext_available'];
 
         // 3) Exécution des référentiels (principaux + risque de biais + reporting) dont un
@@ -148,11 +145,15 @@ final class AnalysisOrchestrator
             ...$plan['risk_of_bias_tools'],
             ...$plan['reporting_frameworks'],
         ]));
+        $enabled = $this->settings->enabledFrameworks(); // null = tous
         $ranAnalyzers = [];
         foreach ($frameworkIds as $frameworkId) {
             $analyzer = $this->analyzers->get($frameworkId) ?? $this->analyzers->get($this->frameworkFamily($frameworkId));
             if (null === $analyzer || isset($ranAnalyzers[$analyzer->frameworkId()])) {
                 continue;
+            }
+            if (null !== $enabled && !\in_array($analyzer->frameworkId(), $enabled, true)) {
+                continue; // référentiel désactivé par l'admin
             }
             $ranAnalyzers[$analyzer->frameworkId()] = true;
 

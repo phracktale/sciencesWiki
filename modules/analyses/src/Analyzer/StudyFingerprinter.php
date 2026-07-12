@@ -6,6 +6,7 @@ namespace Analyses\Analyzer;
 
 use Analyses\Ontology\StudyDesign;
 use Analyses\Sdk\LlmPort;
+use Analyses\Service\SettingsService;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -17,6 +18,7 @@ final class StudyFingerprinter
 {
     public function __construct(
         private readonly LlmPort $llm,
+        private readonly SettingsService $settings,
         #[Autowire(env: 'ANALYS_EXTRACTOR_MODEL')]
         private readonly string $model = 'glm-4.7-flash:latest',
     ) {
@@ -59,7 +61,7 @@ final class StudyFingerprinter
             Si le plan ne peut être déterminé, utilise "unknown" avec une confiance basse.
             PROMPT;
 
-        $out = $this->llm->generateJson($prompt, $this->model);
+        $out = $this->llm->generateJson($prompt, $this->settings->extractorModel() ?: $this->model);
 
         $design = StudyDesign::tryFrom((string) ($out['study_design'] ?? '')) ?? StudyDesign::Unknown;
         $confidence = (float) ($out['confidence'] ?? 0);

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Analyses\Analyzer;
 
 use Analyses\Sdk\LlmPort;
+use Analyses\Service\SettingsService;
+use Symfony\Contracts\Service\Attribute\Required;
 
 /**
  * Socle commun aux analyseurs « par critères » (AXIS, RoB 2, AMSTAR 2, MMAT…). Porte
@@ -18,8 +20,23 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
     private const ANCHORED_TYPES = ['explicit_quote', 'absence_verified'];
     private const VALID_CONFIDENCE = ['high', 'medium', 'low'];
 
+    private ?SettingsService $settings = null;
+
     public function __construct(protected readonly LlmPort $llm, protected readonly string $model)
     {
+    }
+
+    /** Injection par setter : le modèle effectif est configurable à chaud (réglages admin). */
+    #[Required]
+    public function setSettings(SettingsService $settings): void
+    {
+        $this->settings = $settings;
+    }
+
+    /** Modèle effectif : réglage admin (analys.default_model) sinon valeur d'environnement. */
+    protected function model(): string
+    {
+        return $this->settings?->analysisModel() ?? $this->model;
     }
 
     /** @return list<array{id: string, dimension: string, question: string}> */
@@ -64,7 +81,8 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
             {"answers":[{"criterion_id":"...","answer":"...","quote":"...","evidence_type":"...","confidence":"...","analysis":"..."}]}
             PROMPT;
 
-        $out = $this->llm->generateJson($prompt, $this->model);
+        $model = $this->model();
+        $out = $this->llm->generateJson($prompt, $model);
         $byId = $this->indexAnswers($out['answers'] ?? []);
 
         $results = [];
@@ -88,7 +106,7 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
             'criteria' => $results,
             'overall' => [
                 'framework_id' => $this->frameworkId(),
-                'model' => $this->model,
+                'model' => $model,
                 'coverage' => $coverage,
                 'answered' => $answered,
                 'downgraded' => $downgraded,
