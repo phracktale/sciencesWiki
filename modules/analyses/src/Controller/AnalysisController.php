@@ -9,12 +9,15 @@ use Analyses\Analyzer\PublicationNotFound;
 use Analyses\Entity\Assessment;
 use Analyses\Entity\AssessmentCriterion;
 use Analyses\Entity\Evidence;
+use Analyses\Pdf\PdfRenderer;
+use Analyses\Projection\ProjectionEngine;
 use Analyses\Repository\AssessmentCriterionRepository;
 use Analyses\Repository\AssessmentRepository;
 use Analyses\Repository\EvidenceRepository;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Uid\Ulid;
 
@@ -30,6 +33,8 @@ final class AnalysisController extends AbstractController
         private readonly AssessmentRepository $assessments,
         private readonly AssessmentCriterionRepository $criteria,
         private readonly EvidenceRepository $evidence,
+        private readonly ProjectionEngine $projection,
+        private readonly PdfRenderer $pdf,
     ) {
     }
 
@@ -80,6 +85,46 @@ final class AnalysisController extends AbstractController
         }
 
         return new JsonResponse($this->serialize($assessment, withDetails: true));
+    }
+
+    /** Export PDF de l'évaluation (généré à la volée, port pdf:render). */
+    #[Route('/analyses/{id}/pdf', name: 'analys_analyses_pdf', methods: ['GET'])]
+    public function pdf(string $id): Response
+    {
+        if (!Ulid::isValid($id)) {
+            return new JsonResponse(['error' => 'Identifiant invalide.'], 400);
+        }
+        $assessment = $this->assessments->find(Ulid::fromString($id));
+        if (null === $assessment) {
+            return new JsonResponse(['error' => 'Analyse introuvable.'], 404);
+        }
+
+        $binary = $this->pdf->render($assessment, $this->criteria->findForAssessment($assessment->getId()));
+
+        return new Response($binary, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => \sprintf('inline; filename="analyse-%s.pdf"', $assessment->getId()),
+        ]);
+    }
+
+    /** Projection du résultat canonique selon un rôle (SPECS §20). */
+    #[Route('/analyses/{id}/projection/{role}', name: 'analys_analyses_projection', methods: ['GET'])]
+    public function projection(string $id, string $role): JsonResponse
+    {
+        if (!Ulid::isValid($id)) {
+            return new JsonResponse(['error' => 'Identifiant invalide.'], 400);
+        }
+        $assessment = $this->assessments->find(Ulid::fromString($id));
+        if (null === $assessment) {
+            return new JsonResponse(['error' => 'Analyse introuvable.'], 404);
+        }
+
+        return new JsonResponse($this->projection->project(
+            $assessment,
+            $this->criteria->findForAssessment($assessment->getId()),
+            $this->evidence->findForAssessment($assessment->getId()),
+            $role,
+        ));
     }
 
     /**
