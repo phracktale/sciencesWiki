@@ -164,9 +164,12 @@ final class AnalysisOrchestrator
                     ->setRequiresHumanReview((bool) ($c['requires_human_review'] ?? false));
                 $this->em->persist($criterion);
 
+                // Preuve persistée UNIQUEMENT si la citation a été vérifiée dans le texte
+                // (evidence_type reste « explicit_quote » après le garde-fou d'ancrage).
+                // Une citation non vérifiée (« unverified_quote ») n'est pas stockée.
                 $quote = trim((string) ($c['quote'] ?? ''));
-                if ('' !== $quote) {
-                    $evidence = (new Evidence($assessment->getId(), $quote, (string) ($c['evidence_type'] ?? 'explicit_quote')))
+                if ('' !== $quote && 'explicit_quote' === ($c['evidence_type'] ?? '')) {
+                    $evidence = (new Evidence($assessment->getId(), $quote, 'explicit_quote'))
                         ->setCriterionId((string) $c['criterion_id'])
                         ->setConfidence($c['confidence'] ?? null);
                     $this->em->persist($evidence);

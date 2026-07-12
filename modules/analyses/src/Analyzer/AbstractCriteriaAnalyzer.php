@@ -71,7 +71,7 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
         $downgraded = 0;
         $answered = 0;
         foreach ($criteria as $c) {
-            $result = $this->applyGuardrail($c, $byId[$c['id']] ?? []);
+            $result = $this->applyGuardrail($c, $byId[$c['id']] ?? [], $excerpt);
             $results[] = $result;
             if ($result['requires_human_review']) {
                 ++$downgraded;
@@ -103,7 +103,7 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
      *
      * @return array<string, mixed>
      */
-    private function applyGuardrail(array $criterion, array $raw): array
+    private function applyGuardrail(array $criterion, array $raw, string $text): array
     {
         $unclear = $this->unclearAnswer();
         $answer = \in_array($raw['answer'] ?? null, $this->validAnswers(), true) ? (string) $raw['answer'] : $unclear;
@@ -116,6 +116,15 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
         if (!$this->isInconclusive($answer)) {
             $anchored = \in_array($evidenceType, self::ANCHORED_TYPES, true)
                 && ('absence_verified' === $evidenceType || '' !== $quote);
+
+            // VÉRIFICATION D'ANCRAGE : une citation explicite doit exister LITTÉRALEMENT
+            // dans le texte fourni (on ne fait pas confiance à l'auto-déclaration du LLM).
+            // Sinon la « citation » est une hallucination → non ancrée.
+            if ($anchored && 'explicit_quote' === $evidenceType && !$this->quoteInText($quote, $text)) {
+                $anchored = false;
+                $evidenceType = 'unverified_quote';
+            }
+
             if (!$anchored) {
                 $answer = $unclear;
                 $requiresReview = true;
@@ -143,6 +152,41 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
     private function isInconclusive(string $answer): bool
     {
         return \in_array($answer, [$this->unclearAnswer(), 'not_applicable'], true);
+    }
+
+    /**
+     * La citation apparaît-elle RÉELLEMENT dans le texte ? Comparaison normalisée
+     * (minuscules, sans accents ni ponctuation, espaces compactés) pour tolérer la
+     * mise en forme, avec repli sur les 8 premiers mots (le LLM tronque souvent la fin).
+     */
+    private function quoteInText(string $quote, string $text): bool
+    {
+        $nq = $this->normalizeForMatch($quote);
+        if (mb_strlen($nq) < 15) {
+            return false; // trop court pour être une citation vérifiable
+        }
+        $nt = $this->normalizeForMatch($text);
+        if (str_contains($nt, $nq)) {
+            return true;
+        }
+
+        $words = explode(' ', $nq);
+        if (\count($words) >= 8) {
+            return str_contains($nt, implode(' ', \array_slice($words, 0, 8)));
+        }
+
+        return false;
+    }
+
+    private function normalizeForMatch(string $s): string
+    {
+        $s = \Normalizer::normalize($s, \Normalizer::FORM_D) ?: $s;
+        $s = preg_replace('/\p{Mn}+/u', '', $s) ?? $s;         // retire les diacritiques
+        $s = mb_strtolower($s);
+        $s = preg_replace('/[^a-z0-9]+/', ' ', $s) ?? $s;      // ponctuation → espace
+        $s = preg_replace('/\s+/', ' ', $s) ?? $s;
+
+        return trim($s);
     }
 
     /**
