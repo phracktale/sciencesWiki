@@ -48,6 +48,14 @@ final class StudyFingerprinter
 
             Codes de plan d'étude autorisés : {$designs}
 
+            Repères de classification :
+            - une revue de la littérature / « survey » synthétisant d'autres travaux → systematic_review
+              (ou scoping_review si elle cartographie un champ, umbrella_review si elle agrège des revues) ;
+            - une comparaison de méthodes/modèles/algorithmes → algorithm_benchmark ou methods_validation ;
+            - une enquête/questionnaire à un instant donné → cross_sectional ;
+            - un suivi dans le temps → cohort_prospective/retrospective.
+            N'utilise "unknown" que si le plan est réellement indéterminable d'après le texte.
+
             Format de réponse JSON :
             {
               "study_design": "<un code de la liste, ou 'unknown'>",
