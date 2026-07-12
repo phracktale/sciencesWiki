@@ -1,0 +1,11 @@
+**/.git
+**/.gitignore
+**/.gitkeep
+/vendor/
+/var/
+/.env.local
+/.env.*.local
+/config/jwt/*.pem
+/tests/
+/.dockerignore
+/README.md
