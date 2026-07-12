@@ -680,7 +680,12 @@ final class AdminController extends AbstractController
             return new JsonResponse(['error' => 'Non authentifié.'], 401);
         }
 
-        return new JsonResponse($this->admin->harvestStatus());
+        $response = new JsonResponse($this->admin->harvestStatus());
+        // Statut temps réel : jamais mis en cache (sinon le navigateur ressert un vieux
+        // état — ex. bandeau « limite atteinte » figé après le reset quotidien).
+        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+
+        return $response;
     }
 
     /** Polling AJAX du suivi de l'ingestion du snapshot OpenAlex (onglet dédié). */

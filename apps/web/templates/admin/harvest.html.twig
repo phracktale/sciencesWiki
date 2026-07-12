@@ -383,7 +383,7 @@
         });
 
         function poll() {
-            fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
+            fetch('/admin/harvest/status.json?t=' + Date.now(), { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
                 .then(function (r) { return r.ok ? r.json() : null; })
                 .then(function (d) { if (d) render(d); })
                 .catch(function () {});
