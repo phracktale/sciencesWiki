@@ -55,6 +55,14 @@ class Assessment
     #[ORM\Column(length: 120, nullable: true)]
     private ?string $model = null;
 
+    /** Demandeur (identifiant/e-mail issu du JWT) — pour la notification de fin. */
+    #[ORM\Column(length: 180, nullable: true)]
+    private ?string $requestedBy = null;
+
+    /** Override manuel du plan d'étude demandé (validation humaine, SPECS §13). */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $designOverride = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -160,6 +168,30 @@ class Assessment
     public function setModel(?string $model): self
     {
         $this->model = $model;
+
+        return $this;
+    }
+
+    public function getRequestedBy(): ?string
+    {
+        return $this->requestedBy;
+    }
+
+    public function setRequestedBy(?string $requestedBy): self
+    {
+        $this->requestedBy = $requestedBy;
+
+        return $this;
+    }
+
+    public function getDesignOverride(): ?string
+    {
+        return $this->designOverride;
+    }
+
+    public function setDesignOverride(?string $designOverride): self
+    {
+        $this->designOverride = $designOverride;
 
         return $this;
     }

@@ -33,7 +33,11 @@ final class AnalysisController extends AbstractController
     ) {
     }
 
-    /** Corps : {"document_ref": "<id publication ou DOI>"}. */
+    /**
+     * Met une analyse en file (asynchrone) et retourne 202 avec son identifiant.
+     * Corps : {"document_ref": "<id publication ou DOI>", "study_design": "<override optionnel>"}.
+     * Suivre l'avancement via GET /analyses/{id} (statut queued → running → completed).
+     */
     #[Route('/analyses', name: 'analys_analyses_create', methods: ['POST'])]
     public function create(Request $request): JsonResponse
     {
@@ -45,13 +49,22 @@ final class AnalysisController extends AbstractController
         $designOverride = \is_array($payload) && isset($payload['study_design'])
             ? trim((string) $payload['study_design']) : null;
 
+        // Demandeur = identité du JWT (l'e-mail SciencesWiki), pour la notification.
+        $requestedBy = $this->getUser()?->getUserIdentifier();
+
         try {
-            $assessment = $this->orchestrator->run($ref, $designOverride ?: null);
+            $assessment = $this->orchestrator->queue($ref, $designOverride ?: null, $requestedBy);
         } catch (PublicationNotFound $e) {
             return new JsonResponse(['error' => $e->getMessage()], 404);
         }
 
-        return new JsonResponse($this->serialize($assessment), 201);
+        return new JsonResponse([
+            'id' => (string) $assessment->getId(),
+            'status' => $assessment->getStatus(),
+            'document_ref' => $assessment->getDocumentRef(),
+            'poll' => '/analyses/'.$assessment->getId(),
+            'message' => "Analyse mise en file. Le traitement n'est pas instantané ; suivez le statut via le lien poll.",
+        ], 202);
     }
 
     #[Route('/analyses/{id}', name: 'analys_analyses_read', methods: ['GET'])]

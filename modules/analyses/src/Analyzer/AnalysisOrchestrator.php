@@ -7,16 +7,24 @@ namespace Analyses\Analyzer;
 use Analyses\Entity\Assessment;
 use Analyses\Entity\AssessmentCriterion;
 use Analyses\Entity\Evidence;
+use Analyses\Message\RunAnalysisMessage;
 use Analyses\Ontology\StudyDesign;
+use Analyses\Repository\AssessmentRepository;
 use Analyses\Router\RouterEngine;
 use Analyses\Sdk\CorpusPort;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Symfony\Component\Mailer\MailerInterface;
+use Symfony\Component\Messenger\MessageBusInterface;
+use Symfony\Component\Mime\Email;
+use Symfony\Component\Uid\Ulid;
 
 /**
  * Orchestrateur (SPECS §12) : corpus → empreinte → routage → exécution des référentiels
- * applicables → résultat canonique persisté (analys_*). Le résultat est indépendant du
- * rôle ; la restitution par rôle se fait à la lecture.
+ * applicables → résultat canonique persisté (analys_*). Deux temps :
+ *  - {@see queue()} crée l'évaluation « queued » et publie un message (retour immédiat) ;
+ *  - {@see process()} exécute le pipeline (worker) puis notifie le demandeur.
  */
 final class AnalysisOrchestrator
 {
@@ -26,31 +34,88 @@ final class AnalysisOrchestrator
         private readonly RouterEngine $router,
         private readonly AnalyzerRegistry $analyzers,
         private readonly EntityManagerInterface $em,
+        private readonly AssessmentRepository $assessments,
+        private readonly MessageBusInterface $bus,
+        private readonly MailerInterface $mailer,
         #[Autowire(env: 'ANALYS_MODEL')]
         private readonly string $model = 'glm-5.2:cloud',
         #[Autowire(env: 'ANALYS_HUMAN_REVIEW_THRESHOLD')]
         private readonly float $humanReviewThreshold = 0.75,
+        #[Autowire(env: 'default::ANALYS_MAIL_FROM')]
+        private readonly ?string $mailFrom = null,
+        #[Autowire(env: 'default::MODULE_BASE_URL')]
+        private readonly ?string $baseUrl = null,
     ) {
     }
 
-    public function run(string $documentRef, ?string $designOverride = null): Assessment
+    /**
+     * Crée l'évaluation (statut « queued ») et publie le message d'exécution.
+     * Vérifie l'existence de la publication tout de suite (erreur 404 immédiate).
+     */
+    public function queue(string $documentRef, ?string $designOverride = null, ?string $requestedBy = null): Assessment
     {
-        $pub = $this->corpus->findPublication($documentRef);
-        if (null === $pub) {
+        if (null === $this->corpus->findPublication($documentRef)) {
             throw new PublicationNotFound(\sprintf('Publication introuvable : %s', $documentRef));
         }
 
-        $pubId = (int) $pub['id'];
-        $fulltext = $this->corpus->fulltext($pubId);
+        $override = null !== $designOverride && null !== StudyDesign::tryFrom($designOverride) ? $designOverride : null;
+
+        $assessment = (new Assessment($documentRef))
+            ->setStatus('queued')
+            ->setRequestedBy($requestedBy)
+            ->setDesignOverride($override);
+        $this->em->persist($assessment);
+        $this->em->flush();
+
+        $this->bus->dispatch(new RunAnalysisMessage((string) $assessment->getId()));
+
+        return $assessment;
+    }
+
+    /**
+     * Exécute le pipeline pour une évaluation en file (appelé par le worker).
+     */
+    public function process(Ulid $assessmentId): void
+    {
+        $assessment = $this->assessments->find($assessmentId);
+        if (null === $assessment) {
+            return;
+        }
+
+        $assessment->setStatus('running');
+        $this->em->flush();
+
+        try {
+            $this->executePipeline($assessment);
+        } catch (\Throwable $e) {
+            $assessment->setStatus('failed');
+            $this->em->flush();
+
+            throw $e; // laisse Messenger réessayer selon la stratégie configurée
+        }
+
+        $this->notify($assessment);
+    }
+
+    private function executePipeline(Assessment $assessment): void
+    {
+        $pub = $this->corpus->findPublication($assessment->getDocumentRef());
+        if (null === $pub) {
+            $assessment->setStatus('failed');
+            $this->em->flush();
+
+            return;
+        }
+
+        $fulltext = $this->corpus->fulltext((int) $pub['id']);
 
         // 1) Empreinte d'étude.
         $fingerprint = $this->fingerprinter->fingerprint($pub, $fulltext);
         $design = StudyDesign::tryFrom((string) $fingerprint['study_design']) ?? StudyDesign::Unknown;
 
-        // Override manuel du plan d'étude (validation humaine, SPECS §13) : on conserve
-        // l'empreinte automatique mais on route sur le plan choisi, en exigeant une revue.
+        // Override manuel (validation humaine, SPECS §13).
         $overridden = false;
-        if (null !== $designOverride && null !== ($forced = StudyDesign::tryFrom($designOverride))) {
+        if (null !== $assessment->getDesignOverride() && null !== ($forced = StudyDesign::tryFrom($assessment->getDesignOverride()))) {
             $design = $forced;
             $fingerprint['design_override'] = $forced->value;
             $overridden = true;
@@ -64,15 +129,13 @@ final class AnalysisOrchestrator
             $fingerprint['modalities'],
         );
 
-        $assessment = (new Assessment($documentRef))
+        $assessment
             ->setPrimaryDesign($design->value)
             ->setRoutingConfidence((float) $fingerprint['confidence'])
             ->setFingerprint($fingerprint)
             ->setPlan($plan)
             ->setModel($this->model);
-        $this->em->persist($assessment);
 
-        // Validation humaine requise si routage incertain, texte indisponible, ou override (SPECS §14).
         $humanReview = $overridden
             || (float) $fingerprint['confidence'] < $this->humanReviewThreshold
             || false === $fingerprint['fulltext_available'];
@@ -112,7 +175,41 @@ final class AnalysisOrchestrator
             ->setStatus($humanReview ? 'human_review_required' : 'completed');
 
         $this->em->flush();
+    }
 
-        return $assessment;
+    /**
+     * Notifie le demandeur (port « mailer », graceful). Avec MAILER_DSN=null://null,
+     * l'envoi est un no-op ; aucune erreur ne remonte.
+     */
+    private function notify(Assessment $assessment): void
+    {
+        $to = $assessment->getRequestedBy();
+        if (null === $to || !filter_var($to, \FILTER_VALIDATE_EMAIL)) {
+            return;
+        }
+
+        $link = null !== $this->baseUrl && '' !== $this->baseUrl
+            ? rtrim($this->baseUrl, '/').'/analyses/'.$assessment->getId()
+            : null;
+
+        $body = \sprintf(
+            "Votre analyse (%s) est terminée.\nStatut : %s\nPlan : %s\n%s",
+            $assessment->getDocumentRef(),
+            $assessment->getStatus(),
+            $assessment->getPrimaryDesign() ?? 'indéterminé',
+            null !== $link ? "Résultat : $link" : '',
+        );
+
+        try {
+            $this->mailer->send(
+                (new Email())
+                    ->from($this->mailFrom ?: 'noreply@scienceswiki.eu')
+                    ->to($to)
+                    ->subject('Analyse SciencesWiki terminée')
+                    ->text($body),
+            );
+        } catch (TransportExceptionInterface) {
+            // Notification best-effort : un échec d'envoi ne doit pas invalider l'analyse.
+        }
     }
 }

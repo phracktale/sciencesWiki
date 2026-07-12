@@ -10,4 +10,10 @@ if [ "${RUN_INIT:-0}" = "1" ]; then
 	echo "[analyses] Initialisation terminée."
 fi
 
+# Mode worker : consomme la file d'analyses (traitement LLM asynchrone).
+if [ "${RUN_WORKER:-0}" = "1" ]; then
+	echo "[analyses] Worker : consommation de la file analys_analysis…"
+	exec php bin/console messenger:consume analys_analysis --time-limit=3600 --memory-limit=256M -v
+fi
+
 exec docker-php-entrypoint "$@"
