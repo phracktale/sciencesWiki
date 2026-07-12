@@ -1,0 +1,105 @@
+# Manifeste du module « analyses » — routeur et moteur d'analyse composite.
+# Conforme à docs/Modules/SPECS.md (§6). Module STANDALONE sur base SW partagée.
+# Ne touche PAS à l'analyse legacy (AXIS/RoB2/AMSTAR2/MMAT) — coexistence (§3.8).
+
+# ---- Identité ----
+prefix: ANALYS
+slug: analyses
+name: "Analyses scientifiques"
+description: >
+  Routage composite et évaluation méthodologique universelle des publications
+  scientifiques (type d'étude → référentiels + reporting + risque de biais +
+  contrôles domaine/modalité/intégrité). Voir docs/Modules/analyses/SPECS.md.
+icon: "🔬"
+category: research
+
+# ---- Version & compatibilité ----
+version: 0.1.0
+compat:
+  scienceswiki_min: "8.1.0"
+  scienceswiki_max: "9.x"
+sdk_api: "1"
+
+# ---- Style d'intégration ----
+integration: external            # standalone (base SW partagée), cf. SPECS §3.7
+mount: "/m/analyses"
+entrypoints:
+  main: analys_home
+
+# ---- Accès (sections gardées par rôle) ----
+access:
+  sections:
+    - key: use
+      label: "Utiliser les analyses"
+      roles: [ROLE_RESEARCHER, ROLE_COMITE]
+      route: analys_home
+    - key: review
+      label: "Valider les analyses"
+      roles: [ROLE_COMITE]
+    - key: admin
+      label: "Paramétrage du module Analyses"
+      roles: [ROLE_ADMIN]
+      route: analys_admin_settings
+
+# ---- Capacités hôte demandées (moindre privilège) ----
+capabilities:
+  required:
+    - identity
+    - publications:read
+    - vector-search
+    - llm:generate
+    - pdf:render
+    - queue
+  optional:
+    - tree:read
+    - mailer
+
+# ---- Points d'extension ----
+hooks:
+  menu:
+    - placement: primary
+      label: "Analyses"
+      icon: "🔬"
+      route: analys_home
+      roles: [ROLE_RESEARCHER, ROLE_COMITE]
+      order: 40
+      badge: analys.badge.pending
+  assets:
+    css:
+      - path: "app.css"
+        scope: module
+    js:
+      - path: "app.js"
+        scope: module
+        defer: true
+  settings_pages:
+    admin: analys_admin_settings
+    user:  analys_user_prefs
+  events:
+    subscribes: [core.publication.fulltext_ready]
+    publishes:  [analys.assessment.completed, analys.assessment.requires_review]
+
+# ---- Persistance (tables propres, dans la base SW partagée) ----
+persistence:
+  tables_prefix: analys
+  migrations: "migrations/"
+
+# ---- Réglages exposés (namespacés, avec portée) ----
+settings:
+  - key: analys.default_model
+    scope: admin
+    type: string
+    default: "glm-5.2:cloud"
+  - key: analys.extractor_model
+    scope: admin
+    type: string
+    default: "glm-4.7-flash:latest"
+  - key: analys.threshold.human_review
+    scope: admin
+    type: float
+    default: 0.75
+  - key: analys.user.default_role_projection
+    scope: user
+    type: enum
+    values: [researcher, methodologist, reviewer]
+    default: researcher

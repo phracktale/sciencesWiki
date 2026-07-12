@@ -1,0 +1,104 @@
+# Manifeste du module « figTrack » — forensique d'images scientifiques.
+# Conforme à docs/Modules/SPECS.md (§6). Module STANDALONE (service Python/ML)
+# sur base SW partagée. Outil d'investigation assistée : ne conclut jamais à une
+# fraude (voir docs/Modules/figTrack/SPECS.md).
+
+# ---- Identité ----
+prefix: FIGTRK
+slug: figtrack
+name: "figTrack — intégrité des images"
+description: >
+  Détection, localisation et documentation d'anomalies dans les figures
+  scientifiques (duplications, copier-déplacer, réutilisations, montages,
+  inpainting, contraste…). Human-in-the-loop, sans conclusion automatique.
+icon: "🖼️"
+category: integrity
+
+# ---- Version & compatibilité ----
+version: 0.1.0
+compat:
+  scienceswiki_min: "8.1.0"
+  scienceswiki_max: "9.x"
+sdk_api: "1"
+
+# ---- Style d'intégration ----
+integration: external            # service Python/ML autonome + base SW partagée
+mount: "/m/figtrack"
+entrypoints:
+  main: figtrk_home
+
+# ---- Accès (sections gardées par rôle) ----
+access:
+  sections:
+    - key: use
+      label: "Analyser des figures"
+      roles: [ROLE_RESEARCHER]
+      route: figtrk_home
+    - key: expert
+      label: "Expertise d'intégrité"
+      roles: [ROLE_COMITE]
+    - key: admin
+      label: "Paramétrage du module figTrack"
+      roles: [ROLE_ADMIN]
+      route: figtrk_admin_settings
+
+# ---- Capacités hôte demandées (moindre privilège) ----
+capabilities:
+  required:
+    - identity
+    - publications:read          # figures + PDF plein texte
+    - storage
+    - queue
+    - events
+  optional:
+    - mailer
+
+# ---- Points d'extension ----
+hooks:
+  menu:
+    - placement: hub             # accessible via la page hub des modules
+      label: "figTrack"
+      icon: "🖼️"
+      route: figtrk_home
+      roles: [ROLE_RESEARCHER, ROLE_COMITE]
+      order: 60
+  assets:
+    css:
+      - path: "app.css"
+        scope: module
+    js:
+      - path: "app.js"
+        scope: module
+        defer: true
+  settings_pages:
+    admin: figtrk_admin_settings
+  events:
+    publishes: [figtrk.analysis.completed, figtrk.finding.created, figtrk.report.ready]
+
+# ---- Persistance (tables propres, dans la base SW partagée) ----
+persistence:
+  tables_prefix: figtrk
+  migrations: "migrations/"
+
+# ---- Réglages exposés ----
+settings:
+  - key: figtrk.profile.default
+    scope: admin
+    type: enum
+    values: [biomedical_full, exploratory, quick]
+    default: biomedical_full
+  - key: figtrk.triage.min_level
+    scope: admin
+    type: enum
+    values: [T0, T1, T2, T3]
+    default: T2
+
+# ---- Volet service externe (Python/ML) ----
+service:
+  base_url_env: FIGTRK_BASE_URL
+  auth: bearer
+  secret_env: FIGTRK_API_KEY
+  health: "/healthz"
+  webhooks:
+    signing_secret_env: FIGTRK_WEBHOOK_SECRET
+    events: [analysis.completed, finding.created, report.ready]
