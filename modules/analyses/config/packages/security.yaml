@@ -1,0 +1,24 @@
+security:
+    # Le module NE délivre PAS de token : il VALIDE ceux émis par SciencesWiki
+    # (clé publique partagée). L'utilisateur est reconstruit depuis les claims du JWT
+    # (identifiant + rôles), sans table utilisateur locale.
+    providers:
+        jwt:
+            lexik_jwt:
+                class: Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUser
+
+    firewalls:
+        health:
+            pattern: ^/health
+            security: false
+        api:
+            pattern: ^/
+            stateless: true
+            provider: jwt
+            jwt: ~
+
+    # Accès par section (cf. manifeste module.yaml).
+    access_control:
+        - { path: ^/health, roles: PUBLIC_ACCESS }
+        - { path: ^/admin, roles: ROLE_ADMIN }              # section admin (globale)
+        - { path: ^/, roles: [ROLE_RESEARCHER, ROLE_COMITE] } # section use

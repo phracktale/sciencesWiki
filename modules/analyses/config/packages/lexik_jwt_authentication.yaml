@@ -1,0 +1,11 @@
+lexik_jwt_authentication:
+    # Validation seule : clé PUBLIQUE de SciencesWiki (le module ne signe jamais).
+    public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
+    # Claim d'identifiant utilisateur (les tokens SW portent « username »).
+    user_id_claim: username
+    # Où lire le token (en-tête Authorization: Bearer …).
+    token_extractors:
+        authorization_header:
+            enabled: true
+            prefix: Bearer
+            name: Authorization

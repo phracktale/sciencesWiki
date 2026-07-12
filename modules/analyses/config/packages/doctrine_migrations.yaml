@@ -1,0 +1,5 @@
+doctrine_migrations:
+    migrations_paths:
+        # Migrations des tables analys_* (dans la base SW partagée).
+        'Analyses\Migrations': '%kernel.project_dir%/migrations'
+    enable_profiler: false

@@ -1,0 +1,23 @@
+{
+	{$CADDY_GLOBAL_OPTIONS}
+
+	frankenphp
+
+	# TLS terminé en amont (nginx/Heimdall) ; on écoute en HTTP clair.
+	auto_https off
+
+	order php_server before file_server
+}
+
+{$SERVER_NAME:80} {
+	root * /app/public
+
+	encode zstd br gzip
+
+	php_server
+
+	log {
+		output stderr
+		format console
+	}
+}
