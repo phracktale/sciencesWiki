@@ -235,9 +235,12 @@
         <a class="brand" href="{{ path('home') }}"><img src="{{ crt ? '/logo-crt.svg' : '/logo.svg' }}" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
         <style>
-            .nav-dd { position:relative; display:inline-block }
-            .nav-dd > .nav-dd-btn::after { content:" ▾"; font-size:.8em }
-            .nav-dd-menu { position:absolute; top:100%; left:0; margin-top:.15rem; background:#fff; color:#0f172a;
+            /* Le wrapper .nav-dd porte le style d'item de menu (voir base.css / crt-theme.css :
+               header nav a, header nav .nav-dd). Le lien intérieur hérite couleur+état, sans
+               padding propre, pour un rendu STRICTEMENT identique aux autres entrées. */
+            .nav-dd .nav-dd-btn { color:inherit; padding:0; cursor:pointer; text-decoration:none; font:inherit }
+            .nav-dd .nav-dd-btn::after { content:" ▾"; font-size:.8em }
+            .nav-dd-menu { position:absolute; top:100%; left:0; background:#fff; color:#0f172a;
                 border:1px solid var(--line); border-radius:10px; min-width:180px; padding:.3rem 0;
                 box-shadow:0 10px 28px rgba(15,23,42,.18); display:none; z-index:60 }
             .nav-dd:hover .nav-dd-menu, .nav-dd:focus-within .nav-dd-menu { display:block }
@@ -247,8 +250,8 @@
         <nav>
             <a href="{{ path('home') }}"{{ route == 'home' ? ' class="is-active"' : '' }}>Accueil</a>
             <a href="{{ path('explore') }}"{{ route in ['explore','node','all_questions'] ? ' class="is-active"' : '' }}>Explorer</a>
-            <span class="nav-dd">
-                <a tabindex="0" role="button" aria-haspopup="true" class="nav-dd-btn{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}">Le projet</a>
+            <span class="nav-dd{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}">
+                <a tabindex="0" role="button" aria-haspopup="true" class="nav-dd-btn">Le projet</a>
                 <span class="nav-dd-menu" role="menu">
                     <a href="{{ path('crt_discover') }}" role="menuitem">Découvrir</a>
                     <a href="{{ path('process') }}" role="menuitem">Process</a>

@@ -96,9 +96,9 @@ body.theme-crt header { border-bottom-color: var(--line); }
 body.theme-crt header .brand { color: var(--accent); }
 /* Logo dédié CRT (logo-crt.svg servi par le template) : pas de filtre. */
 body.theme-crt header .brand img { filter: none; }
-body.theme-crt header nav a, body.theme-crt header nav .nav-dd-btn { color: var(--phos); }
-body.theme-crt header nav a:hover, body.theme-crt header nav .nav-dd-btn:hover { background: rgba(185,240,201,.12); color: var(--phos-bright); }
-body.theme-crt header nav a.is-active, body.theme-crt header nav .nav-dd-btn.is-active { color: var(--accent); }
+body.theme-crt header nav a, body.theme-crt header nav .nav-dd { color: var(--phos); }
+body.theme-crt header nav a:hover, body.theme-crt header nav .nav-dd:hover, body.theme-crt header nav .nav-dd:focus-within { background: rgba(185,240,201,.12); color: var(--phos-bright); }
+body.theme-crt header nav a.is-active, body.theme-crt header nav .nav-dd.is-active { color: var(--accent); }
 body.theme-crt header nav a.is-active::after { background: var(--accent); }
 body.theme-crt .nav-dd-top { color: var(--phos); background: none; border: none; }
 body.theme-crt .nav-dd-top:hover, body.theme-crt .nav-dd:focus-within .nav-dd-top { background: rgba(185,240,201,.14); color: var(--phos-bright); }
