@@ -234,13 +234,29 @@
     <header>
         <a class="brand" href="{{ path('home') }}"><img src="{{ crt ? '/logo-crt.svg' : '/logo.svg' }}" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
+        <style>
+            .nav-dd { position:relative; display:inline-block }
+            .nav-dd > .nav-dd-btn { font:inherit; background:none; border:0; cursor:pointer; color:inherit; padding:0 }
+            .nav-dd > .nav-dd-btn::after { content:" ▾"; font-size:.8em }
+            .nav-dd-menu { position:absolute; top:100%; left:0; margin-top:.35rem; background:#fff; color:#0f172a;
+                border:1px solid var(--line); border-radius:10px; min-width:180px; padding:.3rem 0;
+                box-shadow:0 10px 28px rgba(15,23,42,.18); display:none; z-index:60 }
+            .nav-dd:hover .nav-dd-menu, .nav-dd:focus-within .nav-dd-menu { display:block }
+            .nav-dd-menu a { display:block; padding:.45rem 1rem; white-space:nowrap; color:#0f172a; text-decoration:none }
+            .nav-dd-menu a:hover { background:#eef2ff }
+        </style>
         <nav>
-            <a href="{{ path('home') }}"{{ route in ['home','node'] ? ' class="is-active"' : '' }}>Accueil</a>
-            <a href="{{ path('project') }}"{{ route == 'project' ? ' class="is-active"' : '' }}>Le projet</a>
-            <a href="{{ path('crt_discover') }}"{{ route == 'crt_discover' ? ' class="is-active"' : '' }}>Découvrir</a>
-            <a href="{{ path('process') }}"{{ route == 'process' ? ' class="is-active"' : '' }}>Process</a>
-            <a href="{{ path('reliability') }}"{{ route == 'reliability' ? ' class="is-active"' : '' }}>Fiabilité IA</a>
-            <a href="{{ path('crt_manifesto') }}"{{ route == 'crt_manifesto' ? ' class="is-active"' : '' }}>Manifeste</a>
+            <a href="{{ path('home') }}"{{ route == 'home' ? ' class="is-active"' : '' }}>Accueil</a>
+            <a href="{{ path('explore') }}"{{ route in ['explore','node','all_questions'] ? ' class="is-active"' : '' }}>Explorer</a>
+            <span class="nav-dd">
+                <button type="button" class="nav-dd-btn{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}" aria-haspopup="true">Le projet</button>
+                <span class="nav-dd-menu" role="menu">
+                    <a href="{{ path('crt_discover') }}" role="menuitem">Découvrir</a>
+                    <a href="{{ path('process') }}" role="menuitem">Process</a>
+                    <a href="{{ path('reliability') }}" role="menuitem">Fiabilité</a>
+                    <a href="{{ path('crt_manifesto') }}" role="menuitem">Manifeste</a>
+                </span>
+            </span>
             <a href="{{ path('crt_donate') }}" style="color:var(--vul); font-weight:700">★ Soutenir</a>
             <a href="{{ path('crt_contact') }}"{{ route == 'crt_contact' ? ' class="is-active"' : '' }}>Contact</a>
             {# Compte : dans la barre terminal si mode fenêtré, sinon ici (à droite). #}
@@ -253,7 +269,7 @@
     </main>
     <footer>
         Contenu sous licence CC BY-SA 4.0 · vulgarisation sourcée, relue par un comité scientifique ·
-        projet libre, gratuit et open source. <a href="{{ path('project') }}">En savoir plus</a>
+        projet libre, gratuit et open source. <a href="{{ path('home') }}">En savoir plus</a>
         <br>
         <a href="{{ path('crt_discover') }}">Découvrir</a> ·
         <a href="{{ path('crt_manifesto') }}">Manifeste</a> ·

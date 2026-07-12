@@ -26,9 +26,10 @@ final class LatestQuestionsController
         $perPage = min(20, max(1, (int) $request->query->get('limit', '10')));
         $page = max(1, (int) $request->query->get('page', '1'));
         $offset = ($page - 1) * $perPage;
+        $search = trim((string) $request->query->get('q', '')) ?: null;
 
         // On demande un élément de plus pour savoir s'il existe une page suivante.
-        $rows = $this->answers->findLatestPublic($perPage + 1, $offset);
+        $rows = $this->answers->findLatestPublic($perPage + 1, $offset, $search);
         $hasMore = \count($rows) > $perPage;
         $rows = \array_slice($rows, 0, $perPage);
 
@@ -46,6 +47,6 @@ final class LatestQuestionsController
             ];
         }, $rows);
 
-        return new JsonResponse(['items' => $items, 'page' => $page, 'hasMore' => $hasMore]);
+        return new JsonResponse(['items' => $items, 'page' => $page, 'hasMore' => $hasMore, 'q' => $search]);
     }
 }

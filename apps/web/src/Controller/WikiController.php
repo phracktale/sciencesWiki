@@ -684,13 +684,35 @@ final class WikiController extends AbstractController
         return 'revue-'.('' !== $slug ? mb_substr($slug, 0, 60) : 'litterature');
     }
 
+    /** Accueil : présentation du projet + « nous rejoindre ». L'exploration de l'arbre est sur {@see explore()}. */
     #[Route('/{_locale}', name: 'home', requirements: ['_locale' => 'fr'], methods: ['GET'])]
     public function home(): Response
     {
-        return $this->render('wiki/home.html.twig', [
+        return $this->render('wiki/home.html.twig');
+    }
+
+    /** Explorer : intro arbre des savoirs + lanceurs de domaines + stats + dernières questions. */
+    #[Route('/{_locale}/explorer', name: 'explore', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function explore(): Response
+    {
+        return $this->render('wiki/explore.html.twig', [
             'domains' => $this->api->domains(),
             'latestFrame' => $this->api->latestQuestionsPage(5, 1),
             'stats' => $this->api->stats(),
+        ]);
+    }
+
+    /** Toutes les questions publiques : liste paginée + moteur de recherche. */
+    #[Route('/{_locale}/questions', name: 'all_questions', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function allQuestions(Request $request): Response
+    {
+        $q = trim((string) $request->query->get('q', ''));
+        $page = max(1, (int) $request->query->get('page', '1'));
+
+        return $this->render('wiki/questions.html.twig', [
+            'result' => $this->api->latestQuestionsPage(15, $page, $q ?: null),
+            'q' => $q,
+            'page' => $page,
         ]);
     }
 

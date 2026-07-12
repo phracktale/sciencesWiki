@@ -88,15 +88,19 @@ final class ApiClient
      *
      * @return list<array<string,mixed>>
      */
-    /** @return array{items: list<array<string,mixed>>, page:int, hasMore:bool} */
-    public function latestQuestionsPage(int $perPage, int $page): array
+    /** @return array{items: list<array<string,mixed>>, page:int, hasMore:bool, q:?string} */
+    public function latestQuestionsPage(int $perPage, int $page, ?string $q = null): array
     {
         try {
-            $data = $this->get('/api/questions/latest', ['limit' => $perPage, 'page' => $page]);
+            $params = ['limit' => $perPage, 'page' => $page];
+            if (null !== $q && '' !== trim($q)) {
+                $params['q'] = trim($q);
+            }
+            $data = $this->get('/api/questions/latest', $params);
 
-            return ['items' => $data['items'] ?? [], 'page' => $data['page'] ?? $page, 'hasMore' => (bool) ($data['hasMore'] ?? false)];
+            return ['items' => $data['items'] ?? [], 'page' => $data['page'] ?? $page, 'hasMore' => (bool) ($data['hasMore'] ?? false), 'q' => $data['q'] ?? $q];
         } catch (\Throwable) {
-            return ['items' => [], 'page' => $page, 'hasMore' => false];
+            return ['items' => [], 'page' => $page, 'hasMore' => false, 'q' => $q];
         }
     }
 

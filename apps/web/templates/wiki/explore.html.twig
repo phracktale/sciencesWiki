@@ -1,0 +1,67 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Explorer l'arbre des savoirs — SciencesWiki{% endblock %}
+
+{% block body %}
+    {# ===================== ROW 1 : arbre + domaines · stats ===================== #}
+    <div class="home-grid">
+        {# --------------- Colonne principale --------------- #}
+        <div>
+            <section class="side-block" style="background:linear-gradient(135deg,#0f172a,#1e3a8a); color:#fff; border:0">
+                <h1 style="margin:.1rem 0; color:#fff">L'arbre des savoirs scientifiques</h1>
+                <p style="margin:.4rem 0 0; opacity:.95">
+                    Le savoir est organisé en un <strong>arbre des connaissances</strong> : des grands domaines
+                    racines jusqu'aux notions les plus fines. Choisissez un domaine pour naviguer ses rubriques,
+                    <strong>poser une question</strong> et obtenir une réponse <strong>sourcée sur des publications
+                    de recherche</strong>, expliquée simplement.
+                </p>
+            </section>
+
+            <h2>Explorer par domaine racine</h2>
+            {% import 'wiki/_colors.html.twig' as colors %}
+            <div class="domains">
+                {% for domain in domains %}
+                    {% set bg = domain.imageUrl ? 'center/cover no-repeat url(' ~ domain.imageUrl ~ ')' : colors.card_bg(domain.slug, 0) %}
+                    <a class="domain-card" href="/{{ app.request.locale }}/{{ domain.slug }}" style="background:{{ bg }}">
+                        <span class="d-label">{{ domain.label }}</span><br>
+                        <span class="d-sub">{{ domain.childrenCount }} sous-domaine(s)</span>
+                    </a>
+                {% else %}
+                    <p class="muted">Arbre non encore amorcé.</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# --------------- Colonne latérale : statistiques --------------- #}
+        <aside>
+            <section class="side-block">
+                <h2>Statistiques</h2>
+                <div class="stat-grid">
+                    <div class="s"><strong>{{ (stats.publications ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">articles référencés</span></div>
+                    <div class="s"><strong>{{ (stats.fulltextPdfs ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">PDF en texte intégral</span></div>
+                    <div class="s"><strong>{{ (stats.publishedAnswers ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">réponses publiées</span></div>
+                    <div class="s"><strong>{{ (stats.validatedAnswers ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">validées par le comité</span></div>
+                    <div class="s"><strong>{{ (stats.questions ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">questions posées</span></div>
+                    <div class="s"><strong>{{ (stats.placedPublications ?? 0)|number_format(0,',',' ') }}</strong><span class="muted">articles classés</span></div>
+                </div>
+                {% if stats.lastUpdate %}<p class="muted" style="font-size:.78rem; margin:.5rem 0 0">Corpus mis à jour le {{ stats.lastUpdate|date('d/m/Y') }}.</p>{% endif %}
+            </section>
+        </aside>
+    </div>
+
+    {# ===================== ROW 2 : dernières questions + recherche ===================== #}
+    <section class="side-block" style="margin-top:1.5rem">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.5rem">
+            <h2 style="margin:0">Dernières questions</h2>
+            <a href="{{ path('all_questions') }}" style="font-size:.9rem">Toutes les questions →</a>
+        </div>
+
+        <form action="{{ path('all_questions') }}" method="get" role="search" style="display:flex; gap:.5rem; margin:.7rem 0 1rem">
+            <input type="search" name="q" placeholder="Rechercher une question…" maxlength="200"
+                   style="flex:1; padding:.5rem .7rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+            <button type="submit">Rechercher</button>
+        </form>
+
+        {% include 'wiki/_latest_frame.html.twig' with { latest: latestFrame } %}
+    </section>
+{% endblock %}

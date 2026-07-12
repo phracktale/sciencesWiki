@@ -1,0 +1,41 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Toutes les questions — SciencesWiki{% endblock %}
+
+{% block body %}
+    <h1>Toutes les questions</h1>
+    <p class="muted">Parcourez les questions posées à SciencesWiki et leurs réponses sourcées, ou recherchez un sujet précis.</p>
+
+    <form action="{{ path('all_questions') }}" method="get" role="search" style="display:flex; gap:.5rem; flex-wrap:wrap; margin:1rem 0">
+        <input type="search" name="q" value="{{ q }}" placeholder="Rechercher une question…" maxlength="200"
+               style="flex:1; min-width:220px; padding:.55rem .8rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+        <button type="submit">Rechercher</button>
+        {% if q %}<a class="btn" href="{{ path('all_questions') }}" style="align-self:center">réinitialiser</a>{% endif %}
+    </form>
+
+    {% if q %}<p class="muted" style="margin:.2rem 0 1rem">Résultats pour <strong>« {{ q }} »</strong>.</p>{% endif %}
+
+    {% if result.items is empty %}
+        <p class="muted">Aucune question{% if q %} ne correspond à cette recherche{% elseif page > 1 %} supplémentaire{% endif %}.</p>
+    {% else %}
+        <ul class="qlist">
+            {% for item in result.items %}
+                <li>
+                    <a class="q-title" href="{{ path('answer', { id: item.answerId }) }}">{{ item.title }}</a>
+                    <div class="qmeta">
+                        <span class="pill author">✍️ {{ item.author }}</span>
+                        {% if item.node.slug is defined %}<a class="pill node" href="/{{ app.request.locale }}/{{ item.node.slug }}">{{ item.node.label }}</a>{% endif %}
+                        {% if item.status == 'valide' %}<span class="badge ok">✅ validé</span>{% else %}<span class="badge warn">⚠️ non relu</span>{% endif %}
+                        <time datetime="{{ item.createdAt }}">{{ item.createdAt|date('d/m/Y') }}</time>
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    <div style="display:flex; gap:1rem; align-items:center; justify-content:space-between; font-size:.9rem; margin-top:1rem">
+        <span>{% if page > 1 %}<a href="{{ path('all_questions', { q: q, page: page - 1 }) }}">← précédentes</a>{% endif %}</span>
+        <span class="muted">page {{ page }}</span>
+        <span>{% if result.hasMore %}<a href="{{ path('all_questions', { q: q, page: page + 1 }) }}">suivantes →</a>{% endif %}</span>
+    </div>
+{% endblock %}
