@@ -248,7 +248,7 @@
             <a href="{{ path('home') }}"{{ route == 'home' ? ' class="is-active"' : '' }}>Accueil</a>
             <a href="{{ path('explore') }}"{{ route in ['explore','node','all_questions'] ? ' class="is-active"' : '' }}>Explorer</a>
             <span class="nav-dd">
-                <button type="button" class="nav-dd-btn{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}" aria-haspopup="true">Le projet</button>
+                <a tabindex="0" role="button" aria-haspopup="true" class="nav-dd-btn{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}">Le projet</a>
                 <span class="nav-dd-menu" role="menu">
                     <a href="{{ path('crt_discover') }}" role="menuitem">Découvrir</a>
                     <a href="{{ path('process') }}" role="menuitem">Process</a>
