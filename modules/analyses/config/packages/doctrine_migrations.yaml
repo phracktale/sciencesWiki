@@ -3,3 +3,8 @@ doctrine_migrations:
         # Migrations des tables analys_* (dans la base SW partagée).
         'Analyses\Migrations': '%kernel.project_dir%/migrations'
     enable_profiler: false
+    # Table de suivi DÉDIÉE au module : n'écrit pas dans doctrine_migration_versions
+    # du cœur (isolation, cf. framework SPECS §3.2). Préfixe analys_.
+    storage:
+        table_storage:
+            table_name: analys_migration_versions
