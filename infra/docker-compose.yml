@@ -416,6 +416,9 @@ services:
       ANALYS_MAIL_FROM: ${HARVESTER_CONTACT_EMAIL:-noreply@scienceswiki.eu}
       MODULE_BASE_URL: ${PUBLIC_URL:-}/labo/analyses
       RUN_WORKER: "1"
+    # Le worker ne sert pas de HTTP : on neutralise le healthcheck HTTP hérité.
+    healthcheck:
+      disable: true
     volumes:
       - jwt_keys:/app/config/jwt:ro
     restart: unless-stopped
