@@ -8,6 +8,7 @@
     .scw-selectable:hover { border-color:var(--accent); }
     .scw-card.sel { border-color:var(--accent); box-shadow:0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
     .scw-head { display:flex; justify-content:space-between; gap:.6rem; align-items:flex-start; flex-wrap:wrap; }
+    .scw-card .scw-title { color: var(--phos-faint); }
     .scw-title { margin:0; font-size:1rem; flex:1; min-width:220px; line-height:1.3; }
     .scw-title a { text-decoration:none; color:inherit; }
     .scw-title a:hover { text-decoration:underline; }
@@ -16,8 +17,8 @@
     .scw-enrich { display:flex; gap:.4rem; flex-wrap:wrap; align-items:center; }
     .scw-pill { display:inline-block; padding:.1rem .5rem; border-radius:999px; font-size:.72rem; background:#f1f5f9; color:#334155; }
     .scw-actions { display:flex; gap:.4rem; flex-wrap:wrap; }
-    .scw-analyze { display:inline-block; text-decoration:none; font-size:.8rem; font-weight:600; color:#fff; background:var(--accent); border-radius:7px; padding:.2rem .7rem; }
-    .scw-analyze:hover { filter:brightness(1.08); }
+    .scw-analyze { display:inline-block; text-decoration:none; font-size:.8rem; font-weight:600; color: var(--phos-faint); background:var(--accent); border-radius:7px; padding:.2rem .7rem; }
+    .scw-analyze:hover { filter:brightness(1.08); color: var(--phos); }
 </style>
 <script nonce="{{ csp_nonce.value }}">
 (function () {
