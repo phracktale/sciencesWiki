@@ -53,11 +53,12 @@ abstract class AbstractRichAnalyzer implements AnalyzerInterface
         $source = '' !== trim($fulltext) ? $fulltext : (string) ($meta['abstract'] ?? '');
         $excerpt = mb_substr($source, 0, 20000);
 
-        // Prompt volumineux + sortie riche : génération longue (timeout large, comme AXIS).
+        // Prompt volumineux + sortie riche (jusqu'à ~22 items) : génération longue. En
+        // stream:false le « timeout » HttpClient = budget total ; on laisse une marge large.
         $out = $this->llm->generateJson(
             $this->prompt->user($title, $excerpt),
             $model,
-            600,
+            900,
             $this->prompt->system($f),
         );
 

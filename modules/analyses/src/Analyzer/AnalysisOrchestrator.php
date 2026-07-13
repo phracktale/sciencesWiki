@@ -34,6 +34,7 @@ final class AnalysisOrchestrator
         private readonly MessageBusInterface $bus,
         private readonly AnalysisNotifier $notifier,
         private readonly \Analyses\Service\SettingsService $settings,
+        private readonly \Doctrine\Persistence\ManagerRegistry $doctrine,
     ) {
     }
 
@@ -82,13 +83,34 @@ final class AnalysisOrchestrator
         try {
             $this->executePipeline($assessment);
         } catch (\Throwable $e) {
-            $assessment->setStatus('failed');
-            $this->em->flush();
+            $this->markFailed($assessmentId);
 
             throw $e; // laisse Messenger réessayer selon la stratégie configurée
         }
 
         $this->notifier->notify($assessment);
+    }
+
+    /**
+     * Marque l'évaluation en échec de façon ROBUSTE : si une erreur a fermé l'EntityManager
+     * (ex. erreur SQL au flush), on le réinitialise pour pouvoir écrire le statut « failed »
+     * sans propager une seconde exception « EntityManager is closed ».
+     */
+    private function markFailed(Ulid $assessmentId): void
+    {
+        try {
+            if (!$this->em->isOpen()) {
+                $this->doctrine->resetManager();
+            }
+            $em = $this->doctrine->getManager();
+            $a = $em->find(Assessment::class, $assessmentId);
+            if (null !== $a) {
+                $a->setStatus('failed');
+                $em->flush();
+            }
+        } catch (\Throwable) {
+            // best-effort : ne masque pas l'erreur d'origine.
+        }
     }
 
     private function executePipeline(Assessment $assessment): void
@@ -156,17 +178,20 @@ final class AnalysisOrchestrator
 
             $result = $analyzer->analyze($fulltext, $pub);
             foreach ($result['criteria'] as $c) {
-                $criterion = (new AssessmentCriterion($assessment->getId(), $analyzer->frameworkId(), (string) $c['criterion_id'], (string) $c['question']))
-                    ->setDimension($c['dimension'] ?? null)
-                    ->setAnswer((string) $c['answer'])
-                    ->setVerdict($c['verdict'] ?? null)
+                // Champs bornés (VARCHAR) alimentés par la sortie LLM : on TRONQUE défensivement
+                // à la taille de colonne. Sinon une valeur trop longue (ex. « section » verbeuse)
+                // ferait échouer le flush → EntityManager fermé → toute l'analyse en échec.
+                $criterion = (new AssessmentCriterion($assessment->getId(), $analyzer->frameworkId(), $this->clamp((string) $c['criterion_id'], 64) ?? '', (string) $c['question']))
+                    ->setDimension($this->clamp($c['dimension'] ?? null, 96))
+                    ->setAnswer($this->clamp((string) $c['answer'], 24) ?? 'unclear')
+                    ->setVerdict($this->clamp($c['verdict'] ?? null, 96))
                     ->setExpected($c['expected'] ?? null)
                     ->setEvidenceFound($c['evidence_found'] ?? null)
                     ->setAnalysis($c['analysis'] ?? null)
                     ->setLimitations($c['limitations'] ?? null)
-                    ->setEvidenceType($c['evidence_type'] ?? null)
-                    ->setOverallEvidenceType($c['overall_evidence_type'] ?? null)
-                    ->setConfidence($c['confidence'] ?? null)
+                    ->setEvidenceType($this->clamp($c['evidence_type'] ?? null, 48))
+                    ->setOverallEvidenceType($this->clamp($c['overall_evidence_type'] ?? null, 64))
+                    ->setConfidence($this->clamp($c['confidence'] ?? null, 16))
                     ->setRequiresVisualCheck((bool) ($c['requires_visual_check'] ?? false))
                     ->setRequiresHumanReview((bool) ($c['requires_human_review'] ?? false));
                 $this->em->persist($criterion);
@@ -210,11 +235,11 @@ final class AnalysisOrchestrator
                 $type = (string) ($e['evidence_type'] ?? '');
                 if ('' !== $quote && \in_array($type, ['explicit_quote', 'visual_table', 'visual_figure'], true)) {
                     $this->em->persist(
-                        (new Evidence($assessmentId, $quote, $type))
-                            ->setCriterionId($criterionId)
-                            ->setConfidence($confidence)
-                            ->setSection($e['section'] ?? null)
-                            ->setSourceType($e['source_type'] ?? null),
+                        (new Evidence($assessmentId, $quote, $this->clamp($type, 48) ?? 'explicit_quote'))
+                            ->setCriterionId($this->clamp($criterionId, 64))
+                            ->setConfidence($this->clamp($confidence, 16))
+                            ->setSection($this->clamp($e['section'] ?? null, 96))
+                            ->setSourceType($this->clamp($e['source_type'] ?? null, 16)),
                     );
                 }
             }
@@ -226,10 +251,21 @@ final class AnalysisOrchestrator
         if ('' !== $quote && 'explicit_quote' === ($c['evidence_type'] ?? '')) {
             $this->em->persist(
                 (new Evidence($assessmentId, $quote, 'explicit_quote'))
-                    ->setCriterionId($criterionId)
-                    ->setConfidence($confidence),
+                    ->setCriterionId($this->clamp($criterionId, 64))
+                    ->setConfidence($this->clamp($confidence, 16)),
             );
         }
+    }
+
+    /** Tronque une valeur destinée à une colonne VARCHAR bornée (null-safe). */
+    private function clamp(mixed $v, int $max): ?string
+    {
+        if (null === $v || '' === $v) {
+            return null;
+        }
+        $s = (string) $v;
+
+        return mb_strlen($s) > $max ? mb_substr($s, 0, $max) : $s;
     }
 
     /**
