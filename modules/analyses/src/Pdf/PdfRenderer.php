@@ -42,13 +42,28 @@ final class PdfRenderer
         $plan = $a->getPlan() ?? [];
         $rows = '';
         foreach ($criteria as $c) {
+            $detail = '';
+            if (null !== $c->getExpected()) {
+                $detail .= '<div class="ex"><b>Attendu :</b> '.$this->e($c->getExpected()).'</div>';
+            }
+            if (null !== $c->getEvidenceFound()) {
+                $detail .= '<div class="ex"><b>Trouvé :</b> '.$this->e($c->getEvidenceFound()).'</div>';
+            }
+            if (null !== $c->getAnalysis()) {
+                $detail .= '<div class="an">'.$this->e($c->getAnalysis()).'</div>';
+            }
+            if (null !== $c->getLimitations()) {
+                $detail .= '<div class="lim"><b>Limites :</b> '.$this->e($c->getLimitations()).'</div>';
+            }
+            $vis = $c->requiresVisualCheck() ? ' 👁' : '';
             $rows .= \sprintf(
-                '<tr><td class="cid">%s</td><td class="ans %s">%s</td><td>%s<div class="an">%s</div></td><td class="cf">%s</td></tr>',
+                '<tr><td class="cid">%s</td><td class="ans %s">%s%s</td><td>%s%s</td><td class="cf">%s</td></tr>',
                 $this->e($c->getCriterionId()),
-                $this->e($this->answerClass($c->getAnswer())),
-                $this->e($c->getAnswer()),
+                $this->e($this->answerClass($c->effectiveAnswer())),
+                $this->e($c->effectiveAnswer()),
+                $vis,
                 $this->e($c->getQuestion()),
-                $this->e($c->getAnalysis() ?? ''),
+                $detail,
                 $this->e($c->getConfidence() ?? ''),
             );
         }
@@ -61,6 +76,12 @@ final class PdfRenderer
         $banner = $a->isHumanReview()
             ? '<p class="warn">⚠️ Analyse générée par IA — validation humaine requise. Les réponses non ancrées sur une citation ont été rétrogradées.</p>'
             : '<p class="ok">Analyse générée par IA — ancrée sur les sources du texte intégral.</p>';
+        if (false === $a->isApplicable()) {
+            $banner .= '<p class="warn">Référentiel principal jugé NON applicable à ce design (étape 0).</p>';
+        }
+        $summaryBlock = null !== $a->getSummary()
+            ? '<div class="summary"><b>Synthèse :</b> '.$this->e($a->getSummary()).'</div>'
+            : '';
 
         return <<<HTML
             <html><head><meta charset="utf-8"><style>
@@ -80,6 +101,9 @@ final class PdfRenderer
               td.ans { font-weight: bold; text-align: center; text-transform: uppercase; font-size: 8px; }
               .ans.pos { color: #166534; } .ans.neg { color: #b91c1c; } .ans.neu { color: #92400e; }
               .an { color: #475569; font-size: 8px; margin-top: 2px; font-style: italic; }
+              .ex { color: #334155; font-size: 8px; margin-top: 2px; }
+              .lim { color: #92400e; font-size: 8px; margin-top: 2px; }
+              .summary { background: #f8fafc; border: 1px solid #e2e8f0; padding: 6px 8px; border-radius: 4px; margin: 8px 0; font-size: 9px; }
               .muted { color: #94a3b8; text-align: center; }
               .foot { margin-top: 12px; font-size: 8px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 6px; }
             </style></head><body>
@@ -94,6 +118,7 @@ final class PdfRenderer
                 <b>Référentiels :</b> {$frameworks}{$this->sep($rob)}{$rob}<br>
                 <b>Statut :</b> {$this->e($a->getStatus())}
               </div>
+              {$summaryBlock}
               <table>
                 <thead><tr><th>Critère</th><th>Réponse</th><th>Question / analyse</th><th>Conf.</th></tr></thead>
                 <tbody>{$rows}</tbody>

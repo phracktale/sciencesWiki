@@ -26,18 +26,23 @@ final class LlmPort
      *
      * @return array<string, mixed>
      */
-    public function generateJson(string $prompt, string $model, int $timeout = 180): array
+    public function generateJson(string $prompt, string $model, int $timeout = 180, ?string $system = null): array
     {
+        $payload = [
+            'model' => $model,
+            'prompt' => $prompt,
+            'format' => 'json',
+            'stream' => false,
+            // Désactive le mode « raisonnement » : certains modèles (glm-4.7-flash…)
+            // renvoient sinon le contenu dans « thinking » et laissent « response » vide.
+            'think' => false,
+        ];
+        if (null !== $system && '' !== $system) {
+            $payload['system'] = $system;
+        }
+
         $response = $this->httpClient->request('POST', rtrim($this->baseUrl, '/').'/api/generate', [
-            'json' => [
-                'model' => $model,
-                'prompt' => $prompt,
-                'format' => 'json',
-                'stream' => false,
-                // Désactive le mode « raisonnement » : certains modèles (glm-4.7-flash…)
-                // renvoient sinon le contenu dans « thinking » et laissent « response » vide.
-                'think' => false,
-            ],
+            'json' => $payload,
             'timeout' => $timeout,
         ]);
 

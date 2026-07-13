@@ -70,6 +70,14 @@ class Assessment
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     private ?\DateTimeImmutable $validatedAt = null;
 
+    /** Applicabilité du référentiel principal (étape 0 AXIS : transversal ou non). */
+    #[ORM\Column(nullable: true)]
+    private ?bool $applicable = null;
+
+    /** Réflexion générale (forces/faiblesses), sans note chiffrée. */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $summary = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -211,6 +219,30 @@ class Assessment
     public function getValidatedAt(): ?\DateTimeImmutable
     {
         return $this->validatedAt;
+    }
+
+    public function isApplicable(): ?bool
+    {
+        return $this->applicable;
+    }
+
+    public function setApplicable(?bool $applicable): self
+    {
+        $this->applicable = $applicable;
+
+        return $this;
+    }
+
+    public function getSummary(): ?string
+    {
+        return $this->summary;
+    }
+
+    public function setSummary(?string $summary): self
+    {
+        $this->summary = $summary;
+
+        return $this;
     }
 
     /** Validation par un relecteur : fige l'évaluation comme relue. */

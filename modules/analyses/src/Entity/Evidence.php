@@ -45,6 +45,10 @@ class Evidence
     #[ORM\Column(length: 96, nullable: true)]
     private ?string $section = null;
 
+    /** text | table | figure (SPECS §17). */
+    #[ORM\Column(length: 16, nullable: true)]
+    private ?string $sourceType = null;
+
     public function __construct(Ulid $assessmentId, string $quote, string $evidenceType = 'explicit_quote')
     {
         $this->id = new Ulid();
@@ -117,6 +121,18 @@ class Evidence
     public function setSection(?string $section): self
     {
         $this->section = $section;
+
+        return $this;
+    }
+
+    public function getSourceType(): ?string
+    {
+        return $this->sourceType;
+    }
+
+    public function setSourceType(?string $sourceType): self
+    {
+        $this->sourceType = $sourceType;
 
         return $this;
     }

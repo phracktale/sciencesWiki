@@ -41,11 +41,31 @@ class AssessmentCriterion
     #[ORM\Column(length: 24)]
     private string $answer = 'unclear';
 
-    #[ORM\Column(length: 48, nullable: true)]
+    #[ORM\Column(length: 96, nullable: true)]
     private ?string $verdict = null;
+
+    /** Ce que la grille EXIGE pour un « oui » à cet item (doctrine legacy AXIS). */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $expected = null;
+
+    /** Ce que l'article fournit réellement sur ce point. */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $evidenceFound = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $analysis = null;
+
+    /** Ce qui manque / est ambigu / repose sur une inférence. */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $limitations = null;
+
+    /** Type de preuve global de l'item (ex. mixed_explicit_and_absence). */
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $overallEvidenceType = null;
+
+    /** La réponse dépend probablement d'un tableau/figure non transcrit. */
+    #[ORM\Column(options: ['default' => false])]
+    private bool $requiresVisualCheck = false;
 
     /** explicit_quote | inference | absence_verified | absence_from_extracted_text_only… */
     #[ORM\Column(length: 48, nullable: true)]
@@ -146,6 +166,66 @@ class AssessmentCriterion
     public function setAnalysis(?string $analysis): self
     {
         $this->analysis = $analysis;
+
+        return $this;
+    }
+
+    public function getExpected(): ?string
+    {
+        return $this->expected;
+    }
+
+    public function setExpected(?string $expected): self
+    {
+        $this->expected = $expected;
+
+        return $this;
+    }
+
+    public function getEvidenceFound(): ?string
+    {
+        return $this->evidenceFound;
+    }
+
+    public function setEvidenceFound(?string $evidenceFound): self
+    {
+        $this->evidenceFound = $evidenceFound;
+
+        return $this;
+    }
+
+    public function getLimitations(): ?string
+    {
+        return $this->limitations;
+    }
+
+    public function setLimitations(?string $limitations): self
+    {
+        $this->limitations = $limitations;
+
+        return $this;
+    }
+
+    public function getOverallEvidenceType(): ?string
+    {
+        return $this->overallEvidenceType;
+    }
+
+    public function setOverallEvidenceType(?string $overallEvidenceType): self
+    {
+        $this->overallEvidenceType = $overallEvidenceType;
+
+        return $this;
+    }
+
+    public function requiresVisualCheck(): bool
+    {
+        return $this->requiresVisualCheck;
+    }
+
+    public function setRequiresVisualCheck(bool $requiresVisualCheck): self
+    {
+        $this->requiresVisualCheck = $requiresVisualCheck;
 
         return $this;
     }

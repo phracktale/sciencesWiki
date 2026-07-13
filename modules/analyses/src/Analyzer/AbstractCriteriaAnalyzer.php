@@ -17,6 +17,8 @@ use Symfony\Contracts\Service\Attribute\Required;
  */
 abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
 {
+    use QuoteAnchoring;
+
     private const ANCHORED_TYPES = ['explicit_quote', 'absence_verified'];
     private const VALID_CONFIDENCE = ['high', 'medium', 'low'];
 
@@ -170,47 +172,6 @@ abstract class AbstractCriteriaAnalyzer implements AnalyzerInterface
     private function isInconclusive(string $answer): bool
     {
         return \in_array($answer, [$this->unclearAnswer(), 'not_applicable'], true);
-    }
-
-    /**
-     * La citation apparaît-elle RÉELLEMENT dans le texte ? Comparaison normalisée
-     * (minuscules, sans accents ni ponctuation, espaces compactés) pour tolérer la
-     * mise en forme, avec repli sur les 8 premiers mots (le LLM tronque souvent la fin).
-     */
-    private function quoteInText(string $quote, string $text): bool
-    {
-        $nt = $this->normalizeForMatch($text);
-        $words = explode(' ', $this->normalizeForMatch($quote));
-        $n = \count($words);
-        if ($n < 5) {
-            return false; // trop court pour être une citation vérifiable
-        }
-
-        // Ancrage = au moins une SÉQUENCE contiguë de la citation existe dans le texte.
-        // Tolère la troncature/reformulation aux extrémités, mais exige un vrai passage
-        // copié (≥ 6 mots consécutifs, ou la citation entière si plus courte).
-        $window = 6;
-        if ($n <= $window) {
-            return str_contains($nt, implode(' ', $words));
-        }
-        for ($i = 0; $i + $window <= $n; ++$i) {
-            if (str_contains($nt, implode(' ', \array_slice($words, $i, $window)))) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function normalizeForMatch(string $s): string
-    {
-        $s = \Normalizer::normalize($s, \Normalizer::FORM_D) ?: $s;
-        $s = preg_replace('/\p{Mn}+/u', '', $s) ?? $s;         // retire les diacritiques
-        $s = mb_strtolower($s);
-        $s = preg_replace('/[^a-z0-9]+/', ' ', $s) ?? $s;      // ponctuation → espace
-        $s = preg_replace('/\s+/', ' ', $s) ?? $s;
-
-        return trim($s);
     }
 
     /**

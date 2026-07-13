@@ -162,25 +162,30 @@ final class AnalysisOrchestrator
                 $criterion = (new AssessmentCriterion($assessment->getId(), $analyzer->frameworkId(), (string) $c['criterion_id'], (string) $c['question']))
                     ->setDimension($c['dimension'] ?? null)
                     ->setAnswer((string) $c['answer'])
-                    ->setEvidenceType($c['evidence_type'] ?? null)
-                    ->setConfidence($c['confidence'] ?? null)
+                    ->setVerdict($c['verdict'] ?? null)
+                    ->setExpected($c['expected'] ?? null)
+                    ->setEvidenceFound($c['evidence_found'] ?? null)
                     ->setAnalysis($c['analysis'] ?? null)
+                    ->setLimitations($c['limitations'] ?? null)
+                    ->setEvidenceType($c['evidence_type'] ?? null)
+                    ->setOverallEvidenceType($c['overall_evidence_type'] ?? null)
+                    ->setConfidence($c['confidence'] ?? null)
+                    ->setRequiresVisualCheck((bool) ($c['requires_visual_check'] ?? false))
                     ->setRequiresHumanReview((bool) ($c['requires_human_review'] ?? false));
                 $this->em->persist($criterion);
 
-                // Preuve persistée UNIQUEMENT si la citation a été vérifiée dans le texte
-                // (evidence_type reste « explicit_quote » après le garde-fou d'ancrage).
-                // Une citation non vérifiée (« unverified_quote ») n'est pas stockée.
-                $quote = trim((string) ($c['quote'] ?? ''));
-                if ('' !== $quote && 'explicit_quote' === ($c['evidence_type'] ?? '')) {
-                    $evidence = (new Evidence($assessment->getId(), $quote, 'explicit_quote'))
-                        ->setCriterionId((string) $c['criterion_id'])
-                        ->setConfidence($c['confidence'] ?? null);
-                    $this->em->persist($evidence);
-                }
+                $this->persistEvidence($assessment->getId(), $c);
             }
 
             $humanReview = $humanReview || (bool) ($result['overall']['human_review'] ?? false);
+
+            // L'analyseur principal (AXIS) porte l'applicabilité (étape 0) et la réflexion générale.
+            if (\array_key_exists('applicable', $result['overall'])) {
+                $assessment->setApplicable(null === $result['overall']['applicable'] ? null : (bool) $result['overall']['applicable']);
+            }
+            if (null !== ($result['overall']['summary'] ?? null) && null === $assessment->getSummary()) {
+                $assessment->setSummary((string) $result['overall']['summary']);
+            }
         }
 
         $assessment
@@ -188,6 +193,46 @@ final class AnalysisOrchestrator
             ->setStatus($humanReview ? 'human_review_required' : 'completed');
 
         $this->em->flush();
+    }
+
+    /**
+     * Persiste les preuves d'un critère : tableau riche (AXIS : citations vérifiées avec
+     * source_type/section) ou citation « à plat » (autres analyseurs). Seules les citations
+     * VÉRIFIÉES (explicit_quote / visual_*) sont stockées ; les « unverified_quote » non.
+     *
+     * @param array<string, mixed> $c
+     */
+    private function persistEvidence(\Symfony\Component\Uid\Ulid $assessmentId, array $c): void
+    {
+        $criterionId = (string) $c['criterion_id'];
+        $confidence = $c['confidence'] ?? null;
+
+        if (\is_array($c['evidence'] ?? null) && [] !== $c['evidence']) {
+            foreach ($c['evidence'] as $e) {
+                $quote = trim((string) ($e['quote'] ?? ''));
+                $type = (string) ($e['evidence_type'] ?? '');
+                if ('' !== $quote && \in_array($type, ['explicit_quote', 'visual_table', 'visual_figure'], true)) {
+                    $this->em->persist(
+                        (new Evidence($assessmentId, $quote, $type))
+                            ->setCriterionId($criterionId)
+                            ->setConfidence($confidence)
+                            ->setSection($e['section'] ?? null)
+                            ->setSourceType($e['source_type'] ?? null),
+                    );
+                }
+            }
+
+            return;
+        }
+
+        $quote = trim((string) ($c['quote'] ?? ''));
+        if ('' !== $quote && 'explicit_quote' === ($c['evidence_type'] ?? '')) {
+            $this->em->persist(
+                (new Evidence($assessmentId, $quote, 'explicit_quote'))
+                    ->setCriterionId($criterionId)
+                    ->setConfidence($confidence),
+            );
+        }
     }
 
     /**

@@ -4,56 +4,63 @@ declare(strict_types=1);
 
 namespace Analyses\Tests\Analyzer;
 
-use Analyses\Analyzer\AxisAnalyzer;
-use Analyses\Sdk\LlmPort;
+use Analyses\Analyzer\QuoteAnchoring;
 use PHPUnit\Framework\TestCase;
-use Symfony\Component\HttpClient\HttpClient;
 
 /**
  * Vérification d'ancrage des citations (anti-hallucination) : une citation ancrée doit
  * exister littéralement dans le texte (≥ 6 mots consécutifs), tolérante aux accents/
- * ponctuation. Teste la méthode privée quoteInText via réflexion.
+ * ponctuation. Teste directement le trait QuoteAnchoring.
  */
 final class AnchoringTest extends TestCase
 {
-    private function quoteInText(string $quote, string $text): bool
-    {
-        // LlmPort n'est pas appelé ici (quoteInText est purement textuel).
-        $analyzer = new AxisAnalyzer(new LlmPort(HttpClient::create()));
-        $method = new \ReflectionMethod($analyzer, 'quoteInText');
-        $method->setAccessible(true);
+    /** Petit objet qui expose le trait d'ancrage pour le test. */
+    private object $anchorer;
 
-        return (bool) $method->invoke($analyzer, $quote, $text);
+    protected function setUp(): void
+    {
+        $this->anchorer = new class {
+            use QuoteAnchoring;
+
+            public function check(string $quote, string $text): bool
+            {
+                return $this->quoteInText($quote, $text);
+            }
+        };
+    }
+
+    private function check(string $quote, string $text): bool
+    {
+        return $this->anchorer->check($quote, $text);
     }
 
     public function testLiteralQuoteIsAnchored(): void
     {
         $text = 'Participants completed a single online survey about their daily habits and health.';
-        self::assertTrue($this->quoteInText('Participants completed a single online survey', $text));
+        self::assertTrue($this->check('Participants completed a single online survey', $text));
     }
 
     public function testAccentAndPunctuationAreTolerated(): void
     {
         $text = "Les participants ont rempli un questionnaire unique, en ligne, sur leurs habitudes.";
-        self::assertTrue($this->quoteInText('les participants ont rempli un questionnaire', $text));
+        self::assertTrue($this->check('les participants ont rempli un questionnaire', $text));
     }
 
     public function testContiguousSpanAnchorsDespiteTruncatedEnds(): void
     {
         $text = 'The cross-sectional study recruited two hundred adult participants from three clinics.';
-        // La fin diverge, mais une séquence de 6 mots reste présente.
-        self::assertTrue($this->quoteInText('the cross sectional study recruited two hundred children', $text));
+        self::assertTrue($this->check('the cross sectional study recruited two hundred children', $text));
     }
 
     public function testHallucinatedQuoteIsRejected(): void
     {
         $text = 'The study used a cross-sectional design with 200 participants surveyed once.';
-        self::assertFalse($this->quoteInText('A randomized double-blind placebo-controlled trial was conducted over five years', $text));
+        self::assertFalse($this->check('A randomized double-blind placebo-controlled trial was conducted over five years', $text));
     }
 
     public function testTooShortQuoteIsRejected(): void
     {
         $text = 'The study used a cross-sectional design.';
-        self::assertFalse($this->quoteInText('the study used', $text));
+        self::assertFalse($this->check('the study used', $text));
     }
 }
