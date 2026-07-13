@@ -1,0 +1,30 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mon compte — SciencesWiki{% endblock %}
+
+{% block body %}
+    <h1>👤 Mon compte</h1>
+
+    <section class="side-block" style="margin-top:.6rem">
+        <div style="display:flex; flex-wrap:wrap; gap:.4rem 1rem; align-items:baseline">
+            <strong style="font-size:1.1rem">{{ current_user.displayName }}</strong>
+            {% if current_user.me.email is defined %}<span class="muted">{{ current_user.me.email }}</span>{% endif %}
+        </div>
+        <div style="margin-top:.5rem; display:flex; flex-wrap:wrap; gap:.35rem">
+            {% for r in roles %}
+                <span class="pill" style="font-size:.72rem">{{ r }}</span>
+            {% endfor %}
+        </div>
+    </section>
+
+    <p class="muted" style="margin:1rem 0 .4rem">Vos espaces, selon votre rôle :</p>
+
+    <div class="domains">
+        {% for r in rubrics %}
+            <a class="domain-card" href="{{ path(r.route) }}" style="background:linear-gradient(135deg,#0f172a,#1e293b)">
+                <span class="d-label">{{ r.icon }} {{ r.name }}</span><br>
+                <span class="d-sub">{{ r.desc }}</span>
+            </a>
+        {% endfor %}
+    </div>
+{% endblock %}
