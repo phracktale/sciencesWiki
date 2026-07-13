@@ -26,7 +26,10 @@ final class LlmPort
      *
      * @return array<string, mixed>
      */
-    public function generateJson(string $prompt, string $model, int $timeout = 180, ?string $system = null): array
+    // En stream:false, le client attend TOUTE la génération sans recevoir de données :
+    // le « timeout » de Symfony HttpClient (inactivité) doit donc couvrir la durée
+    // complète de génération du modèle. D'où des valeurs généreuses.
+    public function generateJson(string $prompt, string $model, int $timeout = 300, ?string $system = null): array
     {
         $payload = [
             'model' => $model,

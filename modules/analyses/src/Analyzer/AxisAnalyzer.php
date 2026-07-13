@@ -42,10 +42,11 @@ final class AxisAnalyzer implements AnalyzerInterface
         $source = '' !== trim($fulltext) ? $fulltext : (string) ($meta['abstract'] ?? '');
         $excerpt = mb_substr($source, 0, 20000);
 
+        // AXIS : prompt volumineux + sortie riche de 20 items → génération longue.
         $out = $this->llm->generateJson(
             $this->prompt->user($title, $excerpt),
             $model,
-            240,
+            600,
             $this->prompt->system(),
         );
 
