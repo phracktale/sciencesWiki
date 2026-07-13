@@ -1,4 +1,18 @@
 security:
+    # Hiérarchie des rôles RÉPLIQUÉE depuis SciencesWiki (apps/api/config/packages/security.yaml).
+    # Indispensable : le JWT ne porte que les rôles DÉCLARÉS de l'utilisateur (ex. un admin =
+    # [ROLE_USER, ROLE_ADMIN]). Sans cette hiérarchie, ROLE_ADMIN n'impliquerait pas
+    # ROLE_RESEARCHER/ROLE_COMITE et l'admin serait refusé (403) sur la section « use ».
+    role_hierarchy:
+        ROLE_AUTEUR:      [ROLE_USER]
+        ROLE_RESEARCHER:  [ROLE_AUTEUR]
+        ROLE_REDACTEUR:   [ROLE_AUTEUR]
+        ROLE_STUDENT:     [ROLE_USER]
+        ROLE_TEACHER:     [ROLE_STUDENT]
+        ROLE_COMITE:      [ROLE_REDACTEUR]
+        ROLE_MODERATEUR:  [ROLE_REDACTEUR]
+        ROLE_ADMIN:       [ROLE_MODERATEUR, ROLE_COMITE, ROLE_RESEARCHER, ROLE_TEACHER]
+
     # Le module NE délivre PAS de token : il VALIDE ceux émis par SciencesWiki
     # (clé publique partagée). L'utilisateur est reconstruit depuis les claims du JWT
     # (identifiant + rôles), sans table utilisateur locale.

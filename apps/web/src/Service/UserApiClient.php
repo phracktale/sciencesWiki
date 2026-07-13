@@ -56,11 +56,19 @@ final class UserApiClient
             if (!\is_string($token) || '' === $token) {
                 return false;
             }
+            // toArray() (sans false) LÈVE sur réponse non-2xx : si /api/me échoue (api
+            // instable, ex. redéploiement), on ne stocke PAS une session sans rôles
+            // (qui provoquerait des 403). Le login échoue proprement → réessai.
             $me = $this->httpClient->request('GET', $this->baseUrl.'/api/me', [
                 'headers' => ['Authorization' => 'Bearer '.$token],
                 'timeout' => 10,
-            ])->toArray(false);
+            ])->toArray();
         } catch (\Throwable) {
+            return false;
+        }
+
+        // Garde-fou : ne jamais ouvrir une session sans rôles (source de 403 silencieux).
+        if (!isset($me['roles']) || !\is_array($me['roles'])) {
             return false;
         }
 
