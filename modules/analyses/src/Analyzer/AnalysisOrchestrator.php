@@ -166,6 +166,8 @@ final class AnalysisOrchestrator
         ]));
         $enabled = $this->settings->enabledFrameworks(); // null = tous
         $ranAnalyzers = [];
+        $succeeded = 0;
+        $failedFrameworks = [];
         foreach ($frameworkIds as $frameworkId) {
             $analyzer = $this->analyzers->get($frameworkId) ?? $this->analyzers->get($this->frameworkFamily($frameworkId));
             if (null === $analyzer || isset($ranAnalyzers[$analyzer->frameworkId()])) {
@@ -176,38 +178,53 @@ final class AnalysisOrchestrator
             }
             $ranAnalyzers[$analyzer->frameworkId()] = true;
 
-            $result = $analyzer->analyze($fulltext, $pub);
-            foreach ($result['criteria'] as $c) {
-                // Champs bornés (VARCHAR) alimentés par la sortie LLM : on TRONQUE défensivement
-                // à la taille de colonne. Sinon une valeur trop longue (ex. « section » verbeuse)
-                // ferait échouer le flush → EntityManager fermé → toute l'analyse en échec.
-                $criterion = (new AssessmentCriterion($assessment->getId(), $analyzer->frameworkId(), $this->clamp((string) $c['criterion_id'], 64) ?? '', (string) $c['question']))
-                    ->setDimension($this->clamp($c['dimension'] ?? null, 96))
-                    ->setAnswer($this->clamp((string) $c['answer'], 24) ?? 'unclear')
-                    ->setVerdict($this->clamp($c['verdict'] ?? null, 96))
-                    ->setExpected($c['expected'] ?? null)
-                    ->setEvidenceFound($c['evidence_found'] ?? null)
-                    ->setAnalysis($c['analysis'] ?? null)
-                    ->setLimitations($c['limitations'] ?? null)
-                    ->setEvidenceType($this->clamp($c['evidence_type'] ?? null, 48))
-                    ->setOverallEvidenceType($this->clamp($c['overall_evidence_type'] ?? null, 64))
-                    ->setConfidence($this->clamp($c['confidence'] ?? null, 16))
-                    ->setRequiresVisualCheck((bool) ($c['requires_visual_check'] ?? false))
-                    ->setRequiresHumanReview((bool) ($c['requires_human_review'] ?? false));
-                $this->em->persist($criterion);
+            // L'appel LLM (long) est fait AVANT toute persistance : s'il échoue (souvent un
+            // timeout), rien n'est écrit pour ce référentiel et on passe au suivant. Chaque
+            // référentiel est ensuite flushé SÉPARÉMENT → les résultats déjà obtenus survivent
+            // même si un référentiel ultérieur échoue.
+            try {
+                $result = $analyzer->analyze($fulltext, $pub);
+                foreach ($result['criteria'] as $c) {
+                    // Champs bornés (VARCHAR) alimentés par le LLM : troncature défensive.
+                    $criterion = (new AssessmentCriterion($assessment->getId(), $analyzer->frameworkId(), $this->clamp((string) $c['criterion_id'], 64) ?? '', (string) $c['question']))
+                        ->setDimension($this->clamp($c['dimension'] ?? null, 96))
+                        ->setAnswer($this->clamp((string) $c['answer'], 24) ?? 'unclear')
+                        ->setVerdict($this->clamp($c['verdict'] ?? null, 96))
+                        ->setExpected($c['expected'] ?? null)
+                        ->setEvidenceFound($c['evidence_found'] ?? null)
+                        ->setAnalysis($c['analysis'] ?? null)
+                        ->setLimitations($c['limitations'] ?? null)
+                        ->setEvidenceType($this->clamp($c['evidence_type'] ?? null, 48))
+                        ->setOverallEvidenceType($this->clamp($c['overall_evidence_type'] ?? null, 64))
+                        ->setConfidence($this->clamp($c['confidence'] ?? null, 16))
+                        ->setRequiresVisualCheck((bool) ($c['requires_visual_check'] ?? false))
+                        ->setRequiresHumanReview((bool) ($c['requires_human_review'] ?? false));
+                    $this->em->persist($criterion);
 
-                $this->persistEvidence($assessment->getId(), $c);
-            }
+                    $this->persistEvidence($assessment->getId(), $c);
+                }
 
-            $humanReview = $humanReview || (bool) ($result['overall']['human_review'] ?? false);
+                $humanReview = $humanReview || (bool) ($result['overall']['human_review'] ?? false);
 
-            // L'analyseur principal (AXIS) porte l'applicabilité (étape 0) et la réflexion générale.
-            if (\array_key_exists('applicable', $result['overall'])) {
-                $assessment->setApplicable(null === $result['overall']['applicable'] ? null : (bool) $result['overall']['applicable']);
+                // L'analyseur principal (AXIS) porte l'applicabilité (étape 0) et la réflexion générale.
+                if (\array_key_exists('applicable', $result['overall'])) {
+                    $assessment->setApplicable(null === $result['overall']['applicable'] ? null : (bool) $result['overall']['applicable']);
+                }
+                if (null !== ($result['overall']['summary'] ?? null) && null === $assessment->getSummary()) {
+                    $assessment->setSummary((string) $result['overall']['summary']);
+                }
+
+                $this->em->flush();
+                ++$succeeded;
+            } catch (\Throwable) {
+                $failedFrameworks[] = $analyzer->frameworkId();
+                $humanReview = true;
             }
-            if (null !== ($result['overall']['summary'] ?? null) && null === $assessment->getSummary()) {
-                $assessment->setSummary((string) $result['overall']['summary']);
-            }
+        }
+
+        // Aucun référentiel abouti → échec réel (laisse Messenger réessayer).
+        if (0 === $succeeded) {
+            throw new \RuntimeException(\sprintf('Aucun référentiel exécuté (échecs : %s).', implode(', ', $failedFrameworks) ?: 'aucun analyseur'));
         }
 
         $assessment

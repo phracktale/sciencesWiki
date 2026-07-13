@@ -7,9 +7,12 @@ framework:
             # base SW partagée) : n'utilise PAS la file du cœur. auto_setup crée la table.
             analys_analysis:
                 dsn: 'doctrine://default?table_name=analys_messenger_messages&queue_name=analysis'
+                # 1 seul réessai : un référentiel lent est déjà isolé (les résultats obtenus
+                # survivent, revue humaine forcée) ; inutile de rejouer tout le pipeline LLM
+                # (long, worker unique) plus d'une fois en cas d'échec total.
                 retry_strategy:
-                    max_retries: 2
-                    delay: 5000
+                    max_retries: 1
+                    delay: 10000
             analys_failed:
                 dsn: 'doctrine://default?table_name=analys_messenger_messages&queue_name=failed'
 
