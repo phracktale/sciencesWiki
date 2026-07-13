@@ -51,8 +51,6 @@ final class AccountController extends AbstractController
                 'desc' => 'Gestion de classe et suivi des élèves.'],
             ['show' => $isStudent && !$this->user->canTeach(), 'route' => 'student_dashboard', 'icon' => '🎓', 'name' => 'Espace élève',
                 'desc' => 'Vos outils d’apprentissage et votre classe.'],
-            ['show' => $this->user->canEdit(), 'route' => 'contribute', 'icon' => '✍️', 'name' => 'Contribuer',
-                'desc' => 'Proposer et rédiger du contenu encyclopédique.'],
             ['show' => $isAdmin, 'route' => 'admin_dashboard', 'icon' => '⚙️', 'name' => 'Administration',
                 'desc' => 'Tableau de bord d’administration.'],
         ];
