@@ -4,36 +4,19 @@ declare(strict_types=1);
 
 namespace Analyses\Analyzer;
 
+use Analyses\Framework\RichFramework;
 use Analyses\Framework\Strobe\StrobeFramework;
-use Analyses\Sdk\LlmPort;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
- * Exécuteur STROBE (reporting des études observationnelles).
+ * Exécuteur STROBE RICHE : reporting des études observationnelles (reported / partially_reported /
+ * not_reported), calibré item par item avec sortie structurée et ancrage ({@see AbstractRichAnalyzer}).
  */
-final class StrobeAnalyzer extends AbstractReportingAnalyzer
+final class StrobeAnalyzer extends AbstractRichAnalyzer
 {
-    public function __construct(
-        LlmPort $llm,
-        private readonly StrobeFramework $strobe = new StrobeFramework(),
-        #[Autowire(env: 'ANALYS_MODEL')]
-        string $model = 'glm-5.2:cloud',
-    ) {
-        parent::__construct($llm, $model);
-    }
+    private ?StrobeFramework $strobe = null;
 
-    public function frameworkId(): string
+    protected function framework(): RichFramework
     {
-        return 'strobe';
-    }
-
-    protected function criteria(): array
-    {
-        return $this->strobe->criteria();
-    }
-
-    protected function promptIntro(): string
-    {
-        return "Tu es un éditeur scientifique. Évalue la QUALITÉ DE REPORTING d'une étude observationnelle selon STROBE. Pour chaque item : reported (rapporté), partially_reported, not_reported, ou not_applicable.";
+        return $this->strobe ??= new StrobeFramework();
     }
 }
