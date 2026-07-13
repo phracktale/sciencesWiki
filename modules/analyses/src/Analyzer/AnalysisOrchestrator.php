@@ -13,11 +13,7 @@ use Analyses\Repository\AssessmentRepository;
 use Analyses\Router\RouterEngine;
 use Analyses\Sdk\CorpusPort;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
-use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
-use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Messenger\MessageBusInterface;
-use Symfony\Component\Mime\Email;
 use Symfony\Component\Uid\Ulid;
 
 /**
@@ -36,12 +32,8 @@ final class AnalysisOrchestrator
         private readonly EntityManagerInterface $em,
         private readonly AssessmentRepository $assessments,
         private readonly MessageBusInterface $bus,
-        private readonly MailerInterface $mailer,
+        private readonly AnalysisNotifier $notifier,
         private readonly \Analyses\Service\SettingsService $settings,
-        #[Autowire(env: 'default::ANALYS_MAIL_FROM')]
-        private readonly ?string $mailFrom = null,
-        #[Autowire(env: 'default::MODULE_BASE_URL')]
-        private readonly ?string $baseUrl = null,
     ) {
     }
 
@@ -51,16 +43,21 @@ final class AnalysisOrchestrator
      */
     public function queue(string $documentRef, ?string $designOverride = null, ?string $requestedBy = null): Assessment
     {
-        if (null === $this->corpus->findPublication($documentRef)) {
+        $pub = $this->corpus->findPublication($documentRef);
+        if (null === $pub) {
             throw new PublicationNotFound(\sprintf('Publication introuvable : %s', $documentRef));
         }
 
         $override = null !== $designOverride && null !== StudyDesign::tryFrom($designOverride) ? $designOverride : null;
+        $treePath = $this->corpus->treePath((int) $pub['id']);
 
         $assessment = (new Assessment($documentRef))
             ->setStatus('queued')
             ->setRequestedBy($requestedBy)
-            ->setDesignOverride($override);
+            ->setDesignOverride($override)
+            ->setDocumentTitle(\is_string($pub['title'] ?? null) ? (string) $pub['title'] : null)
+            ->setDocumentDoi(\is_string($pub['doi'] ?? null) ? (string) $pub['doi'] : null)
+            ->setTreePath([] !== $treePath ? $treePath : null);
         $this->em->persist($assessment);
         $this->em->flush();
 
@@ -91,7 +88,7 @@ final class AnalysisOrchestrator
             throw $e; // laisse Messenger réessayer selon la stratégie configurée
         }
 
-        $this->notify($assessment);
+        $this->notifier->notify($assessment);
     }
 
     private function executePipeline(Assessment $assessment): void
@@ -248,41 +245,5 @@ final class AnalysisOrchestrator
         }
 
         return $id;
-    }
-
-    /**
-     * Notifie le demandeur (port « mailer », graceful). Avec MAILER_DSN=null://null,
-     * l'envoi est un no-op ; aucune erreur ne remonte.
-     */
-    private function notify(Assessment $assessment): void
-    {
-        $to = $assessment->getRequestedBy();
-        if (null === $to || !filter_var($to, \FILTER_VALIDATE_EMAIL)) {
-            return;
-        }
-
-        $link = null !== $this->baseUrl && '' !== $this->baseUrl
-            ? rtrim($this->baseUrl, '/').'/analyses/'.$assessment->getId()
-            : null;
-
-        $body = \sprintf(
-            "Votre analyse (%s) est terminée.\nStatut : %s\nPlan : %s\n%s",
-            $assessment->getDocumentRef(),
-            $assessment->getStatus(),
-            $assessment->getPrimaryDesign() ?? 'indéterminé',
-            null !== $link ? "Résultat : $link" : '',
-        );
-
-        try {
-            $this->mailer->send(
-                (new Email())
-                    ->from($this->mailFrom ?: 'noreply@scienceswiki.eu')
-                    ->to($to)
-                    ->subject('Analyse SciencesWiki terminée')
-                    ->text($body),
-            );
-        } catch (TransportExceptionInterface) {
-            // Notification best-effort : un échec d'envoi ne doit pas invalider l'analyse.
-        }
     }
 }

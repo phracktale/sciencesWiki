@@ -44,6 +44,41 @@ final class CorpusPort
      *
      * @return string le texte disponible (peut être vide si non vectorisé)
      */
+    /**
+     * Chemin arborescent (racine → rubrique) de la publication dans l'arbre des savoirs.
+     * Prend le placement de meilleur score puis remonte les parents « principaux ».
+     *
+     * @return list<array{slug: string, label: string}>
+     */
+    public function treePath(int $publicationId): array
+    {
+        $nodeId = $this->db->fetchOne(
+            'SELECT tree_node_id FROM placement_suggestion WHERE publication_id = :id ORDER BY score DESC NULLS LAST LIMIT 1',
+            ['id' => $publicationId],
+        );
+        if (false === $nodeId || null === $nodeId) {
+            return [];
+        }
+
+        $rows = $this->db->fetchAllAssociative(
+            'WITH RECURSIVE up AS (
+                SELECT tn.id, tn.slug, tn.label, 0 AS depth
+                FROM tree_node tn WHERE tn.id = :node
+                UNION ALL
+                SELECT p.id, p.slug, p.label, u.depth + 1
+                FROM up u
+                JOIN LATERAL (
+                    SELECT parent_id FROM tree_edge WHERE child_id = u.id ORDER BY principal DESC LIMIT 1
+                ) e ON true
+                JOIN tree_node p ON p.id = e.parent_id
+             )
+             SELECT slug, label FROM up ORDER BY depth DESC',
+            ['node' => (int) $nodeId],
+        );
+
+        return array_map(static fn (array $r): array => ['slug' => (string) $r['slug'], 'label' => (string) $r['label']], $rows);
+    }
+
     public function fulltext(int $publicationId, int $maxChunks = 400): string
     {
         $maxChunks = max(1, min(2000, $maxChunks));

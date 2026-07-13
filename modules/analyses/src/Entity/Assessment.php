@@ -78,6 +78,17 @@ class Assessment
     #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $summary = null;
 
+    /** Snapshot du titre de la publication (pour le classeur / l'e-mail, sans re-requête). */
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $documentTitle = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $documentDoi = null;
+
+    /** Chemin arborescent (racine → rubrique) sérialisé. */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    private ?array $treePath = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -243,6 +254,53 @@ class Assessment
         $this->summary = $summary;
 
         return $this;
+    }
+
+    public function getDocumentTitle(): ?string
+    {
+        return $this->documentTitle;
+    }
+
+    public function setDocumentTitle(?string $documentTitle): self
+    {
+        $this->documentTitle = $documentTitle;
+
+        return $this;
+    }
+
+    public function getDocumentDoi(): ?string
+    {
+        return $this->documentDoi;
+    }
+
+    public function setDocumentDoi(?string $documentDoi): self
+    {
+        $this->documentDoi = $documentDoi;
+
+        return $this;
+    }
+
+    /** @return list<array{slug: string, label: string}>|null */
+    public function getTreePath(): ?array
+    {
+        return $this->treePath;
+    }
+
+    public function setTreePath(?array $treePath): self
+    {
+        $this->treePath = $treePath;
+
+        return $this;
+    }
+
+    /** Chemin lisible « Racine › … › Rubrique ». */
+    public function treePathLabel(): ?string
+    {
+        if (null === $this->treePath || [] === $this->treePath) {
+            return null;
+        }
+
+        return implode(' › ', array_map(static fn (array $n): string => (string) ($n['label'] ?? ''), $this->treePath));
     }
 
     /** Validation par un relecteur : fige l'évaluation comme relue. */

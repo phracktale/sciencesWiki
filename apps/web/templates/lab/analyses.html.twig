@@ -167,6 +167,16 @@
                 })
                 .catch(function () { setStatus('Erreur réseau.'); submit.disabled = false; });
         });
+
+        // Ouverture directe d'une analyse du classeur (?id=...) : affiche le résultat
+        // (et continue à interroger si elle est encore en cours).
+        var qid = new URLSearchParams(window.location.search).get('id');
+        if (qid) {
+            setStatus('Chargement de l\'analyse…');
+            if (timer) clearInterval(timer);
+            timer = setInterval(function () { poll(qid); }, 5000);
+            poll(qid);
+        }
     })();
     </script>
 {% endblock %}

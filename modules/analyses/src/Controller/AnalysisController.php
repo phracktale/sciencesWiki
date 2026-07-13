@@ -72,6 +72,37 @@ final class AnalysisController extends AbstractController
         ], 202);
     }
 
+    /**
+     * Classeur personnel : liste horodatée des analyses demandées par l'utilisateur courant
+     * (titre, DOI, chemin arborescent, statut). Toujours filtré sur l'identité du JWT.
+     */
+    #[Route('/me/analyses', name: 'analys_me_analyses', methods: ['GET'])]
+    public function myAnalyses(): JsonResponse
+    {
+        $me = $this->getUser()?->getUserIdentifier();
+        if (null === $me) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+
+        $items = array_map(
+            fn (Assessment $a): array => [
+                'id' => (string) $a->getId(),
+                'document_ref' => $a->getDocumentRef(),
+                'title' => $a->getDocumentTitle(),
+                'doi' => $a->getDocumentDoi(),
+                'tree_path' => $a->getTreePath(),
+                'tree_path_label' => $a->treePathLabel(),
+                'status' => $a->getStatus(),
+                'primary_design' => $a->getPrimaryDesign(),
+                'human_review_required' => $a->isHumanReview(),
+                'created_at' => $a->getCreatedAt()->format(\DateTimeInterface::ATOM),
+            ],
+            $this->assessments->findForUser($me),
+        );
+
+        return new JsonResponse(['items' => $items]);
+    }
+
     #[Route('/analyses/{id}', name: 'analys_analyses_read', methods: ['GET'])]
     public function read(string $id): JsonResponse
     {

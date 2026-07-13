@@ -67,6 +67,24 @@ final class LabController extends AbstractController
     }
 
     /**
+     * Classeur personnel : liste horodatée des analyses de l'utilisateur (compte perso).
+     * Les données viennent du module (GET me/analyses) via le proxy ; chaque ligne ouvre
+     * l'analyse complète (/labo/analyses?id=…).
+     */
+    #[Route('/{_locale}/labo/classeur', name: 'lab_classeur', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function classeur(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/labo/classeur']);
+        }
+        if (!$this->user->hasRole('ROLE_RESEARCHER') && !$this->user->hasRole('ROLE_COMITE')) {
+            throw $this->createAccessDeniedException();
+        }
+
+        return $this->render('lab/classeur.html.twig');
+    }
+
+    /**
      * Proxy vers le module « analyses » (standalone) : ajoute le JWT de session en Bearer
      * et relaie la réponse telle quelle (JSON ou PDF). L'accès de section (rôles) est
      * appliqué par le module lui-même.

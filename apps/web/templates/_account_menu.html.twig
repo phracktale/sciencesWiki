@@ -7,6 +7,7 @@
         <div class="nav-dd-menu">
             <a href="{{ path('chat') }}"{{ route == 'chat' ? ' class="is-active"' : '' }}>💬 Assistant IA</a>
             {% if current_user.canResearch %}<a href="{{ path('researcher_dashboard') }}"{{ route == 'researcher_dashboard' ? ' class="is-active"' : '' }}>🔬 Espace chercheur</a>{% endif %}
+            {% if current_user.canResearch or current_user.hasRole('ROLE_COMITE') %}<a href="{{ path('lab_classeur') }}"{{ route == 'lab_classeur' ? ' class="is-active"' : '' }}>📁 Mon classeur</a>{% endif %}
             {% if current_user.hasRole('ROLE_ADMIN') %}<a href="{{ path('admin_dashboard') }}">⚙️ Tableau de bord</a>{% endif %}
             <a href="{{ path('logout') }}" class="nav-dd-logout">⏻ Déconnexion</a>
         </div>

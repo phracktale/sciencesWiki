@@ -388,7 +388,7 @@ services:
       ANALYS_EXTRACTOR_MODEL: ${ANALYS_EXTRACTOR_MODEL:-glm-4.7-flash:latest}
       MAILER_DSN: ${MAILER_DSN:-null://null}
       ANALYS_MAIL_FROM: ${HARVESTER_CONTACT_EMAIL:-noreply@scienceswiki.eu}
-      MODULE_BASE_URL: ${PUBLIC_URL:-}/labo/analyses
+      MODULE_BASE_URL: ${PUBLIC_URL:-}/fr/labo/analyses
       # Cette instance applique les migrations analys_* (table de suivi dédiée).
       RUN_INIT: "1"
     volumes:
@@ -414,7 +414,7 @@ services:
       ANALYS_EXTRACTOR_MODEL: ${ANALYS_EXTRACTOR_MODEL:-glm-4.7-flash:latest}
       MAILER_DSN: ${MAILER_DSN:-null://null}
       ANALYS_MAIL_FROM: ${HARVESTER_CONTACT_EMAIL:-noreply@scienceswiki.eu}
-      MODULE_BASE_URL: ${PUBLIC_URL:-}/labo/analyses
+      MODULE_BASE_URL: ${PUBLIC_URL:-}/fr/labo/analyses
       RUN_WORKER: "1"
     # Le worker ne sert pas de HTTP : on neutralise le healthcheck HTTP hérité.
     healthcheck:

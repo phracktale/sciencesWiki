@@ -1,0 +1,70 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Mon classeur — Analyses{% endblock %}
+
+{% block body %}
+    <p style="margin:.2rem 0"><a href="{{ path('lab_hub') }}" class="muted">← Labo</a></p>
+    <h1>📁 Mon classeur</h1>
+    <p class="muted">Vos analyses méthodologiques, sauvegardées et horodatées. Cliquez une ligne
+        pour rouvrir le résultat complet.</p>
+
+    <section id="cl-list" class="side-block" style="margin-top:1rem">
+        <p class="muted" id="cl-loading">Chargement…</p>
+    </section>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var SRC = "{{ path('lab_analyses_proxy', {path: 'me/analyses'}) }}";
+        var VIEW = "{{ path('lab_analyses_ui') }}";
+        var listEl = document.getElementById('cl-list');
+
+        function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+        function fmtDate(iso) {
+            try { return new Date(iso).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' }); }
+            catch (e) { return iso || ''; }
+        }
+        function statusBadge(s, hr) {
+            var map = {
+                queued: ['⏳ En file', '#d97706'], running: ['⚙️ En cours', '#d97706'],
+                completed: ['✅ Terminée', '#16a34a'], validated: ['✔️ Validée', '#16a34a'],
+                human_review_required: ['⚠️ Validation requise', '#d97706'], failed: ['✖️ Échec', '#dc2626']
+            };
+            var m = map[s] || [s, '#94a3b8'];
+            return '<span style="font-size:.72rem; font-weight:700; color:' + m[1] + '">' + esc(m[0]) + '</span>';
+        }
+
+        fetch(SRC, { headers: { 'Accept': 'application/json' }, cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var items = (d && d.items) || [];
+                if (!items.length) {
+                    listEl.innerHTML = '<p class="muted">Aucune analyse pour l\'instant. '
+                        + 'Lancez-en une depuis <a href="' + VIEW + '">🔬 Analyses scientifiques</a>.</p>';
+                    return;
+                }
+                var rows = items.map(function (a) {
+                    var title = a.title || a.document_ref;
+                    var doi = a.doi ? '<span style="font-family:monospace; font-size:.72rem" class="muted">' + esc(a.doi) + '</span>' : '';
+                    var path = a.tree_path_label ? '<div style="font-size:.74rem" class="muted">🗂 ' + esc(a.tree_path_label) + '</div>' : '';
+                    return '<tr style="cursor:pointer" data-href="' + VIEW + '?id=' + esc(a.id) + '">'
+                        + '<td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); white-space:nowrap; vertical-align:top; font-size:.78rem" class="muted">' + esc(fmtDate(a.created_at)) + '</td>'
+                        + '<td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); vertical-align:top"><strong>' + esc(title) + '</strong> ' + doi + path + '</td>'
+                        + '<td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); vertical-align:top; font-size:.78rem">' + esc(a.primary_design || '—') + '</td>'
+                        + '<td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); vertical-align:top; text-align:right">' + statusBadge(a.status, a.human_review_required) + '</td>'
+                        + '</tr>';
+                }).join('');
+                listEl.innerHTML = '<table style="width:100%; border-collapse:collapse; font-size:.9rem"><thead><tr>'
+                    + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Date</th>'
+                    + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Article / emplacement</th>'
+                    + '<th style="text-align:left; border-bottom:2px solid var(--line); padding:.3rem">Plan</th>'
+                    + '<th style="border-bottom:2px solid var(--line); padding:.3rem">Statut</th>'
+                    + '</tr></thead><tbody>' + rows + '</tbody></table>';
+                listEl.addEventListener('click', function (e) {
+                    var tr = e.target.closest('tr[data-href]');
+                    if (tr) window.location.href = tr.getAttribute('data-href');
+                });
+            })
+            .catch(function () { listEl.innerHTML = '<p class="badge warn">Classeur momentanément indisponible.</p>'; });
+    })();
+    </script>
+{% endblock %}
