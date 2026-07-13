@@ -2,6 +2,9 @@ lexik_jwt_authentication:
     secret_key: '%env(resolve:JWT_SECRET_KEY)%'
     public_key: '%env(resolve:JWT_PUBLIC_KEY)%'
     pass_phrase: '%env(JWT_PASSPHRASE)%'
-    # Aligné sur la session du BO (8 h) : le JWT stocké en session ne doit pas
-    # expirer avant elle, sinon les appels /api/admin tombent en 401.
-    token_ttl: 28800
+    # Durée de vie longue (30 j) pour éviter les déconnexions fréquentes : le JWT est
+    # stocké en session ; s'il expire avant elle, les appels API tombent en 401 et
+    # l'utilisateur « décroche » alors qu'il paraît connecté. Aligné sur la session du
+    # front/BO (30 j). Compromis homelab : jeton non révocable → durée volontairement
+    # longue mais pas illimitée.
+    token_ttl: 2592000

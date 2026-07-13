@@ -24,15 +24,16 @@ framework:
     trusted_headers: ['x-forwarded-for', 'x-forwarded-host', 'x-forwarded-proto', 'x-forwarded-port']
     trusted_hosts: '%env(TRUSTED_HOSTS)%'
 
-    # Session du back-office : 8 h (journée de travail) pour ne pas redemander le
-    # login toutes les ~20 min (défaut PHP gc_maxlifetime), sans session interminable.
+    # Session : 30 jours, alignée sur le JWT (token_ttl 30 j). Évite les déconnexions
+    # fréquentes : avant, session ET JWT expiraient à 8 h (fixe, non glissant) → l'utilisateur
+    # décrochait chaque jour ; et le JWT expirant en premier cassait les appels API.
     session:
         # Stockage des sessions dans un répertoire dédié (monté en volume Docker)
         # pour qu'elles SURVIVENT aux rebuilds du conteneur (sinon /tmp éphémère →
         # déconnexion à chaque déploiement).
         save_path: '%kernel.project_dir%/var/sessions'
-        cookie_lifetime: 28800
-        gc_maxlifetime: 28800
+        cookie_lifetime: 2592000
+        gc_maxlifetime: 2592000
         cookie_secure: auto
         cookie_samesite: lax
         # Vide par défaut (host-only) ; « .scienceswiki.eu » en prod pour le SSO chat.
