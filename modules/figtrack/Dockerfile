@@ -18,7 +18,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh
+# Normalise les fins de ligne (au cas où le fichier arrive en CRLF depuis un checkout Windows)
+# puis rend le script exécutable.
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
