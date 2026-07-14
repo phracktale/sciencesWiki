@@ -12,3 +12,5 @@ opencv-python-headless==4.10.0.84
 imagehash==4.3.1
 scipy==1.15.1
 PyWavelets==1.8.0
+# Extraction des figures embarquées dans les PDF (AGPL — usage homelab/institutionnel interne).
+PyMuPDF==1.25.1

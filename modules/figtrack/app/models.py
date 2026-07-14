@@ -19,8 +19,28 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+class Document(Base):
+    """Document source (PDF) dont on extrait les figures. Regroupe des assets (figures)."""
+
+    __tablename__ = "figtrk_document"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=_uid)
+    sha256: Mapped[str] = mapped_column(String(64), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    doi: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    pages: Mapped[int] = mapped_column(Integer, default=0)
+    figure_count: Mapped[int] = mapped_column(Integer, default=0)
+    triage_max: Mapped[str] = mapped_column(String(4), default="T0")
+    requested_by: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
+
+
 class Asset(Base):
-    """Image originale conservée (octet + empreinte), avec ses empreintes perceptuelles."""
+    """Image originale conservée (octet + empreinte), avec ses empreintes perceptuelles.
+
+    Peut être une image isolée (document_id null) ou une FIGURE extraite d'un PDF (document_id).
+    """
 
     __tablename__ = "figtrk_asset"
 
@@ -34,6 +54,10 @@ class Asset(Base):
     phash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     dhash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ahash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Rattachement à un document PDF (figures extraites) ; null pour une image isolée.
+    document_id: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    page: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    figure_index: Mapped[int | None] = mapped_column(Integer, nullable=True)
     requested_by: Mapped[str | None] = mapped_column(String(180), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_now)
 

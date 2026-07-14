@@ -11,15 +11,17 @@
 
     <section class="side-block" style="margin-top:1rem">
         <form id="ft-form" style="display:grid; gap:.6rem; max-width:640px">
-            <label>Image à analyser (PNG, JPEG, TIFF, WebP…)
-                <input type="file" id="ft-file" accept="image/*" required
+            <label>Image ou PDF à analyser
+                <input type="file" id="ft-file" accept="image/*,application/pdf" required
                        style="width:100%; padding:.4rem; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff">
             </label>
-            <label>Titre / figure <span class="muted" style="font-size:.78rem">(facultatif)</span>
-                <input type="text" id="ft-title" placeholder="ex. Figure 3B — western blot"
+            <p class="muted" style="font-size:.78rem; margin:0">Une image → analyse directe ; un PDF → extraction des figures
+                et détection de <strong>réutilisation entre figures</strong> de l'article.</p>
+            <label>Titre <span class="muted" style="font-size:.78rem">(facultatif)</span>
+                <input type="text" id="ft-title" placeholder="ex. Dupont et al. 2024, ou Figure 3B"
                        style="width:100%; padding:.5rem .7rem; border:1px solid var(--line); border-radius:8px; font:inherit">
             </label>
-            <div><button type="submit" id="ft-submit">Analyser l'image</button></div>
+            <div><button type="submit" id="ft-submit">Analyser</button></div>
         </form>
         <p id="ft-status" class="muted" style="margin:.8rem 0 0" hidden></p>
     </section>
@@ -35,7 +37,7 @@
         var statusEl = document.getElementById('ft-status');
         var resultsEl = document.getElementById('ft-results');
         var submit = document.getElementById('ft-submit');
-        var current = null;
+        var current = null; // {kind:'analysis'|'document', id}
 
         function setStatus(t) { statusEl.hidden = false; statusEl.textContent = t; }
         function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
@@ -45,6 +47,7 @@
             if (t === 'T1') return '#0369a1';
             return '#16a34a';
         }
+        function tbadge(t) { return '<span style="font-weight:700; color:' + triageColor(t) + '">' + esc(t) + '</span>'; }
         function region(r) {
             if (!r) return '';
             return ' <span class="muted" style="font-size:.72rem">[x' + r.x + ' y' + r.y + ' ' + r.width + '×' + r.height + ']</span>';
@@ -69,7 +72,7 @@
             return '<div style="border:1px solid var(--line); border-radius:8px; padding:.6rem; margin:.5rem 0">'
                 + '<div style="display:flex; justify-content:space-between; gap:.5rem; flex-wrap:wrap; align-items:baseline">'
                 + '<strong>' + esc(f.anomaly_type) + '</strong>'
-                + '<span style="font-size:.72rem"><span style="font-weight:700; color:' + triageColor(f.triage_level) + '">' + esc(f.triage_level) + '</span> · preuve ' + esc(f.evidence_level) + ' · <span class="muted">' + esc(f.detector) + ' v' + esc(f.detector_version) + '</span></span>'
+                + '<span style="font-size:.72rem">' + tbadge(f.triage_level) + ' · preuve ' + esc(f.evidence_level) + ' · <span class="muted">' + esc(f.detector) + ' v' + esc(f.detector_version) + '</span></span>'
                 + '</div>'
                 + '<p style="margin:.35rem 0; font-size:.9rem">' + esc(f.description) + region(f.source_region) + region(f.target_region) + '</p>'
                 + tr
@@ -79,17 +82,52 @@
         }
 
         function render(d) {
-            current = d;
-            var badge = '<span style="font-weight:700; color:' + triageColor(d.triage_max) + '">' + esc(d.triage_max) + '</span>';
+            current = { kind: 'analysis', id: d.id };
             var a = d.asset || {};
             var findings = (d.findings || []).map(renderFinding).join('') || '<p class="muted">Aucun indice technique détecté. L\'absence de détection ne prouve pas l\'intégrité de l\'image.</p>';
             resultsEl.innerHTML = '<section class="side-block">'
-                + '<h2 style="margin:0 0 .3rem">Résultat — priorité ' + badge + '</h2>'
-                + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(a.filename) + ' · ' + (a.width || '?') + '×' + (a.height || '?') + ' · sha256 ' + esc((a.sha256 || '').slice(0, 12)) + '…</p>'
+                + '<h2 style="margin:0 0 .3rem">Résultat — priorité ' + tbadge(d.triage_max) + '</h2>'
+                + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(a.filename) + ' · ' + (a.width || '?') + '×' + (a.height || '?') + '</p>'
                 + (d.summary ? '<p style="margin:.4rem 0">' + esc(d.summary) + '</p>' : '')
-                + findings
-                + '</section>';
+                + findings + '</section>';
             resultsEl.hidden = false;
+        }
+
+        function renderDocument(d) {
+            current = { kind: 'document', id: d.id };
+            var head = '<section class="side-block">'
+                + '<h2 style="margin:0 0 .3rem">Document — ' + (d.figure_count || 0) + ' figure(s) · priorité ' + tbadge(d.triage_max) + '</h2>'
+                + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(d.title || d.filename) + ' · ' + (d.pages || '?') + ' page(s)</p>';
+            if (!d.figures || !d.figures.length) {
+                head += '<p class="muted">Aucune figure raster n\'a pu être extraite (PDF vectoriel, scanné, ou protégé). '
+                    + 'L\'extraction avancée (rendu de page, OCR) n\'est pas encore disponible.</p></section>';
+                resultsEl.innerHTML = head; resultsEl.hidden = false; return;
+            }
+            head += '</section>';
+            var cards = d.figures.map(function (fig) {
+                var img = BASE + 'assets/' + encodeURIComponent(fig.asset_id) + '/image';
+                var findings = (fig.findings || []).map(renderFinding).join('');
+                var count = (fig.findings || []).length;
+                return '<section class="side-block" style="margin-top:.8rem">'
+                    + '<div style="display:flex; gap:1rem; flex-wrap:wrap; align-items:flex-start">'
+                    + '<a href="' + img + '" target="_blank" rel="noopener"><img src="' + img + '" alt="figure" loading="lazy" '
+                    + 'style="max-width:180px; max-height:180px; border:1px solid var(--line); border-radius:6px"></a>'
+                    + '<div style="flex:1; min-width:220px">'
+                    + '<div><strong>Figure ' + fig.figure_index + '</strong> <span class="muted" style="font-size:.78rem">p.' + (fig.page || '?') + ' · ' + (fig.width || '?') + '×' + (fig.height || '?') + '</span> · ' + tbadge(fig.triage_max) + '</div>'
+                    + (fig.summary ? '<p style="margin:.35rem 0; font-size:.85rem">' + esc(fig.summary) + '</p>' : '')
+                    + '</div></div>'
+                    + (count ? findings : '<p class="muted" style="font-size:.82rem; margin:.4rem 0 0">Aucun indice technique sur cette figure.</p>')
+                    + '</section>';
+            }).join('');
+            resultsEl.innerHTML = head + cards;
+            resultsEl.hidden = true; resultsEl.hidden = false;
+        }
+
+        function reloadCurrent() {
+            if (!current) return Promise.resolve();
+            var url = BASE + (current.kind === 'document' ? 'documents/' : 'analyses/') + current.id;
+            return fetch(url, { cache: 'no-store' }).then(function (r) { return r.json(); })
+                .then(current.kind === 'document' ? renderDocument : render);
         }
 
         resultsEl.addEventListener('click', function (e) {
@@ -101,29 +139,30 @@
             fetch(BASE + 'findings/' + encodeURIComponent(fid) + '/review', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: st, rationale: rationale })
-            }).then(function (r) { return r.json(); }).then(function () {
-                // Recharge l'analyse pour refléter la décision.
-                return fetch(BASE + 'analyses/' + current.id, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(render);
-            }).catch(function () {});
+            }).then(function (r) { return r.json(); }).then(reloadCurrent).catch(function () {});
         });
 
         form.addEventListener('submit', function (e) {
             e.preventDefault();
             var file = fileEl.files[0];
             if (!file) return;
+            var isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
             resultsEl.hidden = true; resultsEl.innerHTML = ''; submit.disabled = true;
-            setStatus('Analyse en cours…');
+            setStatus(isPdf ? 'Extraction des figures et analyse du document…' : 'Analyse de l\'image…');
             var qs = 'filename=' + encodeURIComponent(file.name) + '&title=' + encodeURIComponent(titleEl.value.trim());
-            fetch(BASE + 'analyses?' + qs, {
-                method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file, cache: 'no-store'
+            fetch(BASE + (isPdf ? 'documents?' : 'analyses?') + qs, {
+                method: 'POST',
+                headers: { 'Content-Type': file.type || (isPdf ? 'application/pdf' : 'application/octet-stream') },
+                body: file, cache: 'no-store'
             })
                 .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
                 .then(function (res) {
                     submit.disabled = false;
                     if (!res.ok) { setStatus('Erreur : ' + (res.d.detail || res.d.error || 'analyse impossible')); return; }
-                    setStatus('Terminé.'); render(res.d);
+                    setStatus('Terminé.');
+                    if (isPdf) { renderDocument(res.d); } else { render(res.d); }
                 })
-                .catch(function () { setStatus('Erreur réseau.'); submit.disabled = false; });
+                .catch(function () { setStatus('Erreur réseau (fichier trop lourd ?).'); submit.disabled = false; });
         });
     })();
     </script>
