@@ -8,13 +8,41 @@
     <section class="side-block" style="margin-top:.6rem">
         <div style="display:flex; flex-wrap:wrap; gap:.4rem 1rem; align-items:baseline">
             <strong style="font-size:1.1rem">{{ current_user.displayName }}</strong>
-            {% if current_user.me.email is defined %}<span class="muted">{{ current_user.me.email }}</span>{% endif %}
+            {% if profile.email %}<span class="muted">{{ profile.email }}</span>{% endif %}
         </div>
         <div style="margin-top:.5rem; display:flex; flex-wrap:wrap; gap:.35rem">
             {% for r in roles %}
                 <span class="pill" style="font-size:.72rem">{{ r }}</span>
             {% endfor %}
         </div>
+
+        <details style="margin-top:.9rem">
+            <summary style="cursor:pointer; font-weight:600">✏️ Modifier mon profil</summary>
+            <form method="post" action="{{ path('account_profile_save') }}" style="display:grid; gap:.6rem; max-width:560px; margin-top:.7rem">
+                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                <label>Nom
+                    <input type="text" name="real_name" required value="{{ profile.realName }}"
+                           style="width:100%; padding:.45rem .6rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+                </label>
+                <label>Pseudo <span class="muted" style="font-size:.78rem">(affiché à la place du nom s'il est renseigné)</span>
+                    <input type="text" name="pseudo" value="{{ profile.pseudo }}"
+                           style="width:100%; padding:.45rem .6rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+                </label>
+                <label>Affiliation
+                    <input type="text" name="affiliation" value="{{ profile.affiliation }}"
+                           style="width:100%; padding:.45rem .6rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+                </label>
+                <label>ORCID
+                    <input type="text" name="orcid" value="{{ profile.orcid }}" placeholder="0000-0000-0000-0000"
+                           style="width:100%; padding:.45rem .6rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+                </label>
+                <label>Bio
+                    <textarea name="bio" rows="3"
+                              style="width:100%; padding:.45rem .6rem; border:1px solid var(--line); border-radius:8px; font:inherit">{{ profile.bio }}</textarea>
+                </label>
+                <div><button type="submit">Enregistrer</button></div>
+            </form>
+        </details>
     </section>
 
     <p class="muted" style="margin:1rem 0 .4rem">Vos espaces, selon votre rôle :</p>

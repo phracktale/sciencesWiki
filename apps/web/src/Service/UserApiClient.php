@@ -144,6 +144,33 @@ final class UserApiClient
         return \is_array($me) ? $me : [];
     }
 
+    /**
+     * Recharge le profil depuis l'API et met à jour la session (après une édition de profil,
+     * ou pour compléter une session ancienne dont le `me` n'a pas tous les champs).
+     *
+     * @return array<string,mixed>
+     */
+    public function refreshMe(): array
+    {
+        $token = $this->token();
+        if (null === $token) {
+            return $this->me();
+        }
+        try {
+            $me = $this->httpClient->request('GET', $this->baseUrl.'/api/me', [
+                'headers' => ['Authorization' => 'Bearer '.$token],
+                'timeout' => 10,
+            ])->toArray();
+        } catch (\Throwable) {
+            return $this->me();
+        }
+        if (isset($me['roles']) && \is_array($me['roles'])) {
+            $this->session()->set(self::ME_KEY, $me);
+        }
+
+        return $this->me();
+    }
+
     public function displayName(): string
     {
         $me = $this->me();

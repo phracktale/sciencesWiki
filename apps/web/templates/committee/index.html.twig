@@ -1,0 +1,73 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}Comité — validations{% endblock %}
+
+{% block body %}
+    <p style="margin:.2rem 0"><a href="{{ path('account') }}" class="muted">← Mon compte</a></p>
+    <h1>⚖️ Comité — validations</h1>
+    <p class="muted">Contenus en attente de relecture et de validation. Lisez, puis validez.
+        La validation est soumise à votre compétence sur le domaine concerné.</p>
+
+    {% if unavailable %}
+        <p class="badge warn">File du comité momentanément indisponible.</p>
+    {% endif %}
+
+    <section class="side-block" style="margin-top:1rem">
+        <h2 style="margin:0 0 .5rem">Réponses (Q/R) — {{ counts.answers }}</h2>
+        {% if answers is empty %}
+            <p class="muted">Aucune réponse en attente. 🎉</p>
+        {% else %}
+            <table style="width:100%; border-collapse:collapse; font-size:.9rem">
+                <tbody>
+                {% for a in answers %}
+                    <tr>
+                        <td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); vertical-align:top">
+                            <strong>{{ a.title }}</strong>
+                            <div class="muted" style="font-size:.74rem">
+                                🗂 {{ a.node.label }}
+                                {% if a.needsRevalidation %}· <span style="color:#dc2626; font-weight:700">à revalider (source signalée)</span>{% endif %}
+                            </div>
+                        </td>
+                        <td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); vertical-align:top; text-align:right; white-space:nowrap">
+                            <a class="btn" href="{{ path('answer', {id: a.questionId}) }}" target="_blank" rel="noopener">Voir</a>
+                            <form method="post" action="{{ path('answer_validate', {id: a.id}) }}" style="display:inline"
+                                  onsubmit="return confirm('Valider cette réponse ?')">
+                                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                <button type="submit">✅ Valider</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+
+    <section class="side-block" style="margin-top:1rem">
+        <h2 style="margin:0 0 .5rem">Articles de rubrique — {{ counts.articles }}</h2>
+        {% if articles is empty %}
+            <p class="muted">Aucun article en attente. 🎉</p>
+        {% else %}
+            <table style="width:100%; border-collapse:collapse; font-size:.9rem">
+                <tbody>
+                {% for n in articles %}
+                    <tr>
+                        <td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); vertical-align:top">
+                            <strong>{{ n.label }}</strong>
+                            <div class="muted" style="font-size:.74rem">/{{ n.slug }}</div>
+                        </td>
+                        <td style="padding:.45rem .3rem; border-bottom:1px solid var(--line); vertical-align:top; text-align:right; white-space:nowrap">
+                            <a class="btn" href="{{ path('node', {path: n.slug}) }}" target="_blank" rel="noopener">Voir</a>
+                            <form method="post" action="{{ path('article_validate', {id: n.id}) }}" style="display:inline"
+                                  onsubmit="return confirm('Valider cet article ?')">
+                                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                                <button type="submit">✅ Valider</button>
+                            </form>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </section>
+{% endblock %}

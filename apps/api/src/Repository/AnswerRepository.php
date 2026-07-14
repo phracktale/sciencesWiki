@@ -45,6 +45,26 @@ class AnswerRepository extends ServiceEntityRepository
     }
 
     /**
+     * File de relecture du COMITÉ : réponses en relecture comité, ou marquées à revalider
+     * (source rétractée). Les plus anciennes d'abord (à traiter en priorité).
+     *
+     * @return list<Answer>
+     */
+    public function findForCommittee(int $limit = 60): array
+    {
+        /** @var list<Answer> $r */
+        $r = $this->createQueryBuilder('a')
+            ->andWhere('a.validationStatus = :rev OR a.needsRevalidation = true')
+            ->setParameter('rev', AnswerValidationStatus::InCommitteeReview)
+            ->orderBy('a.createdAt', 'ASC')
+            ->setMaxResults(max(1, min(200, $limit)))
+            ->getQuery()
+            ->getResult();
+
+        return $r;
+    }
+
+    /**
      * Dernières Q/R publiques (accueil / page « toutes les questions »).
      * Si $search est fourni, filtre sur le texte de la question et son titre.
      *

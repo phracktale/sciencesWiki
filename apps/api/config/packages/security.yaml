@@ -83,6 +83,8 @@ security:
         - { path: ^/api/me/study, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
         - { path: ^/api/me/studies, roles: [ROLE_RESEARCHER, ROLE_TEACHER, ROLE_STUDENT] }
         - { path: ^/api/me, roles: ROLE_USER }
+        # File de relecture du comité scientifique (lecture) : comité ou modérateur.
+        - { path: ^/api/committee, roles: [ROLE_COMITE, ROLE_MODERATEUR] }
         - { path: ^/api/admin, roles: ROLE_ADMIN }
         - { path: ^/api/literature-reviews, roles: ROLE_RESEARCHER }
         - { path: ^/api, roles: PUBLIC_ACCESS }
