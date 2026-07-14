@@ -25,6 +25,8 @@ final class LabController extends AbstractController
         private readonly HttpClientInterface $httpClient,
         #[Autowire(env: 'ANALYS_BASE_URL')]
         private readonly string $analysesBaseUrl = 'http://analyses',
+        #[Autowire(env: 'FIGTRK_BASE_URL')]
+        private readonly string $figtrackBaseUrl = 'http://figtrack',
     ) {
     }
 
@@ -44,6 +46,13 @@ final class LabController extends AbstractController
                 'icon' => '🔬',
                 'description' => "Routage et évaluation méthodologique composite des publications (AXIS, RoB 2, AMSTAR 2, MMAT…).",
                 'href' => $this->generateUrl('lab_analyses_ui'),
+            ];
+            $modules[] = [
+                'slug' => 'figtrack',
+                'name' => 'figTrack — intégrité des images',
+                'icon' => '🖼️',
+                'description' => "Forensique d'images scientifiques : doublons, copier-déplacer, contraste. Indices neutres, validation humaine.",
+                'href' => $this->generateUrl('lab_figtrack_ui'),
             ];
         }
 
@@ -117,6 +126,59 @@ final class LabController extends AbstractController
             return new Response($response->getContent(false), $response->getStatusCode(), ['Content-Type' => $contentType]);
         } catch (\Throwable) {
             return new JsonResponse(['error' => 'Module analyses momentanément indisponible.'], 502);
+        }
+    }
+
+    /** Interface du module figTrack (upload d'une image + suivi + findings). */
+    #[Route('/{_locale}/labo/figtrack', name: 'lab_figtrack_ui', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function figtrackUi(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/labo/figtrack']);
+        }
+        if (!$this->user->hasRole('ROLE_RESEARCHER') && !$this->user->hasRole('ROLE_COMITE')) {
+            throw $this->createAccessDeniedException();
+        }
+
+        return $this->render('lab/figtrack.html.twig');
+    }
+
+    /**
+     * Proxy vers le module « figTrack » (standalone Python). Comme le proxy analyses, mais
+     * PRÉSERVE le Content-Type entrant (upload multipart d'image) au lieu de forcer JSON.
+     */
+    #[Route('/{_locale}/labo/figtrack/{path}', name: 'lab_figtrack_proxy', requirements: ['_locale' => 'fr', 'path' => '.+'], methods: ['GET', 'POST'])]
+    public function figtrackProxy(string $path, Request $request): Response
+    {
+        if (!$this->user->isLogged()) {
+            return new JsonResponse(['error' => 'Non authentifié.'], 401);
+        }
+        $token = $this->user->token();
+        if (!\is_string($token)) {
+            return new JsonResponse(['error' => 'Session invalide.'], 401);
+        }
+
+        $headers = ['Authorization' => 'Bearer '.$token];
+        $options = ['headers' => $headers, 'timeout' => 240];
+        if (!$request->isMethod('GET')) {
+            // Préserve le corps brut ET le Content-Type (boundary multipart pour l'upload).
+            $ct = $request->headers->get('Content-Type');
+            if (\is_string($ct) && '' !== $ct) {
+                $headers['Content-Type'] = $ct;
+                $options['headers'] = $headers;
+            }
+            $options['body'] = $request->getContent();
+        }
+        $qs = $request->getQueryString();
+        $url = rtrim($this->figtrackBaseUrl, '/').'/'.ltrim($path, '/').(null !== $qs && '' !== $qs ? '?'.$qs : '');
+
+        try {
+            $response = $this->httpClient->request($request->getMethod(), $url, $options);
+            $contentType = $response->getHeaders(false)['content-type'][0] ?? 'application/json';
+
+            return new Response($response->getContent(false), $response->getStatusCode(), ['Content-Type' => $contentType]);
+        } catch (\Throwable) {
+            return new JsonResponse(['error' => 'Module figTrack momentanément indisponible.'], 502);
         }
     }
 }

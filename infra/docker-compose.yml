@@ -348,6 +348,7 @@ services:
       API_BASE_URL: "http://api"
       # Module « analyses » (standalone) joint en interne — façade /labo/analyses.
       ANALYS_BASE_URL: ${ANALYS_BASE_URL:-http://analyses}
+      FIGTRK_BASE_URL: ${FIGTRK_BASE_URL:-http://figtrack}
       # SSO chat : « .scienceswiki.eu » pour partager la session avec chat.scienceswiki.eu
       # (forward-auth Open WebUI). Vide = host-only (défaut). À régler au go-live.
       SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-}
@@ -423,6 +424,29 @@ services:
       - jwt_keys:/app/config/jwt:ro
     restart: unless-stopped
 
+  # Module « figTrack » (Python/FastAPI) : forensique d'images scientifiques (CV classique,
+  # v1 sans GPU). Standalone, base SW partagée (tables figtrk_*), valide les JWT SW avec la
+  # clé PUBLIQUE (volume jwt_keys en lecture seule). Joint en interne : http://figtrack.
+  figtrack:
+    <<: *app-hardening
+    build:
+      context: ../modules/figtrack
+      dockerfile: Dockerfile
+      target: prod
+    depends_on:
+      - api
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:-database}:5432/${POSTGRES_DB}"
+      JWT_PUBLIC_KEY_PATH: /app/jwt/public.pem
+      FIGTRK_STORAGE_DIR: /data
+      FIGTRK_NEAR_DUP_HAMMING: ${FIGTRK_NEAR_DUP_HAMMING:-10}
+      # Cette instance crée les tables figtrk_* au démarrage (idempotent).
+      RUN_INIT: "1"
+    volumes:
+      - jwt_keys:/app/jwt:ro
+      - figtrk_data:/data
+    restart: unless-stopped
+
   # Adminer : visualisation directe de la base (accès TOTAL → jamais public).
   # Publié par DÉFAUT sur 127.0.0.1 uniquement (accès via tunnel SSH : `ssh -L`).
   # Pour un accès LAN, mettre ADMINER_BIND=192.168.1.36 ET restreindre au pare-feu.
@@ -494,3 +518,4 @@ volumes:
   web_sessions:
   web_uploads:
   openwebui_data:
+  figtrk_data:

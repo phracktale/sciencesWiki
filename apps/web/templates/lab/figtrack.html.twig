@@ -1,0 +1,130 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}figTrack — intégrité des images{% endblock %}
+
+{% block body %}
+    <p style="margin:.2rem 0"><a href="{{ path('lab_hub') }}" class="muted">← Labo</a></p>
+    <h1>🖼️ figTrack — intégrité des images</h1>
+    <p class="muted">Outil d'<strong>investigation assistée</strong>. Produit des indices techniques
+        localisés et neutres (doublons, région potentiellement dupliquée, contraste), <strong>jamais
+        une conclusion de fraude</strong>. Chaque indice demande une validation humaine.</p>
+
+    <section class="side-block" style="margin-top:1rem">
+        <form id="ft-form" style="display:grid; gap:.6rem; max-width:640px">
+            <label>Image à analyser (PNG, JPEG, TIFF, WebP…)
+                <input type="file" id="ft-file" accept="image/*" required
+                       style="width:100%; padding:.4rem; border:1px solid var(--line); border-radius:8px; font:inherit; background:#fff">
+            </label>
+            <label>Titre / figure <span class="muted" style="font-size:.78rem">(facultatif)</span>
+                <input type="text" id="ft-title" placeholder="ex. Figure 3B — western blot"
+                       style="width:100%; padding:.5rem .7rem; border:1px solid var(--line); border-radius:8px; font:inherit">
+            </label>
+            <div><button type="submit" id="ft-submit">Analyser l'image</button></div>
+        </form>
+        <p id="ft-status" class="muted" style="margin:.8rem 0 0" hidden></p>
+    </section>
+
+    <section id="ft-results" hidden style="margin-top:1rem"></section>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var BASE = "{{ path('lab_figtrack_proxy', {path: 'X'}) }}".replace(/X$/, '');
+        var form = document.getElementById('ft-form');
+        var fileEl = document.getElementById('ft-file');
+        var titleEl = document.getElementById('ft-title');
+        var statusEl = document.getElementById('ft-status');
+        var resultsEl = document.getElementById('ft-results');
+        var submit = document.getElementById('ft-submit');
+        var current = null;
+
+        function setStatus(t) { statusEl.hidden = false; statusEl.textContent = t; }
+        function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+        function triageColor(t) {
+            if (t === 'T3') return '#dc2626';
+            if (t === 'T2') return '#d97706';
+            if (t === 'T1') return '#0369a1';
+            return '#16a34a';
+        }
+        function region(r) {
+            if (!r) return '';
+            return ' <span class="muted" style="font-size:.72rem">[x' + r.x + ' y' + r.y + ' ' + r.width + '×' + r.height + ']</span>';
+        }
+
+        function renderFinding(f) {
+            var lim = (f.limitations || []).map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('');
+            var tr = '';
+            if (f.estimated_transform) {
+                var t = f.estimated_transform;
+                tr = '<div style="font-size:.75rem" class="muted">Transformation estimée : ' + esc(t.type)
+                    + (t.rotation_deg != null ? ', rotation ' + t.rotation_deg + '°' : '')
+                    + (t.scale != null ? ', échelle ' + t.scale : '') + '</div>';
+            }
+            var reviewed = f.human_status
+                ? '<span class="pill" style="font-size:.68rem">✓ ' + esc(f.human_status) + (f.reviewed_by ? ' — ' + esc(f.reviewed_by) : '') + '</span>'
+                : '<span style="display:inline-flex; gap:.25rem; flex-wrap:wrap">'
+                    + ['confirmed:Confirmer', 'acceptable:Acceptable/déclaré', 'rejected:Faux positif', 'indeterminate:Indéterminé'].map(function (o) {
+                        var p = o.split(':');
+                        return '<button type="button" class="ft-review" data-fid="' + esc(f.id) + '" data-st="' + p[0] + '" style="font:inherit; font-size:.7rem; cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:5px; padding:.1rem .35rem">' + p[1] + '</button>';
+                    }).join('') + '</span>';
+            return '<div style="border:1px solid var(--line); border-radius:8px; padding:.6rem; margin:.5rem 0">'
+                + '<div style="display:flex; justify-content:space-between; gap:.5rem; flex-wrap:wrap; align-items:baseline">'
+                + '<strong>' + esc(f.anomaly_type) + '</strong>'
+                + '<span style="font-size:.72rem"><span style="font-weight:700; color:' + triageColor(f.triage_level) + '">' + esc(f.triage_level) + '</span> · preuve ' + esc(f.evidence_level) + ' · <span class="muted">' + esc(f.detector) + ' v' + esc(f.detector_version) + '</span></span>'
+                + '</div>'
+                + '<p style="margin:.35rem 0; font-size:.9rem">' + esc(f.description) + region(f.source_region) + region(f.target_region) + '</p>'
+                + tr
+                + (lim ? '<details style="font-size:.78rem"><summary class="muted" style="cursor:pointer">Limites</summary><ul style="margin:.3rem 0 0">' + lim + '</ul></details>' : '')
+                + '<div style="margin-top:.4rem">' + reviewed + '</div>'
+                + '</div>';
+        }
+
+        function render(d) {
+            current = d;
+            var badge = '<span style="font-weight:700; color:' + triageColor(d.triage_max) + '">' + esc(d.triage_max) + '</span>';
+            var a = d.asset || {};
+            var findings = (d.findings || []).map(renderFinding).join('') || '<p class="muted">Aucun indice technique détecté. L\'absence de détection ne prouve pas l\'intégrité de l\'image.</p>';
+            resultsEl.innerHTML = '<section class="side-block">'
+                + '<h2 style="margin:0 0 .3rem">Résultat — priorité ' + badge + '</h2>'
+                + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(a.filename) + ' · ' + (a.width || '?') + '×' + (a.height || '?') + ' · sha256 ' + esc((a.sha256 || '').slice(0, 12)) + '…</p>'
+                + (d.summary ? '<p style="margin:.4rem 0">' + esc(d.summary) + '</p>' : '')
+                + findings
+                + '</section>';
+            resultsEl.hidden = false;
+        }
+
+        resultsEl.addEventListener('click', function (e) {
+            var b = e.target.closest('.ft-review');
+            if (!b || !current) return;
+            var fid = b.getAttribute('data-fid');
+            var st = b.getAttribute('data-st');
+            var rationale = prompt('Justification (facultative) pour « ' + st + ' » :', '') || '';
+            fetch(BASE + 'findings/' + encodeURIComponent(fid) + '/review', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: st, rationale: rationale })
+            }).then(function (r) { return r.json(); }).then(function () {
+                // Recharge l'analyse pour refléter la décision.
+                return fetch(BASE + 'analyses/' + current.id, { cache: 'no-store' }).then(function (r) { return r.json(); }).then(render);
+            }).catch(function () {});
+        });
+
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+            var file = fileEl.files[0];
+            if (!file) return;
+            resultsEl.hidden = true; resultsEl.innerHTML = ''; submit.disabled = true;
+            setStatus('Analyse en cours…');
+            var qs = 'filename=' + encodeURIComponent(file.name) + '&title=' + encodeURIComponent(titleEl.value.trim());
+            fetch(BASE + 'analyses?' + qs, {
+                method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file, cache: 'no-store'
+            })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    submit.disabled = false;
+                    if (!res.ok) { setStatus('Erreur : ' + (res.d.detail || res.d.error || 'analyse impossible')); return; }
+                    setStatus('Terminé.'); render(res.d);
+                })
+                .catch(function () { setStatus('Erreur réseau.'); submit.disabled = false; });
+        });
+    })();
+    </script>
+{% endblock %}
