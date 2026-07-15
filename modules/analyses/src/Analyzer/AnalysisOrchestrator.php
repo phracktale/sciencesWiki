@@ -49,6 +49,16 @@ final class AnalysisOrchestrator
             throw new PublicationNotFound(\sprintf('Publication introuvable : %s', $documentRef));
         }
 
+        // Résumé seul : on bloque (le texte intégral est requis pour une évaluation fiable).
+        $stored = $pub['fulltext_stored'] ?? false;
+        if (true !== $stored && 1 !== $stored && !\in_array((string) $stored, ['1', 't', 'true'], true)) {
+            throw new AbstractOnlyException([
+                'id' => $pub['id'] ?? null,
+                'title' => $pub['title'] ?? null,
+                'doi' => $pub['doi'] ?? null,
+            ]);
+        }
+
         $override = null !== $designOverride && null !== StudyDesign::tryFrom($designOverride) ? $designOverride : null;
         $treePath = $this->corpus->treePath((int) $pub['id']);
 

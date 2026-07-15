@@ -71,6 +71,11 @@ final class MeAxisController
             return new JsonResponse(['status' => 'not_found', 'error' => 'Étude introuvable dans le corpus.'], 404);
         }
 
+        // Résumé seul : on bloque et on invite à déposer le PDF (texte intégral requis).
+        if (!$publication->isFulltextStored()) {
+            return \App\Analysis\AbstractOnlyGuard::response($publication);
+        }
+
         // Ré-évaluation forcée : on purge l'évaluation existante AVANT de dispatcher, pour
         // que le polling reparte en « pending » (sinon l'ancien résultat serait renvoyé).
         if ($force) {

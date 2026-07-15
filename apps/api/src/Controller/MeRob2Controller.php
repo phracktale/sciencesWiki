@@ -64,6 +64,11 @@ final class MeRob2Controller
             return new JsonResponse(['status' => 'not_found', 'error' => 'Étude introuvable dans le corpus.'], 404);
         }
 
+        // Résumé seul : on bloque et on invite à déposer le PDF (texte intégral requis).
+        if (!$publication->isFulltextStored()) {
+            return \App\Analysis\AbstractOnlyGuard::response($publication);
+        }
+
         $existing = $this->appraisals->findForPublication($publication);
         if (null !== $existing) {
             return new JsonResponse($this->ready($publication, $existing));

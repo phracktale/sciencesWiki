@@ -61,6 +61,15 @@ final class AnalysisController extends AbstractController
             $assessment = $this->orchestrator->queue($ref, $designOverride ?: null, $requestedBy);
         } catch (PublicationNotFound $e) {
             return new JsonResponse(['error' => $e->getMessage()], 404);
+        } catch (\Analyses\Analyzer\AbstractOnlyException $e) {
+            $pub = $e->publication();
+            $doi = \is_string($pub['doi'] ?? null) ? (string) $pub['doi'] : null;
+            return new JsonResponse([
+                'status' => 'abstract_only',
+                'error' => "Seul le résumé de cette étude est disponible. Une évaluation fiable exige le texte intégral : "
+                    ."récupérez le PDF via son DOI".($doi ? " (https://doi.org/$doi)" : '')." et déposez-le dans « Analyses » (/fr/analyses).",
+                'publication' => $pub,
+            ], 422);
         }
 
         return new JsonResponse([

@@ -210,6 +210,7 @@ final class WikiController extends AbstractController
         $candidates = null;
         $toolStates = [];
         $privateStudy = null;
+        $abstractOnly = null;
         $query = trim((string) $request->request->get('query', ''));
         $doi = trim((string) $request->request->get('doi', ''));
         $id = (int) $request->request->get('id', 0);
@@ -224,17 +225,17 @@ final class WikiController extends AbstractController
                 $error = 'Jeton de sécurité invalide.';
             } elseif ($id > 0) {
                 // Étude déposée (privée) évaluée par son id.
-                $this->triggerAppraisalById($id, $tool, $result, $pending, $error, $force);
+                $this->triggerAppraisalById($id, $tool, $result, $pending, $error, $abstractOnly, $force);
                 if ('1' === $request->request->get('private')) {
                     $privateStudy = ['id' => $id];
                 }
             } elseif ('' !== $doi) {
                 // Clic sur un résultat (ou DOI fourni) → mise en file / résultat caché.
-                $this->triggerAppraisal($doi, $tool, $result, $pending, $error, $force);
+                $this->triggerAppraisal($doi, $tool, $result, $pending, $error, $abstractOnly, $force);
             } elseif ('' !== $query) {
                 if (1 === preg_match('#10\.\d{4,9}/\S+#', $query, $m)) {
                     // L'utilisateur a collé un DOI : on évalue directement.
-                    $this->triggerAppraisal($m[0], $tool, $result, $pending, $error);
+                    $this->triggerAppraisal($m[0], $tool, $result, $pending, $error, $abstractOnly);
                 } else {
                     $this->searchCandidates($query, $candidates, $toolStates, $error);
                 }
@@ -251,7 +252,7 @@ final class WikiController extends AbstractController
         return $this->render('wiki/axis_tool.html.twig', [
             'result' => $result, 'pending' => $pending, 'error' => $error,
             'candidates' => $candidates, 'toolStates' => $toolStates, 'query' => $query,
-            'privateStudy' => $privateStudy,
+            'privateStudy' => $privateStudy, 'abstractOnly' => $abstractOnly,
         ]);
     }
 
@@ -314,7 +315,7 @@ final class WikiController extends AbstractController
             'result' => $result, 'pending' => $pending, 'error' => $error,
             'candidates' => null, 'toolStates' => [], 'query' => '',
             // Étude privée → proposer l'ajout au corpus (sauf si déjà dans le corpus).
-            'privateStudy' => $inCorpus ? null : ['id' => $pubId],
+            'privateStudy' => $inCorpus ? null : ['id' => $pubId], 'abstractOnly' => null,
         ]);
     }
 
@@ -384,7 +385,7 @@ final class WikiController extends AbstractController
         }
     }
 
-    private function triggerAppraisal(string $doi, string $tool, ?array &$result, ?array &$pending, ?string &$error, bool $force = false): void
+    private function triggerAppraisal(string $doi, string $tool, ?array &$result, ?array &$pending, ?string &$error, ?array &$abstractOnly = null, bool $force = false): void
     {
         $path = \in_array($tool, ['rob2', 'amstar2', 'mmat'], true) ? '/api/me/'.$tool : '/api/me/axis';
         $res = $this->user->send('POST', $path.($force ? '?force=1' : ''), ['doi' => $doi]);
@@ -395,6 +396,9 @@ final class WikiController extends AbstractController
                 break;
             case 'pending':
                 $pending = ['doi' => $doi, 'tool' => $tool, 'publication' => $data['publication'] ?? null];
+                break;
+            case 'abstract_only':
+                $abstractOnly = ['tool' => $tool, 'message' => $data['message'] ?? null, 'publication' => $data['publication'] ?? []];
                 break;
             case 'not_found':
                 $error = 'Cette étude (DOI '.$doi.') n’est pas présente dans le corpus.';
@@ -410,7 +414,7 @@ final class WikiController extends AbstractController
      * @param array<string,mixed>|null $result
      * @param array<string,mixed>|null $pending
      */
-    private function triggerAppraisalById(int $id, string $tool, ?array &$result, ?array &$pending, ?string &$error, bool $force = false): void
+    private function triggerAppraisalById(int $id, string $tool, ?array &$result, ?array &$pending, ?string &$error, ?array &$abstractOnly = null, bool $force = false): void
     {
         $path = '/api/me/'.(\in_array($tool, ['rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis').'/'.$id;
         $res = $this->user->send('POST', $path.($force ? '?force=1' : ''));
@@ -421,6 +425,9 @@ final class WikiController extends AbstractController
                 break;
             case 'pending':
                 $pending = ['id' => $id, 'doi' => '', 'tool' => $tool, 'publication' => $data['publication'] ?? null];
+                break;
+            case 'abstract_only':
+                $abstractOnly = ['tool' => $tool, 'message' => $data['message'] ?? null, 'publication' => $data['publication'] ?? []];
                 break;
             case 'not_found':
                 $error = 'Étude introuvable.';

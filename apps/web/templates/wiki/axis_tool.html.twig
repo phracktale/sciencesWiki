@@ -18,6 +18,39 @@
 
     {% if error %}<p class="badge warn" style="margin-top:1rem">{{ error }}</p>{% endif %}
 
+    {% if abstractOnly %}
+        {% set p = abstractOnly.publication %}
+        <section class="card" style="margin-top:1rem; border-left:4px solid #d97706; max-width:720px">
+            <h2 style="margin:.1rem 0; font-size:1.05rem">⚠️ Seul le résumé de cette étude est disponible</h2>
+            <p style="margin:.3rem 0">{{ abstractOnly.message|default("Une évaluation méthodologique fiable nécessite le texte intégral. Récupérez le PDF de l’étude (via son DOI) et déposez-le ci-dessous pour lancer l’analyse.") }}</p>
+            {% if p.title %}<p style="margin:.3rem 0"><strong>{{ p.title }}</strong>{% if p.year %} · {{ p.year }}{% endif %}{% if p.venue %} · {{ p.venue }}{% endif %}</p>{% endif %}
+            <p style="margin:.3rem 0; font-size:.9rem">
+                {% if p.doi %}🔗 <a href="https://doi.org/{{ p.doi }}" target="_blank" rel="noopener">Ouvrir l’étude (DOI {{ p.doi }})</a> pour récupérer le PDF.{% endif %}
+                {% if p.oaUrl %} · <a href="{{ p.oaUrl }}" target="_blank" rel="noopener">Version en accès ouvert</a>{% elseif p.landingPageUrl %} · <a href="{{ p.landingPageUrl }}" target="_blank" rel="noopener">Page de l’éditeur</a>{% endif %}
+            </p>
+            <form method="post" action="{{ path('axis_deposit') }}" enctype="multipart/form-data" data-turbo="false" style="margin-top:.6rem; display:grid; gap:.55rem">
+                <input type="hidden" name="_csrf" value="{{ admin_csrf.token }}">
+                <div><label>Titre de l’étude *</label><input type="text" name="title" required value="{{ p.title }}"></div>
+                <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+                    <div style="flex:1; min-width:180px"><label>DOI</label><input type="text" name="doi" value="{{ p.doi }}"></div>
+                    <div style="width:110px"><label>Année</label><input type="text" name="year" inputmode="numeric" pattern="[0-9]{4}" value="{{ p.year }}"></div>
+                </div>
+                <div><label>Revue</label><input type="text" name="venue" value="{{ p.venue }}"></div>
+                <div><label>Résumé</label><textarea name="abstract" rows="3">{{ p.abstract }}</textarea></div>
+                <div><label>Outil d’évaluation</label>
+                    <select name="tool">
+                        <option value="axis"{{ abstractOnly.tool == 'axis' ? ' selected' : '' }}>AXIS (étude transversale)</option>
+                        <option value="rob2"{{ abstractOnly.tool == 'rob2' ? ' selected' : '' }}>RoB 2 (essai randomisé)</option>
+                        <option value="amstar2"{{ abstractOnly.tool == 'amstar2' ? ' selected' : '' }}>AMSTAR-2 (revue systématique)</option>
+                        <option value="mmat"{{ abstractOnly.tool == 'mmat' ? ' selected' : '' }}>MMAT (étude empirique / mixte)</option>
+                    </select>
+                </div>
+                <div><label>PDF de l’étude * <span class="muted">(avec couche texte — pas un scan image)</span></label><input type="file" name="pdf" accept="application/pdf,.pdf" required></div>
+                <button type="submit">Déposer le PDF et lancer l’analyse</button>
+            </form>
+        </section>
+    {% endif %}
+
     <details style="margin-top:1rem; max-width:660px"{% if error %} open{% endif %}>
         <summary style="cursor:pointer; color:var(--accent); font-weight:600">📎 L'étude n'est pas dans le corpus ? Déposez son PDF pour l'évaluer</summary>
         <form method="post" action="{{ path('axis_deposit') }}" enctype="multipart/form-data" data-turbo="false" class="card" style="margin-top:.6rem; display:grid; gap:.55rem">
