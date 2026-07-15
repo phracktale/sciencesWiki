@@ -53,6 +53,18 @@
             return ' <span class="muted" style="font-size:.72rem">[x' + r.x + ' y' + r.y + ' ' + r.width + '×' + r.height + ']</span>';
         }
 
+        // Palette IDENTIQUE au calque serveur (overlay.py) : 1 couleur par duplication localisée.
+        var PALETTE = [[220,38,38],[37,99,235],[22,163,74],[217,119,6],[147,51,234],[8,145,178],[219,39,119],[202,138,4]];
+        function rgb(c) { return 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')'; }
+        function assignDupColors(findings) {
+            var i = 0;
+            (findings || []).forEach(function (f) {
+                if (f.source_region && f.target_region) { f._dup = PALETTE[i % PALETTE.length]; f._dupN = ++i; }
+                else { f._dup = null; }
+            });
+            return i; // nombre de duplications localisées
+        }
+
         function renderFinding(f) {
             var lim = (f.limitations || []).map(function (l) { return '<li>' + esc(l) + '</li>'; }).join('');
             var tr = '';
@@ -69,9 +81,12 @@
                         var p = o.split(':');
                         return '<button type="button" class="ft-review" data-fid="' + esc(f.id) + '" data-st="' + p[0] + '" style="font:inherit; font-size:.7rem; cursor:pointer; border:1px solid var(--line); background:#fff; border-radius:5px; padding:.1rem .35rem">' + p[1] + '</button>';
                     }).join('') + '</span>';
+            var swatch = f._dup
+                ? '<span title="Zone ' + f._dupN + ' encadrée sur l\'image" style="display:inline-block; width:11px; height:11px; border-radius:2px; background:' + rgb(f._dup) + '; vertical-align:middle; margin-right:.3rem"></span>zone ' + f._dupN + ' · '
+                : '';
             return '<div style="border:1px solid var(--line); border-radius:8px; padding:.6rem; margin:.5rem 0">'
                 + '<div style="display:flex; justify-content:space-between; gap:.5rem; flex-wrap:wrap; align-items:baseline">'
-                + '<strong>' + esc(f.anomaly_type) + '</strong>'
+                + '<strong>' + swatch + esc(f.anomaly_type) + '</strong>'
                 + '<span style="font-size:.72rem">' + tbadge(f.triage_level) + ' · preuve ' + esc(f.evidence_level) + ' · <span class="muted">' + esc(f.detector) + ' v' + esc(f.detector_version) + '</span></span>'
                 + '</div>'
                 + '<p style="margin:.35rem 0; font-size:.9rem">' + esc(f.description) + region(f.source_region) + region(f.target_region) + '</p>'
@@ -84,10 +99,15 @@
         function render(d) {
             current = { kind: 'analysis', id: d.id };
             var a = d.asset || {};
+            var nDup = assignDupColors(d.findings);
             var findings = (d.findings || []).map(renderFinding).join('') || '<p class="muted">Aucun indice technique détecté. L\'absence de détection ne prouve pas l\'intégrité de l\'image.</p>';
+            var overlay = nDup
+                ? '<div style="margin:.4rem 0"><img src="' + BASE + 'analyses/' + encodeURIComponent(d.id) + '/overlay.png" alt="zones dupliquées encadrées" style="max-width:100%; border:1px solid var(--line); border-radius:6px"><p class="muted" style="font-size:.72rem; margin:.2rem 0">' + nDup + ' duplication(s) localisée(s) : chaque paire de zones est encadrée d\'une couleur distincte.</p></div>'
+                : '';
             resultsEl.innerHTML = '<section class="side-block">'
                 + '<h2 style="margin:0 0 .3rem">Résultat — priorité ' + tbadge(d.triage_max) + '</h2>'
                 + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(a.filename) + ' · ' + (a.width || '?') + '×' + (a.height || '?') + '</p>'
+                + overlay
                 + '<div style="display:flex; gap:.4rem; flex-wrap:wrap; margin:.4rem 0">'
                 + '<a class="btn" href="' + BASE + 'analyses/' + encodeURIComponent(d.id) + '/report.pdf" target="_blank" rel="noopener">📄 Rapport PDF</a>'
                 + (a.id ? '<button type="button" class="ft-similar" data-aid="' + esc(a.id) + '">🔎 Réutilisations corpus</button>' : '')
@@ -110,7 +130,10 @@
             }
             head += '</section>';
             var cards = d.figures.map(function (fig) {
-                var img = BASE + 'assets/' + encodeURIComponent(fig.asset_id) + '/image';
+                var nDup = assignDupColors(fig.findings);
+                var img = (nDup && fig.analysis_id)
+                    ? BASE + 'analyses/' + encodeURIComponent(fig.analysis_id) + '/overlay.png'
+                    : BASE + 'assets/' + encodeURIComponent(fig.asset_id) + '/image';
                 var findings = (fig.findings || []).map(renderFinding).join('');
                 var count = (fig.findings || []).length;
                 return '<section class="side-block" style="margin-top:.8rem">'

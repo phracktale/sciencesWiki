@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import detectors, extract, report, storage
+from . import detectors, extract, overlay, report, storage
 from .auth import require_analyst
 from .config import MAX_UPLOAD_BYTES, NEAR_DUP_HAMMING
 from .db import get_db
@@ -204,6 +204,29 @@ def asset_image(asset_id: str, request: Request, db: Session = Depends(get_db)) 
         raise HTTPException(status_code=404, detail="Fichier absent.")
     with open(path, "rb") as fh:
         return Response(content=fh.read(), media_type=asset.mime or "application/octet-stream")
+
+
+@app.get("/analyses/{analysis_id}/overlay.png")
+def analysis_overlay(analysis_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
+    """Image annotée : zones dupliquées encadrées (1 couleur par duplication distincte)."""
+    require_analyst(request)
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    asset = db.get(Asset, analysis.asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Image introuvable.")
+    path = storage.path_for(asset.sha256)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Fichier absent.")
+    findings = [
+        _serialize_finding(f)
+        for f in db.execute(
+            select(Finding).where(Finding.analysis_id == analysis.id).order_by(Finding.triage_level.desc())
+        ).scalars()
+    ]
+    png = overlay.render_overlay(path, findings)
+    return Response(content=png, media_type="image/png")
 
 
 # ---------------------------------------------------------------------------
