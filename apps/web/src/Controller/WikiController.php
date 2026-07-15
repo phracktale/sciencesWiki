@@ -277,6 +277,16 @@ final class WikiController extends AbstractController
 
             return $this->redirectToRoute('axis_tool', ['_locale' => 'fr']);
         }
+        // Upload rejeté par PHP (trop volumineux…) : tmp_name vide → ne PAS construire le
+        // multipart (sinon « Path must not be empty »). Message explicite à la place.
+        if (!$file->isValid() || '' === (string) $file->getPathname()) {
+            $tooBig = \in_array($file->getError(), [\UPLOAD_ERR_INI_SIZE, \UPLOAD_ERR_FORM_SIZE], true);
+            $this->addFlash('error', $tooBig
+                ? 'Le PDF est trop volumineux (limite 40 Mo).'
+                : 'Le fichier n’a pas pu être reçu. Réessayez.');
+
+            return $this->redirectToRoute('axis_tool', ['_locale' => 'fr']);
+        }
         $tool = $request->request->get('tool', 'axis');
         $tool = \in_array($tool, ['axis', 'rob2', 'amstar2', 'mmat'], true) ? $tool : 'axis';
 
