@@ -12,7 +12,9 @@ import imagehash
 import numpy as np
 from PIL import Image
 
-DETECTOR_VERSION = "0.1.0"
+from . import segment
+
+DETECTOR_VERSION = "0.2.0"
 
 
 # ---------------------------------------------------------------------------
@@ -165,6 +167,126 @@ def copy_move_findings(path: str) -> list[dict]:
             "limitations": [
                 "Les textures biologiques répétitives (cellules, bandes) peuvent produire des appariements naturels.",
                 "Résultat à confirmer visuellement (régions source/cible côte à côte).",
+            ],
+        }
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Duplication de panneaux (segmentation + comparaison par paire, transforms discrètes)
+# ---------------------------------------------------------------------------
+_PANEL_TRANSFORMS = {
+    "none": lambda a: a,
+    "miroir horizontal": np.fliplr,
+    "miroir vertical": np.flipud,
+    "rotation 180°": lambda a: np.rot90(a, 2),
+}
+
+
+def panel_duplication_findings(path: str, threshold: int = 8, max_findings: int = 8) -> list[dict]:
+    gray = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    if gray is None:
+        return []
+    panels = segment.segment_panels(gray)
+    if len(panels) < 2:
+        return []
+
+    infos: list[dict | None] = []
+    for (x, y, w, h) in panels:
+        crop = gray[y : y + h, x : x + w]
+        # Ignore les panneaux quasi-uniformes (fond, aplat) : hachage non discriminant.
+        if crop.size == 0 or float(crop.std()) < 8.0:
+            infos.append(None)
+            continue
+        infos.append(
+            {
+                "box": {"x": int(x), "y": int(y), "width": int(w), "height": int(h)},
+                "base": imagehash.phash(Image.fromarray(crop)),
+                "variants": {name: imagehash.phash(Image.fromarray(fn(crop))) for name, fn in _PANEL_TRANSFORMS.items()},
+            }
+        )
+
+    findings: list[dict] = []
+    n = len(panels)
+    for i in range(n):
+        if infos[i] is None:
+            continue
+        for j in range(i + 1, n):
+            if infos[j] is None:
+                continue
+            best_name, best_d = "none", 999
+            for name, ph in infos[i]["variants"].items():
+                d = ph - infos[j]["base"]
+                if d < best_d:
+                    best_d, best_name = d, name
+            if best_d > threshold:
+                continue
+            transform = "" if best_name == "none" else f" après {best_name}"
+            findings.append(
+                {
+                    "detector": "panel_duplication",
+                    "anomaly_type": "panel_duplication",
+                    "evidence_level": "E3" if best_d <= 4 else "E2",
+                    "triage_level": "T2",
+                    "raw_score": 1.0 - best_d / 64.0,
+                    "calibrated_score": 1.0 - best_d / 64.0,
+                    "source_region": infos[i]["box"],
+                    "target_region": infos[j]["box"],
+                    "estimated_transform": None if best_name == "none" else {"type": best_name},
+                    "description": (
+                        f"Deux panneaux de la figure présentent une forte similarité{transform} "
+                        f"(distance de Hamming {best_d}/64) : réutilisation possible d'un panneau, à examiner."
+                    ),
+                    "limitations": [
+                        "Des panneaux de contrôle légitimement identiques peuvent être signalés.",
+                        "Segmentation automatique : vérifier le découpage des panneaux.",
+                    ],
+                }
+            )
+            if len(findings) >= max_findings:
+                return findings
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# Splicing / incohérence de bruit (indice FAIBLE — SPECS §16.3)
+# ---------------------------------------------------------------------------
+def splice_findings(path: str) -> list[dict]:
+    gray = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    if gray is None:
+        return []
+    h, w = gray.shape
+    gy = gx = 6
+    ch, cw = h // gy, w // gx
+    if ch < 8 or cw < 8:
+        return []
+
+    # Résidu de bruit = image - médiane locale ; on mesure sa dispersion par cellule.
+    resid = cv2.absdiff(gray, cv2.medianBlur(gray, 3)).astype(np.float32)
+    stds = np.array(
+        [float(resid[r * ch : (r + 1) * ch, c * cw : (c + 1) * cw].std()) for r in range(gy) for c in range(gx)]
+    )
+    med = float(np.median(stds))
+    mx = float(stds.max())
+    if med <= 0.5 or mx / max(med, 1e-6) < 3.5:
+        return []
+
+    return [
+        {
+            "detector": "noise_inconsistency",
+            "anomaly_type": "local_noise_inconsistency",
+            "evidence_level": "E1",
+            "triage_level": "T1",
+            "raw_score": round(min(1.0, (mx / max(med, 1e-6)) / 8.0), 3),
+            "calibrated_score": round(min(1.0, (mx / max(med, 1e-6)) / 8.0), 3),
+            "description": (
+                "Le niveau de bruit local varie fortement entre régions de l'image "
+                f"(rapport {mx / max(med, 1e-6):.1f}×) : incohérence compatible avec un raccord, "
+                "un collage ou un nettoyage local. Indice FAIBLE."
+            ),
+            "limitations": [
+                "La compression PDF, un fond uni ou une zone saturée expliquent souvent cet écart.",
+                "Indice faible : ne constitue jamais seul une alerte prioritaire (SPECS §16.3).",
             ],
         }
     ]

@@ -39,7 +39,13 @@ def root(_: object = Depends(require_analyst)) -> dict:
     return {
         "module": "figtrack",
         "version": detectors.DETECTOR_VERSION,
-        "detectors": ["perceptual_hash", "copy_move_keypoint", "contrast_clipping"],
+        "detectors": [
+            "perceptual_hash",
+            "panel_duplication",
+            "copy_move_keypoint",
+            "noise_inconsistency",
+            "contrast_clipping",
+        ],
         "inputs": ["image", "pdf"],
         "note": "Indices techniques neutres, human-in-the-loop. Aucune conclusion de fraude.",
     }
@@ -291,7 +297,9 @@ def _analyze_asset(
 
     raw: list[dict] = []
     raw += detectors.near_duplicate_findings(phash, candidates, NEAR_DUP_HAMMING)
+    raw += detectors.panel_duplication_findings(path)
     raw += detectors.copy_move_findings(path)
+    raw += detectors.splice_findings(path)
     raw += detectors.contrast_findings(path)
 
     analysis = Analysis(asset_id=asset.id, title=title, doi=doi, status="completed", requested_by=username)
