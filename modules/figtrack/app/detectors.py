@@ -41,6 +41,16 @@ def hamming(h1: str | None, h2: str | None) -> int | None:
         return None
 
 
+def best_distance(a: dict, b: dict) -> int | None:
+    """Distance perceptuelle la plus favorable entre deux empreintes (min pHash / dHash)."""
+    ds = [
+        d
+        for d in (hamming(a.get("phash"), b.get("phash")), hamming(a.get("dhash"), b.get("dhash")))
+        if d is not None
+    ]
+    return min(ds) if ds else None
+
+
 def near_duplicate_findings(phash: str, candidates: list[dict], threshold: int) -> list[dict]:
     """Compare l'empreinte à un corpus d'assets existants (id, phash, filename)."""
     out: list[dict] = []

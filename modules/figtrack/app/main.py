@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import detectors, extract, storage
+from . import detectors, extract, report, storage
 from .auth import require_analyst
 from .config import MAX_UPLOAD_BYTES, NEAR_DUP_HAMMING
 from .db import get_db
@@ -204,6 +204,121 @@ def asset_image(asset_id: str, request: Request, db: Session = Depends(get_db)) 
         raise HTTPException(status_code=404, detail="Fichier absent.")
     with open(path, "rb") as fh:
         return Response(content=fh.read(), media_type=asset.mime or "application/octet-stream")
+
+
+# ---------------------------------------------------------------------------
+# Recherche de réutilisation dans le corpus (kNN perceptuel)
+# ---------------------------------------------------------------------------
+@app.get("/assets/{asset_id}/similar")
+def similar_assets(asset_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    require_analyst(request)
+    asset = db.get(Asset, asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Asset introuvable.")
+    k = _clamp_int(request.query_params.get("k"), default=10, lo=1, hi=50)
+    ref = {"phash": asset.phash, "dhash": asset.dhash}
+    return {"items": _rank_corpus(db, ref, k, exclude_sha=asset.sha256, exclude_id=asset.id)}
+
+
+@app.post("/corpus/search")
+async def corpus_search(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Recherche les figures du corpus les plus proches d'une IMAGE transmise en corps brut."""
+    require_analyst(request)
+    data = await _read_body(request)
+    sha = storage.save_bytes(data)
+    pil = _load_or_422(storage.path_for(sha))
+    hashes = detectors.perceptual_hashes(pil)
+    k = _clamp_int(request.query_params.get("k"), default=10, lo=1, hi=50)
+    return {"items": _rank_corpus(db, hashes, k, exclude_sha=sha, exclude_id=None)}
+
+
+def _rank_corpus(db: Session, ref: dict, k: int, exclude_sha: str, exclude_id: str | None) -> list[dict]:
+    ranked: list[tuple[int, Asset]] = []
+    for a in db.execute(select(Asset).where(Asset.sha256 != exclude_sha)).scalars():
+        if exclude_id is not None and a.id == exclude_id:
+            continue
+        dist = detectors.best_distance(ref, {"phash": a.phash, "dhash": a.dhash})
+        if dist is not None:
+            ranked.append((dist, a))
+    ranked.sort(key=lambda t: t[0])
+    return [
+        {
+            "asset_id": a.id,
+            "document_id": a.document_id,
+            "filename": a.filename,
+            "page": a.page,
+            "figure_index": a.figure_index,
+            "distance": dist,
+            "close": dist <= NEAR_DUP_HAMMING,
+        }
+        for dist, a in ranked[:k]
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Rapport PDF « dossier de preuve »
+# ---------------------------------------------------------------------------
+@app.get("/documents/{document_id}/report.pdf")
+def document_report(document_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
+    require_analyst(request)
+    doc = db.get(Document, document_id)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="Document introuvable.")
+    data = _serialize_document(db, doc)
+    header = {
+        "kind": "document (PDF)",
+        "title": data["title"],
+        "filename": data["filename"],
+        "triage_max": data["triage_max"],
+        "figure_count": data["figure_count"],
+        "created_at": data["created_at"],
+    }
+    pdf = report.build_report(header, data["figures"], doc.sha256)
+    return _pdf_response(pdf, f"figtrack-{doc.id}.pdf")
+
+
+@app.get("/analyses/{analysis_id}/report.pdf")
+def analysis_report(analysis_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
+    require_analyst(request)
+    analysis = db.get(Analysis, analysis_id)
+    if analysis is None:
+        raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    asset = db.get(Asset, analysis.asset_id)
+    data = _serialize_analysis(db, analysis, asset)
+    header = {
+        "kind": "image",
+        "title": data["title"],
+        "filename": (asset.filename if asset else None),
+        "triage_max": data["triage_max"],
+        "figure_count": 1,
+        "created_at": data["created_at"],
+    }
+    figure = {
+        "sha256": asset.sha256 if asset else None,
+        "filename": asset.filename if asset else None,
+        "page": None,
+        "figure_index": 1,
+        "triage_max": data["triage_max"],
+        "summary": data["summary"],
+        "findings": data["findings"],
+    }
+    pdf = report.build_report(header, [figure], asset.sha256 if asset else "")
+    return _pdf_response(pdf, f"figtrack-{analysis.id}.pdf")
+
+
+def _pdf_response(pdf_bytes: bytes, filename: str) -> Response:
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
+    )
+
+
+def _clamp_int(value: str | None, default: int, lo: int, hi: int) -> int:
+    try:
+        return max(lo, min(hi, int(value)))
+    except (TypeError, ValueError):
+        return default
 
 
 # ---------------------------------------------------------------------------
@@ -425,6 +540,7 @@ def _serialize_document(db: Session, doc: Document) -> dict:
         figures.append(
             {
                 "asset_id": a.id,
+                "sha256": a.sha256,
                 "page": a.page,
                 "figure_index": a.figure_index,
                 "filename": a.filename,

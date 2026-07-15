@@ -88,6 +88,10 @@
             resultsEl.innerHTML = '<section class="side-block">'
                 + '<h2 style="margin:0 0 .3rem">Résultat — priorité ' + tbadge(d.triage_max) + '</h2>'
                 + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(a.filename) + ' · ' + (a.width || '?') + '×' + (a.height || '?') + '</p>'
+                + '<div style="display:flex; gap:.4rem; flex-wrap:wrap; margin:.4rem 0">'
+                + '<a class="btn" href="' + BASE + 'analyses/' + encodeURIComponent(d.id) + '/report.pdf" target="_blank" rel="noopener">📄 Rapport PDF</a>'
+                + (a.id ? '<button type="button" class="ft-similar" data-aid="' + esc(a.id) + '">🔎 Réutilisations corpus</button>' : '')
+                + '</div><div class="ft-sim" id="sim-' + esc(a.id) + '"></div>'
                 + (d.summary ? '<p style="margin:.4rem 0">' + esc(d.summary) + '</p>' : '')
                 + findings + '</section>';
             resultsEl.hidden = false;
@@ -97,7 +101,8 @@
             current = { kind: 'document', id: d.id };
             var head = '<section class="side-block">'
                 + '<h2 style="margin:0 0 .3rem">Document — ' + (d.figure_count || 0) + ' figure(s) · priorité ' + tbadge(d.triage_max) + '</h2>'
-                + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(d.title || d.filename) + ' · ' + (d.pages || '?') + ' page(s)</p>';
+                + '<p class="muted" style="font-size:.8rem; margin:.1rem 0">' + esc(d.title || d.filename) + ' · ' + (d.pages || '?') + ' page(s)</p>'
+                + '<div style="margin:.4rem 0"><a class="btn" href="' + BASE + 'documents/' + encodeURIComponent(d.id) + '/report.pdf" target="_blank" rel="noopener">📄 Rapport PDF du dossier</a></div>';
             if (!d.figures || !d.figures.length) {
                 head += '<p class="muted">Aucune figure raster n\'a pu être extraite (PDF vectoriel, scanné, ou protégé). '
                     + 'L\'extraction avancée (rendu de page, OCR) n\'est pas encore disponible.</p></section>';
@@ -115,12 +120,30 @@
                     + '<div style="flex:1; min-width:220px">'
                     + '<div><strong>Figure ' + fig.figure_index + '</strong> <span class="muted" style="font-size:.78rem">p.' + (fig.page || '?') + ' · ' + (fig.width || '?') + '×' + (fig.height || '?') + '</span> · ' + tbadge(fig.triage_max) + '</div>'
                     + (fig.summary ? '<p style="margin:.35rem 0; font-size:.85rem">' + esc(fig.summary) + '</p>' : '')
+                    + '<div style="margin:.25rem 0"><button type="button" class="ft-similar" data-aid="' + esc(fig.asset_id) + '">🔎 Réutilisations corpus</button></div>'
+                    + '<div class="ft-sim" id="sim-' + esc(fig.asset_id) + '"></div>'
                     + '</div></div>'
                     + (count ? findings : '<p class="muted" style="font-size:.82rem; margin:.4rem 0 0">Aucun indice technique sur cette figure.</p>')
                     + '</section>';
             }).join('');
             resultsEl.innerHTML = head + cards;
             resultsEl.hidden = true; resultsEl.hidden = false;
+        }
+
+        function renderSimilar(aid, items) {
+            var el = document.getElementById('sim-' + aid);
+            if (!el) return;
+            if (!items.length) { el.innerHTML = '<p class="muted" style="font-size:.8rem">Aucune image proche dans le corpus.</p>'; return; }
+            el.innerHTML = '<p class="muted" style="font-size:.72rem; margin:.2rem 0">Images les plus proches du corpus (⚠ = sous le seuil de quasi-doublon) :</p>'
+                + '<div style="display:flex; gap:.5rem; flex-wrap:wrap">' + items.map(function (m) {
+                    var img = BASE + 'assets/' + encodeURIComponent(m.asset_id) + '/image';
+                    var col = m.close ? '#d97706' : '#94a3b8';
+                    return '<a href="' + img + '" target="_blank" rel="noopener" style="text-align:center; text-decoration:none">'
+                        + '<img src="' + img + '" style="width:64px; height:64px; object-fit:cover; border:2px solid ' + col + '; border-radius:6px" loading="lazy"><br>'
+                        + '<span style="font-size:.66rem; color:' + col + '">d=' + m.distance + (m.close ? ' ⚠' : '') + '</span>'
+                        + (m.figure_index ? '<br><span class="muted" style="font-size:.62rem">fig' + m.figure_index + (m.page ? ' p' + m.page : '') + '</span>' : '')
+                        + '</a>';
+                }).join('') + '</div>';
         }
 
         function reloadCurrent() {
@@ -131,6 +154,16 @@
         }
 
         resultsEl.addEventListener('click', function (e) {
+            var s = e.target.closest('.ft-similar');
+            if (s) {
+                var aid = s.getAttribute('data-aid');
+                var el = document.getElementById('sim-' + aid);
+                if (el) el.innerHTML = '<p class="muted" style="font-size:.8rem">Recherche dans le corpus…</p>';
+                fetch(BASE + 'assets/' + encodeURIComponent(aid) + '/similar?k=8', { cache: 'no-store' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (d) { renderSimilar(aid, d.items || []); }).catch(function () {});
+                return;
+            }
             var b = e.target.closest('.ft-review');
             if (!b || !current) return;
             var fid = b.getAttribute('data-fid');

@@ -14,3 +14,5 @@ scipy==1.15.1
 PyWavelets==1.8.0
 # Extraction des figures embarquées dans les PDF (AGPL — usage homelab/institutionnel interne).
 PyMuPDF==1.25.1
+# Génération du rapport PDF « dossier de preuve » (pur Python, sans dépendance système).
+fpdf2==2.8.1
