@@ -206,9 +206,9 @@ def copy_move_findings(
         tgt_box = _bbox(dst_in)
         # Rejette les modèles DÉGÉNÉRÉS (régions minuscules) et ceux dont source≈cible
         # (recouvrement fort = pas une vraie duplication distincte).
-        if min(src_box["width"], src_box["height"], tgt_box["width"], tgt_box["height"]) < 30:
+        if min(src_box["width"], src_box["height"], tgt_box["width"], tgt_box["height"]) < min_region:
             continue
-        if _iou(src_box, tgt_box) > 0.4:
+        if _iou(src_box, tgt_box) > max_iou:
             continue
         # Déduplication : ignore un modèle recouvrant fortement une duplication déjà retenue.
         if any(_iou(src_box, f["source_region"]) > 0.5 or _iou(tgt_box, f["target_region"]) > 0.5 for f in findings):
