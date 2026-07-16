@@ -539,7 +539,7 @@ def _analyze_asset(
     raw: list[dict] = []
     raw += detectors.near_duplicate_findings(phash, candidates, NEAR_DUP_HAMMING)
     raw += detectors.panel_duplication_findings(path)
-    raw += detectors.copy_move_findings(path)
+    raw += _copy_move_multi(path)  # essaie plusieurs rehaussements (préréglages)
     raw += detectors.splice_findings(path)
     raw += detectors.contrast_findings(path)
 
@@ -573,6 +573,66 @@ def _analyze_asset(
     analysis.triage_max = triage_max
     analysis.summary = _summary(raw, triage_max)
     return analysis, triage_max
+
+
+def _copy_move_multi(path: str) -> list[dict]:
+    """Copier-déplacer sous CHAQUE préréglage de rehaussement, puis fusion : un filtre peut
+    faire apparaître une duplication invisible sur l'image brute (idée utilisateur)."""
+    collected: list[dict] = []
+    for name, params in enhance.PRESETS.items():
+        try:
+            gray = None if params is None else enhance.process(path, params)
+        except Exception:  # noqa: BLE001
+            continue
+        for f in detectors.copy_move_findings(path, gray_in=gray):
+            f["revealed_by"] = name
+            collected.append(f)
+    return _dedup_copymove(collected)
+
+
+def _dedup_copymove(findings: list[dict]) -> list[dict]:
+    """Fusionne les duplications trouvées sous plusieurs préréglages (mêmes régions) et annote
+    la description avec le(s) filtre(s) l'ayant révélée."""
+    kept: list[dict] = []
+    revealers: list[set] = []
+    for f in sorted(findings, key=lambda x: -(x.get("raw_score") or 0.0)):
+        s, t = f.get("source_region"), f.get("target_region")
+        hit = None
+        if s and t:
+            for i, k in enumerate(kept):
+                ks, kt = k.get("source_region"), k.get("target_region")
+                if ks and kt and (
+                    detectors._iou(s, ks) > 0.5
+                    or detectors._iou(t, kt) > 0.5
+                    or detectors._iou(s, kt) > 0.5
+                    or detectors._iou(t, ks) > 0.5
+                ):
+                    hit = i
+                    break
+        if hit is not None:
+            revealers[hit].add(f.get("revealed_by"))
+        else:
+            kept.append(f)
+            revealers.append({f.get("revealed_by")})
+
+    for k, revs in zip(kept, revealers):
+        enh = sorted(r for r in revs if r and "brute" not in r.lower())
+        if not enh:
+            continue
+        if "Image brute" in revs:
+            k["description"] = (k.get("description") or "") + " Également détecté après rehaussement (" + ", ".join(enh) + ")."
+        else:
+            k["description"] = (
+                (k.get("description") or "")
+                + " Visible SEULEMENT après rehaussement (" + ", ".join(enh) + ") — non détecté sur l'image brute."
+            )
+    return kept
+
+
+@app.get("/presets")
+def presets(request: Request) -> dict:
+    require_analyst(request)
+    return {"presets": enhance.PRESETS}
 
 
 def _summary(findings: list[dict], triage_max: str) -> str:

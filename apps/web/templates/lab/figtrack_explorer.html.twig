@@ -25,6 +25,11 @@
         <div style="flex:1; min-width:280px; display:flex; flex-direction:column; gap:.8rem">
             <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.6rem">
                 <legend style="font-weight:600; font-size:.85rem">Réglages d'image</legend>
+                <label style="font-size:.8rem; display:block; margin-bottom:.5rem">Préréglage
+                    <select id="ex-preset" style="width:100%; padding:.3rem; border:1px solid var(--line); border-radius:6px; font:inherit">
+                        <option value="">— personnalisé —</option>
+                    </select>
+                </label>
                 <div id="ex-ctrl-img" style="display:grid; gap:.5rem"></div>
             </fieldset>
             <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.6rem">
@@ -181,7 +186,41 @@
                 .catch(function () { setStatus('Erreur réseau.'); });
         });
 
+        var PRESETS = {};
+        function applyPreset(name) {
+            CTRL.filter(function (c) { return c.g === 'img'; }).forEach(function (c) {
+                var inp = document.querySelector('[data-k="' + c.k + '"]');
+                if (!inp) return;
+                if (inp.type === 'checkbox') inp.checked = !!c.def; else inp.value = c.def;
+            });
+            var params = PRESETS[name];
+            if (params) {
+                Object.keys(params).forEach(function (k) {
+                    var inp = document.querySelector('[data-k="' + k + '"]');
+                    if (!inp) return;
+                    var v = params[k];
+                    if (inp.type === 'checkbox') inp.checked = (v === true || v === '1' || v === 1);
+                    else inp.value = v;
+                });
+            }
+            document.querySelectorAll('#ex-ctrl-img input[type=range]').forEach(function (inp) {
+                var sp = inp.parentElement.querySelector('.ex-val'); if (sp) sp.textContent = inp.value;
+            });
+            refresh();
+        }
+
         buildControls();
+
+        fetch(BASE + 'presets', { cache: 'no-store' })
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                PRESETS = d.presets || {};
+                var sel = document.getElementById('ex-preset');
+                Object.keys(PRESETS).forEach(function (name) {
+                    var o = document.createElement('option'); o.value = name; o.textContent = name; sel.appendChild(o);
+                });
+                sel.addEventListener('change', function () { if (sel.value) applyPreset(sel.value); });
+            }).catch(function () {});
     })();
     </script>
 {% endblock %}

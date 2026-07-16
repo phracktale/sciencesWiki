@@ -13,6 +13,17 @@ import numpy as np
 from PIL import Image
 
 
+# Préréglages de rehaussement essayés lors de l'analyse AUTOMATIQUE (et proposés dans
+# l'explorateur). « Image brute » (None) = pas de rehaussement (comportement historique).
+# Un filtre qui fait APPARAÎTRE une duplication invisible à l'œil est ainsi exploité d'office.
+PRESETS: dict[str, dict | None] = {
+    "Image brute": None,
+    "Contraste fort / gamma bas": {"contrast": 3.0, "gamma": 0.35},
+    "Égalisation locale (CLAHE)": {"equalize": True, "contrast": 1.3},
+    "Saturation rehaussée": {"channel": "sat", "contrast": 1.8},
+}
+
+
 def _channel(bgr: np.ndarray, ch: str) -> np.ndarray:
     if ch == "r":
         return bgr[:, :, 2]
