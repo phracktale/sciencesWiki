@@ -108,11 +108,26 @@ def _iou(a: dict, b: dict) -> float:
     return inter / union if union > 0 else 0.0
 
 
-def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
-    gray = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+def copy_move_findings(
+    path: str,
+    *,
+    orb_features: int = 5000,
+    desc_dist: int = 32,
+    min_spatial: int = 40,
+    ransac_thresh: float = 5.0,
+    min_inliers: int = 12,
+    max_models: int = 5,
+    mask_text: bool = True,
+    min_region: int = 30,
+    max_iou: float = 0.4,
+    gray_in: np.ndarray | None = None,
+    color_in: np.ndarray | None = None,
+) -> list[dict]:
+    # gray_in : image de travail déjà rehaussée (explorateur) ; sinon on charge depuis le disque.
+    gray = gray_in if gray_in is not None else cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if gray is None:
         return []
-    color = cv2.imread(path, cv2.IMREAD_COLOR)
+    color = color_in if color_in is not None else cv2.imread(path, cv2.IMREAD_COLOR)
     # Réduit les très grandes images (perf + stabilité des appariements).
     h, w = gray.shape[:2]
     scale = 1.0
@@ -122,23 +137,24 @@ def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
         if color is not None:
             color = cv2.resize(color, (gray.shape[1], gray.shape[0]), interpolation=cv2.INTER_AREA)
 
-    # Masque le TEXTE/les traits (libellés, axes) : sinon leurs points d'intérêt répétés
-    # produisent une fausse « duplication » et masquent les vraies (SPECS §11).
-    tmask = textmask.text_mask(color if color is not None else gray)
-
-    orb = cv2.ORB_create(nfeatures=5000)
+    orb = cv2.ORB_create(nfeatures=max(500, orb_features))
     kp, des = orb.detectAndCompute(gray, None)
     if des is None or len(kp) < 20:
         return []
-    keep = [
-        i
-        for i, k in enumerate(kp)
-        if not tmask[min(int(k.pt[1]), tmask.shape[0] - 1), min(int(k.pt[0]), tmask.shape[1] - 1)]
-    ]
-    if len(keep) < 20:
-        return []
-    kp = [kp[i] for i in keep]
-    des = des[keep]
+
+    # Masque le TEXTE/les traits (libellés, axes) : sinon leurs points d'intérêt répétés
+    # produisent une fausse « duplication » et masquent les vraies (SPECS §11).
+    if mask_text:
+        tmask = textmask.text_mask(color if color is not None else gray)
+        keep = [
+            i
+            for i, k in enumerate(kp)
+            if not tmask[min(int(k.pt[1]), tmask.shape[0] - 1), min(int(k.pt[0]), tmask.shape[1] - 1)]
+        ]
+        if len(keep) < 20:
+            return []
+        kp = [kp[i] for i in keep]
+        des = des[keep]
 
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
     knn = matcher.knnMatch(des, des, k=3)  # k=3 pour ignorer l'auto-appariement
@@ -152,12 +168,13 @@ def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
             p1 = kp[m.queryIdx].pt
             p2 = kp[m.trainIdx].pt
             spatial = ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
-            if m.distance <= 32 and spatial >= 40:
+            if m.distance <= desc_dist and spatial >= min_spatial:
                 src_pts.append(p1)
                 dst_pts.append(p2)
             break  # un seul (plus proche non-self) par point
 
-    if len(src_pts) < 12:
+    floor = max(6, min_inliers)
+    if len(src_pts) < floor:
         return []
 
     src = np.float32(src_pts)
@@ -167,12 +184,12 @@ def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
 
     # RANSAC ITÉRATIF : on retire les inliers d'un modèle et on recommence, pour trouver
     # PLUSIEURS duplications distinctes (sinon la plus « propre » masque les autres).
-    for _ in range(max_models):
-        if int(active.sum()) < 12:
+    for _ in range(max(1, max_models)):
+        if int(active.sum()) < floor:
             break
         idx_active = np.where(active)[0]
         matrix, inliers = cv2.estimateAffinePartial2D(
-            src[idx_active], dst[idx_active], method=cv2.RANSAC, ransacReprojThreshold=5.0
+            src[idx_active], dst[idx_active], method=cv2.RANSAC, ransacReprojThreshold=ransac_thresh
         )
         if matrix is None or inliers is None:
             break

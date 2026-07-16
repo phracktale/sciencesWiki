@@ -14,7 +14,7 @@ from fastapi.responses import JSONResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import detectors, extract, overlay, report, storage
+from . import detectors, enhance, extract, overlay, report, storage
 from .auth import require_analyst
 from .config import MAX_UPLOAD_BYTES, NEAR_DUP_HAMMING
 from .db import get_db
@@ -204,6 +204,109 @@ def asset_image(asset_id: str, request: Request, db: Session = Depends(get_db)) 
         raise HTTPException(status_code=404, detail="Fichier absent.")
     with open(path, "rb") as fh:
         return Response(content=fh.read(), media_type=asset.mime or "application/octet-stream")
+
+
+# ---------------------------------------------------------------------------
+# Explorateur interactif : rehaussement d'image + copier-déplacer paramétrable
+# ---------------------------------------------------------------------------
+@app.post("/explore")
+async def explore_upload(request: Request, db: Session = Depends(get_db)) -> dict:
+    """Dépose une image pour l'explorateur (sans lancer d'analyse). Renvoie l'asset + dimensions."""
+    user = require_analyst(request)
+    data = await _read_body(request)
+    sha = storage.save_bytes(data)
+    pil = _load_or_422(storage.path_for(sha))
+    w, h = pil.size
+    hashes = detectors.perceptual_hashes(pil)
+    asset = Asset(
+        sha256=sha,
+        filename=(request.query_params.get("filename") or "image")[:255],
+        mime=(request.headers.get("content-type") or "application/octet-stream")[:64],
+        size=len(data),
+        width=w,
+        height=h,
+        phash=hashes["phash"],
+        dhash=hashes["dhash"],
+        ahash=hashes["ahash"],
+        requested_by=user.username,
+    )
+    db.add(asset)
+    db.commit()
+    return {"asset_id": asset.id, "width": w, "height": h}
+
+
+@app.get("/assets/{asset_id}/processed.png")
+def processed_image(asset_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
+    """Image de travail rehaussée (canal/niveaux/contraste/gamma…) pour l'affichage canvas."""
+    require_analyst(request)
+    path = _asset_path(db, asset_id)
+    gray = enhance.process(path, _adjust_params(request.query_params))
+    return Response(content=enhance.to_png(gray), media_type="image/png")
+
+
+@app.get("/assets/{asset_id}/copymove")
+def explore_copymove(asset_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
+    """Copier-déplacer paramétrable exécuté sur l'image REHAUSSÉE (mêmes réglages que /processed.png)."""
+    require_analyst(request)
+    path = _asset_path(db, asset_id)
+    gray = enhance.process(path, _adjust_params(request.query_params))
+    findings = detectors.copy_move_findings(path, gray_in=gray, **_algo_params(request.query_params))
+    return {"findings": findings, "image": {"width": int(gray.shape[1]), "height": int(gray.shape[0])}}
+
+
+def _asset_path(db: Session, asset_id: str) -> str:
+    asset = db.get(Asset, asset_id)
+    if asset is None:
+        raise HTTPException(status_code=404, detail="Asset introuvable.")
+    path = storage.path_for(asset.sha256)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="Fichier absent.")
+    return path
+
+
+def _adjust_params(qp) -> dict:
+    def num(key: str, default: float) -> float:
+        try:
+            return float(qp.get(key))
+        except (TypeError, ValueError):
+            return default
+
+    return {
+        "channel": qp.get("channel", "lum"),
+        "black": num("black", 0.0),
+        "white": num("white", 255.0),
+        "contrast": num("contrast", 1.0),
+        "brightness": num("brightness", 0.0),
+        "gamma": num("gamma", 1.0),
+        "equalize": str(qp.get("equalize", "0")) in ("1", "true"),
+        "invert": str(qp.get("invert", "0")) in ("1", "true"),
+    }
+
+
+def _algo_params(qp) -> dict:
+    def ival(key: str, default: int) -> int:
+        try:
+            return int(float(qp.get(key)))
+        except (TypeError, ValueError):
+            return default
+
+    def fval(key: str, default: float) -> float:
+        try:
+            return float(qp.get(key))
+        except (TypeError, ValueError):
+            return default
+
+    return {
+        "orb_features": ival("orb", 5000),
+        "desc_dist": ival("desc", 32),
+        "min_spatial": ival("spatial", 40),
+        "ransac_thresh": fval("ransac", 5.0),
+        "min_inliers": ival("inliers", 12),
+        "max_models": ival("models", 5),
+        "mask_text": str(qp.get("mask", "1")) in ("1", "true"),
+        "min_region": ival("minreg", 30),
+        "max_iou": fval("iou", 0.4),
+    }
 
 
 @app.get("/analyses/{analysis_id}/overlay.png")

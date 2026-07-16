@@ -1,0 +1,187 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}figTrack — explorateur interactif{% endblock %}
+
+{% block body %}
+    <p style="margin:.2rem 0"><a href="{{ path('lab_figtrack_ui') }}" class="muted">← figTrack</a></p>
+    <h1>🎛️ Explorateur — zones dupliquées</h1>
+    <p class="muted">Ajustez l'<strong>image</strong> (canal, contraste, niveaux, gamma…) et les
+        <strong>paramètres de détection</strong> : les zones dupliquées se redessinent en direct.
+        Outil exploratoire — les réglages ne « restaurent » aucune donnée, ils aident à voir.</p>
+
+    <section class="side-block" style="margin-top:.6rem">
+        <label>Image à explorer
+            <input type="file" id="ex-file" accept="image/*"
+                   style="width:100%; max-width:420px; padding:.4rem; border:1px solid var(--line); border-radius:8px; background:#fff">
+        </label>
+        <p id="ex-status" class="muted" style="margin:.5rem 0 0" hidden></p>
+    </section>
+
+    <div id="ex-main" hidden style="display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem; align-items:flex-start">
+        <div style="flex:2; min-width:320px">
+            <canvas id="ex-canvas" style="max-width:100%; border:1px solid var(--line); border-radius:6px; background:#fff"></canvas>
+            <div id="ex-findings" style="margin-top:.5rem"></div>
+        </div>
+        <div style="flex:1; min-width:280px; display:flex; flex-direction:column; gap:.8rem">
+            <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.6rem">
+                <legend style="font-weight:600; font-size:.85rem">Réglages d'image</legend>
+                <div id="ex-ctrl-img" style="display:grid; gap:.5rem"></div>
+            </fieldset>
+            <fieldset style="border:1px solid var(--line); border-radius:8px; padding:.6rem">
+                <legend style="font-weight:600; font-size:.85rem">Paramètres de détection</legend>
+                <div id="ex-ctrl-algo" style="display:grid; gap:.5rem"></div>
+            </fieldset>
+            <button type="button" id="ex-reset">Réinitialiser les réglages</button>
+        </div>
+    </div>
+
+    <script nonce="{{ csp_nonce.value }}">
+    (function () {
+        var BASE = "{{ path('lab_figtrack_proxy', {path: 'X'}) }}".replace(/X$/, '');
+        var PALETTE = [[220,38,38],[37,99,235],[22,163,74],[217,119,6],[147,51,234],[8,145,178],[219,39,119],[202,138,4]];
+        function rgb(c){ return 'rgb('+c[0]+','+c[1]+','+c[2]+')'; }
+
+        var CTRL = [
+            {g:'img', k:'channel', label:'Canal', type:'select', opts:[['lum','Luminance'],['r','Rouge'],['g','Vert'],['b','Bleu'],['sat','Saturation'],['hue','Teinte']], def:'lum'},
+            {g:'img', k:'contrast', label:'Contraste', min:0.3, max:3, step:0.05, def:1},
+            {g:'img', k:'brightness', label:'Luminosité', min:-100, max:100, step:1, def:0},
+            {g:'img', k:'gamma', label:'Gamma', min:0.3, max:3, step:0.05, def:1},
+            {g:'img', k:'black', label:'Niveau noir', min:0, max:254, step:1, def:0},
+            {g:'img', k:'white', label:'Niveau blanc', min:1, max:255, step:1, def:255},
+            {g:'img', k:'equalize', label:'Égalisation (CLAHE)', type:'check', def:false},
+            {g:'img', k:'invert', label:'Inverser', type:'check', def:false},
+            {g:'algo', k:'orb', label:'Points ORB', min:1000, max:8000, step:250, def:5000},
+            {g:'algo', k:'desc', label:'Seuil descripteur (↓ strict)', min:16, max:64, step:1, def:32},
+            {g:'algo', k:'spatial', label:'Distance mini source/cible', min:20, max:300, step:5, def:40},
+            {g:'algo', k:'ransac', label:'Tolérance RANSAC (px)', min:2, max:15, step:0.5, def:5},
+            {g:'algo', k:'inliers', label:'Inliers minimum', min:6, max:40, step:1, def:12},
+            {g:'algo', k:'models', label:'Nb duplications max', min:1, max:8, step:1, def:5},
+            {g:'algo', k:'minreg', label:'Taille mini région (px)', min:8, max:80, step:1, def:30},
+            {g:'algo', k:'iou', label:'Rejet recouvrement (IoU)', min:0.1, max:0.8, step:0.05, def:0.4},
+            {g:'algo', k:'mask', label:'Masquer le texte', type:'check', def:true}
+        ];
+
+        var fileEl = document.getElementById('ex-file');
+        var statusEl = document.getElementById('ex-status');
+        var mainEl = document.getElementById('ex-main');
+        var canvas = document.getElementById('ex-canvas');
+        var ctx = canvas.getContext('2d');
+        var findingsEl = document.getElementById('ex-findings');
+        var aid = null, dims = null, timer = null;
+        var procImg = new Image();
+        var lastFindings = [];
+
+        function setStatus(t){ statusEl.hidden = false; statusEl.textContent = t; }
+        function el(html){ var d=document.createElement('div'); d.innerHTML=html; return d.firstElementChild; }
+
+        function buildControls() {
+            ['img','algo'].forEach(function (grp) {
+                var box = document.getElementById(grp==='img' ? 'ex-ctrl-img' : 'ex-ctrl-algo');
+                CTRL.filter(function(c){return c.g===grp;}).forEach(function (c) {
+                    var row;
+                    if (c.type === 'select') {
+                        var opts = c.opts.map(function(o){return '<option value="'+o[0]+'">'+o[1]+'</option>';}).join('');
+                        row = el('<label style="font-size:.8rem">'+c.label+'<select data-k="'+c.k+'" style="width:100%; padding:.3rem; border:1px solid var(--line); border-radius:6px; font:inherit">'+opts+'</select></label>');
+                    } else if (c.type === 'check') {
+                        row = el('<label style="font-size:.82rem; display:flex; gap:.4rem; align-items:center"><input type="checkbox" data-k="'+c.k+'"'+(c.def?' checked':'')+'> '+c.label+'</label>');
+                    } else {
+                        row = el('<label style="font-size:.8rem">'+c.label+' <span class="ex-val" style="color:var(--accent)">'+c.def+'</span><input type="range" data-k="'+c.k+'" min="'+c.min+'" max="'+c.max+'" step="'+c.step+'" value="'+c.def+'" style="width:100%"></label>');
+                    }
+                    box.appendChild(row);
+                });
+            });
+            document.querySelectorAll('[data-k]').forEach(function (inp) {
+                inp.addEventListener('input', function () {
+                    if (inp.type === 'range') { var v = inp.parentElement.querySelector('.ex-val'); if (v) v.textContent = inp.value; }
+                    schedule();
+                });
+            });
+        }
+
+        function collect() {
+            var q = {};
+            document.querySelectorAll('[data-k]').forEach(function (inp) {
+                var k = inp.getAttribute('data-k');
+                q[k] = inp.type === 'checkbox' ? (inp.checked ? '1' : '0') : inp.value;
+            });
+            return q;
+        }
+        function qs(o){ return Object.keys(o).map(function(k){return encodeURIComponent(k)+'='+encodeURIComponent(o[k]);}).join('&'); }
+
+        function schedule(){ if (timer) clearTimeout(timer); timer = setTimeout(refresh, 350); }
+
+        function refresh() {
+            if (!aid) return;
+            var q = qs(collect());
+            procImg.onload = redraw;
+            procImg.src = BASE + 'assets/' + encodeURIComponent(aid) + '/processed.png?' + q;
+            fetch(BASE + 'assets/' + encodeURIComponent(aid) + '/copymove?' + q, { cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (d) { lastFindings = d.findings || []; redraw(); renderFindings(); })
+                .catch(function () {});
+        }
+
+        function redraw() {
+            if (!procImg.width) return;
+            var maxW = 820;
+            var scale = Math.min(1, maxW / procImg.width);
+            canvas.width = Math.round(procImg.width * scale);
+            canvas.height = Math.round(procImg.height * scale);
+            ctx.drawImage(procImg, 0, 0, canvas.width, canvas.height);
+            ctx.lineWidth = Math.max(2, Math.round(canvas.width / 300));
+            ctx.font = 'bold 13px sans-serif';
+            lastFindings.forEach(function (f, i) {
+                if (!f.source_region || !f.target_region) return;
+                var col = rgb(PALETTE[i % PALETTE.length]);
+                [f.source_region, f.target_region].forEach(function (r) {
+                    ctx.strokeStyle = col;
+                    ctx.strokeRect(r.x * scale, r.y * scale, r.width * scale, r.height * scale);
+                    ctx.fillStyle = col;
+                    ctx.fillRect(r.x * scale, Math.max(0, r.y * scale - 15), 15, 15);
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(String(i + 1), r.x * scale + 3, Math.max(11, r.y * scale - 3));
+                });
+            });
+        }
+
+        function renderFindings() {
+            var loc = lastFindings.filter(function (f) { return f.source_region && f.target_region; });
+            if (!loc.length) { findingsEl.innerHTML = '<p class="muted" style="font-size:.85rem">Aucune zone dupliquée détectée avec ces réglages.</p>'; return; }
+            findingsEl.innerHTML = '<p style="font-size:.85rem; margin:.2rem 0"><strong>' + loc.length + ' duplication(s) localisée(s)</strong></p>'
+                + loc.map(function (f, i) {
+                    var col = rgb(PALETTE[i % PALETTE.length]);
+                    return '<div style="font-size:.78rem; margin:.15rem 0"><span style="display:inline-block; width:11px; height:11px; border-radius:2px; background:' + col + '; vertical-align:middle; margin-right:.3rem"></span>zone ' + (i+1) + ' · ' + (f.estimated_transform && f.estimated_transform.rotation_deg ? 'rot ' + f.estimated_transform.rotation_deg + '° · ' : '') + f.description.replace(/<[^>]*>/g,'').slice(0, 90) + '…</div>';
+                }).join('');
+        }
+
+        document.getElementById('ex-reset').addEventListener('click', function () {
+            document.querySelectorAll('[data-k]').forEach(function (inp) {
+                var c = CTRL.find(function(x){return x.k===inp.getAttribute('data-k');});
+                if (!c) return;
+                if (inp.type === 'checkbox') inp.checked = !!c.def; else inp.value = c.def;
+                if (inp.type === 'range') { var v = inp.parentElement.querySelector('.ex-val'); if (v) v.textContent = c.def; }
+            });
+            refresh();
+        });
+
+        fileEl.addEventListener('change', function () {
+            var file = fileEl.files[0];
+            if (!file) return;
+            setStatus('Envoi de l\'image…');
+            fetch(BASE + 'explore?filename=' + encodeURIComponent(file.name), {
+                method: 'POST', headers: { 'Content-Type': file.type || 'application/octet-stream' }, body: file, cache: 'no-store'
+            })
+                .then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d }; }); })
+                .then(function (res) {
+                    if (!res.ok || !res.d.asset_id) { setStatus('Erreur : ' + (res.d.detail || res.d.error || 'envoi impossible')); return; }
+                    aid = res.d.asset_id; dims = res.d;
+                    statusEl.hidden = true; mainEl.hidden = false;
+                    refresh();
+                })
+                .catch(function () { setStatus('Erreur réseau.'); });
+        });
+
+        buildControls();
+    })();
+    </script>
+{% endblock %}

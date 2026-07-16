@@ -143,6 +143,20 @@ final class LabController extends AbstractController
         return $this->render('lab/figtrack.html.twig');
     }
 
+    /** Explorateur interactif : rehaussement d'image + paramètres de détection sur canvas. */
+    #[Route('/{_locale}/labo/figtrack-explorer', name: 'lab_figtrack_explorer', requirements: ['_locale' => 'fr'], methods: ['GET'])]
+    public function figtrackExplorer(): Response
+    {
+        if (!$this->user->isLogged()) {
+            return $this->redirectToRoute('login', ['back' => '/labo/figtrack-explorer']);
+        }
+        if (!$this->user->hasRole('ROLE_RESEARCHER') && !$this->user->hasRole('ROLE_COMITE')) {
+            throw $this->createAccessDeniedException();
+        }
+
+        return $this->render('lab/figtrack_explorer.html.twig');
+    }
+
     /**
      * Proxy vers le module « figTrack » (standalone Python). Comme le proxy analyses, mais
      * PRÉSERVE le Content-Type entrant (upload multipart d'image) au lieu de forcer JSON.
