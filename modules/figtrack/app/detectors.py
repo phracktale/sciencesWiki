@@ -195,7 +195,7 @@ def copy_move_findings(
             break
         inl = inliers.ravel() == 1
         n_inliers = int(inl.sum())
-        if n_inliers < 12:
+        if n_inliers < min_inliers:
             break
 
         src_in = src[idx_active][inl] / scale
