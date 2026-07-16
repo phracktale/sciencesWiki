@@ -133,7 +133,8 @@ def _render_figure(pdf: _Report, fig: dict) -> None:
     # localisées, sinon l'image telle quelle. Largeur = 3/4 de la largeur utile.
     img = None
     img_h_mm = 0.0
-    img_w_mm = pdf.epw * 0.75
+    # Grande image : ~80 % de la largeur de PAGE (bornée à la largeur utile).
+    img_w_mm = min(pdf.epw, pdf.w * 0.8)
     sha = fig.get("sha256")
     if sha:
         path = storage.path_for(sha)
