@@ -8,12 +8,13 @@ descriptive, jamais accusatoire.
 from __future__ import annotations
 
 import hashlib
+import io
 import os
 
 from fpdf import FPDF
 from PIL import Image
 
-from . import storage
+from . import enhance, overlay, storage
 from .detectors import DETECTOR_VERSION
 
 _TRIAGE_LABEL = {
@@ -87,8 +88,28 @@ def build_report(header: dict, figures: list[dict], source_sha256: str) -> bytes
     for fig in figures:
         _render_figure(pdf, fig)
 
-    # Manifeste de preuve (empreintes).
+    # Filtres de rehaussement essayés (paramètres) — pour reproductibilité (SPECS §4.4). Un
+    # finding « révélé après rehaussement (X) » se lit avec les paramètres du filtre X ci-dessous.
     pdf.add_page()
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.cell(0, 8, "Filtres de rehaussement essayes (parametres)", ln=1)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(90)
+    pdf.multi_cell(0, 4.5, _s(
+        "L'analyse essaie chaque filtre ci-dessous ; une zone dupliquee peut n'apparaitre "
+        "qu'apres rehaussement. Les rectangles du meme numero/couleur relient source et cible."
+    ))
+    pdf.set_text_color(0)
+    pdf.ln(1)
+    for name, params in enhance.PRESETS.items():
+        desc = "aucun (image brute)" if not params else ", ".join(f"{k} = {v}" for k, v in params.items())
+        pdf.set_font("Helvetica", "B", 9)
+        pdf.multi_cell(0, 4.5, _s(f"- {name}"))
+        pdf.set_font("Courier", "", 8)
+        pdf.multi_cell(0, 4.5, _s(f"    {desc}"))
+    pdf.ln(2)
+
+    # Manifeste de preuve (empreintes).
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Manifeste de preuve (SHA-256)", ln=1)
     pdf.set_font("Courier", "", 8)
@@ -102,54 +123,70 @@ def build_report(header: dict, figures: list[dict], source_sha256: str) -> bytes
 
 
 def _render_figure(pdf: _Report, fig: dict) -> None:
-    if pdf.get_y() > 230:
-        pdf.add_page()
-    pdf.set_draw_color(210)
-    pdf.set_font("Helvetica", "B", 11)
-    label = fig.get("filename") or f"Figure {fig.get('figure_index', '')}"
-    page = f" (p.{fig['page']})" if fig.get("page") else ""
-    pdf.cell(0, 7, _s(f"{label}{page} - {_TRIAGE_LABEL.get(fig.get('triage_max', 'T0'), fig.get('triage_max', 'T0'))}"), ln=1)
+    findings = fig.get("findings") or []
+    localized = [f for f in findings if f.get("source_region") and f.get("target_region")]
 
-    y0 = pdf.get_y()
-    # Vignette (via PIL pour éviter les soucis d'extension sur les fichiers stockés par sha256).
+    # Prépare l'image : le CALQUE ANNOTÉ (zones dupliquées encadrées) si des zones sont
+    # localisées, sinon l'image telle quelle. Largeur = 3/4 de la largeur utile.
+    img = None
+    img_h_mm = 0.0
+    img_w_mm = pdf.epw * 0.75
     sha = fig.get("sha256")
     if sha:
         path = storage.path_for(sha)
         if os.path.exists(path):
             try:
-                with Image.open(path) as im:
-                    im = im.convert("RGB")
-                    pdf.image(im, x=pdf.l_margin, y=y0, w=38)
+                if localized:
+                    img = Image.open(io.BytesIO(overlay.render_overlay(path, findings))).convert("RGB")
+                else:
+                    img = Image.open(path).convert("RGB")
+                img_h_mm = img_w_mm * img.height / max(1, img.width)
             except Exception:  # noqa: BLE001
-                pass
-    pdf.set_xy(pdf.l_margin + 42, y0)
+                img = None
+
+    # Saut de page si le titre + l'image ne tiennent pas.
+    if pdf.get_y() > pdf.t_margin + 10 and pdf.get_y() + 10 + img_h_mm > pdf.h - pdf.b_margin:
+        pdf.add_page()
+
+    pdf.set_font("Helvetica", "B", 11)
+    label = fig.get("filename") or f"Figure {fig.get('figure_index', '')}"
+    page = f" (p.{fig['page']})" if fig.get("page") else ""
+    pdf.cell(0, 7, _s(f"{label}{page} - {_TRIAGE_LABEL.get(fig.get('triage_max', 'T0'), fig.get('triage_max', 'T0'))}"), ln=1)
+
+    if img is not None:
+        y = pdf.get_y()
+        pdf.image(img, x=pdf.l_margin, y=y, w=img_w_mm)
+        pdf.set_y(y + img_h_mm + 1.5)
+        if localized:
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.set_text_color(90)
+            pdf.multi_cell(0, 4, _s("Zones dupliquees encadrees ; meme couleur/numero = une meme duplication (source et cible)."))
+            pdf.set_text_color(0)
 
     if fig.get("summary"):
         pdf.set_font("Helvetica", "", 9)
         pdf.multi_cell(0, 4.5, _s(fig["summary"]))
-    findings = fig.get("findings") or []
     if not findings:
-        pdf.set_x(pdf.l_margin + 42)
         pdf.set_font("Helvetica", "I", 9)
         pdf.set_text_color(90)
         pdf.multi_cell(0, 4.5, _s("Aucun indice technique sur cette figure."))
         pdf.set_text_color(0)
+
+    loc_n = 0
     for f in findings:
-        pdf.set_x(pdf.l_margin + 42)
+        prefix = ""
+        if f.get("source_region") and f.get("target_region"):
+            loc_n += 1
+            prefix = f"[zone {loc_n}] "
         pdf.set_font("Helvetica", "B", 9)
         pdf.multi_cell(
             0,
             4.5,
-            _s(f"[{f.get('triage_level', '')}/{f.get('evidence_level', '')}] {f.get('anomaly_type', '')} - {f.get('detector', '')} v{f.get('detector_version', '')}"),
+            _s(f"{prefix}[{f.get('triage_level', '')}/{f.get('evidence_level', '')}] {f.get('anomaly_type', '')} - {f.get('detector', '')} v{f.get('detector_version', '')}"),
         )
-        pdf.set_x(pdf.l_margin + 42)
         pdf.set_font("Helvetica", "", 9)
         pdf.multi_cell(0, 4.5, _s(f.get("description", "")))
         if f.get("human_status"):
-            pdf.set_x(pdf.l_margin + 42)
             pdf.set_font("Helvetica", "I", 9)
             pdf.multi_cell(0, 4.5, _s(f"Decision humaine : {f['human_status']}" + (f" - {f['rationale']}" if f.get("rationale") else "")))
-    # Assure que le curseur passe sous la vignette.
-    if pdf.get_y() < y0 + 40:
-        pdf.set_y(y0 + 40)
-    pdf.ln(3)
+    pdf.ln(4)
