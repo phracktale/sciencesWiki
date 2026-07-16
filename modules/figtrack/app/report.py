@@ -156,19 +156,23 @@ def _render_figure(pdf: _Report, fig: dict) -> None:
     if img is not None:
         y = pdf.get_y()
         pdf.image(img, x=pdf.l_margin, y=y, w=img_w_mm)
-        pdf.set_y(y + img_h_mm + 1.5)
+        # image() laisse le curseur X au bord droit de l'image : on revient à la marge gauche.
+        pdf.set_xy(pdf.l_margin, y + img_h_mm + 1.5)
         if localized:
             pdf.set_font("Helvetica", "I", 8)
             pdf.set_text_color(90)
+            pdf.set_x(pdf.l_margin)
             pdf.multi_cell(0, 4, _s("Zones dupliquees encadrees ; meme couleur/numero = une meme duplication (source et cible)."))
             pdf.set_text_color(0)
 
     if fig.get("summary"):
         pdf.set_font("Helvetica", "", 9)
+        pdf.set_x(pdf.l_margin)
         pdf.multi_cell(0, 4.5, _s(fig["summary"]))
     if not findings:
         pdf.set_font("Helvetica", "I", 9)
         pdf.set_text_color(90)
+        pdf.set_x(pdf.l_margin)
         pdf.multi_cell(0, 4.5, _s("Aucun indice technique sur cette figure."))
         pdf.set_text_color(0)
 
@@ -179,14 +183,17 @@ def _render_figure(pdf: _Report, fig: dict) -> None:
             loc_n += 1
             prefix = f"[zone {loc_n}] "
         pdf.set_font("Helvetica", "B", 9)
+        pdf.set_x(pdf.l_margin)
         pdf.multi_cell(
             0,
             4.5,
             _s(f"{prefix}[{f.get('triage_level', '')}/{f.get('evidence_level', '')}] {f.get('anomaly_type', '')} - {f.get('detector', '')} v{f.get('detector_version', '')}"),
         )
         pdf.set_font("Helvetica", "", 9)
+        pdf.set_x(pdf.l_margin)
         pdf.multi_cell(0, 4.5, _s(f.get("description", "")))
         if f.get("human_status"):
             pdf.set_font("Helvetica", "I", 9)
+            pdf.set_x(pdf.l_margin)
             pdf.multi_cell(0, 4.5, _s(f"Decision humaine : {f['human_status']}" + (f" - {f['rationale']}" if f.get("rationale") else "")))
     pdf.ln(4)
