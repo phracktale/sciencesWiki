@@ -12,9 +12,9 @@ import imagehash
 import numpy as np
 from PIL import Image
 
-from . import segment
+from . import segment, textmask
 
-DETECTOR_VERSION = "0.2.0"
+DETECTOR_VERSION = "0.3.0"
 
 
 # ---------------------------------------------------------------------------
@@ -98,25 +98,40 @@ def _bbox(points: np.ndarray) -> dict:
     }
 
 
-def copy_move_findings(path: str) -> list[dict]:
-    img = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
-    if img is None:
+def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
+    gray = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+    if gray is None:
         return []
+    color = cv2.imread(path, cv2.IMREAD_COLOR)
     # Réduit les très grandes images (perf + stabilité des appariements).
-    h, w = img.shape[:2]
+    h, w = gray.shape[:2]
     scale = 1.0
     if max(h, w) > 1600:
         scale = 1600.0 / max(h, w)
-        img = cv2.resize(img, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        gray = cv2.resize(gray, (int(w * scale), int(h * scale)), interpolation=cv2.INTER_AREA)
+        if color is not None:
+            color = cv2.resize(color, (gray.shape[1], gray.shape[0]), interpolation=cv2.INTER_AREA)
 
-    orb = cv2.ORB_create(nfeatures=4000)
-    kp, des = orb.detectAndCompute(img, None)
+    # Masque le TEXTE/les traits (libellés, axes) : sinon leurs points d'intérêt répétés
+    # produisent une fausse « duplication » et masquent les vraies (SPECS §11).
+    tmask = textmask.text_mask(color if color is not None else gray)
+
+    orb = cv2.ORB_create(nfeatures=5000)
+    kp, des = orb.detectAndCompute(gray, None)
     if des is None or len(kp) < 20:
         return []
+    keep = [
+        i
+        for i, k in enumerate(kp)
+        if not tmask[min(int(k.pt[1]), tmask.shape[0] - 1), min(int(k.pt[0]), tmask.shape[1] - 1)]
+    ]
+    if len(keep) < 20:
+        return []
+    kp = [kp[i] for i in keep]
+    des = des[keep]
 
     matcher = cv2.BFMatcher(cv2.NORM_HAMMING)
-    # k=3 pour ignorer l'auto-appariement (index identique) et garder le plus proche voisin réel.
-    knn = matcher.knnMatch(des, des, k=3)
+    knn = matcher.knnMatch(des, des, k=3)  # k=3 pour ignorer l'auto-appariement
 
     src_pts: list[tuple[float, float]] = []
     dst_pts: list[tuple[float, float]] = []
@@ -127,7 +142,6 @@ def copy_move_findings(path: str) -> list[dict]:
             p1 = kp[m.queryIdx].pt
             p2 = kp[m.trainIdx].pt
             spatial = ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) ** 0.5
-            # Descripteurs très proches MAIS éloignés spatialement → copie possible.
             if m.distance <= 32 and spatial >= 40:
                 src_pts.append(p1)
                 dst_pts.append(p2)
@@ -138,48 +152,59 @@ def copy_move_findings(path: str) -> list[dict]:
 
     src = np.float32(src_pts)
     dst = np.float32(dst_pts)
-    matrix, inliers = cv2.estimateAffinePartial2D(
-        src, dst, method=cv2.RANSAC, ransacReprojThreshold=5.0
-    )
-    if matrix is None or inliers is None:
-        return []
-    mask = inliers.ravel() == 1
-    n_inliers = int(mask.sum())
-    if n_inliers < 12:
-        return []
+    active = np.ones(len(src), dtype=bool)
+    findings: list[dict] = []
 
-    src_in = src[mask] / scale
-    dst_in = dst[mask] / scale
-    rotation = float(np.degrees(np.arctan2(matrix[1, 0], matrix[0, 0])))
-    scale_est = float(np.hypot(matrix[0, 0], matrix[1, 0]))
-    strong = n_inliers >= 25
+    # RANSAC ITÉRATIF : on retire les inliers d'un modèle et on recommence, pour trouver
+    # PLUSIEURS duplications distinctes (sinon la plus « propre » masque les autres).
+    for _ in range(max_models):
+        if int(active.sum()) < 12:
+            break
+        idx_active = np.where(active)[0]
+        matrix, inliers = cv2.estimateAffinePartial2D(
+            src[idx_active], dst[idx_active], method=cv2.RANSAC, ransacReprojThreshold=5.0
+        )
+        if matrix is None or inliers is None:
+            break
+        inl = inliers.ravel() == 1
+        n_inliers = int(inl.sum())
+        if n_inliers < 12:
+            break
 
-    return [
-        {
-            "detector": "copy_move_keypoint",
-            "anomaly_type": "internal_duplication",
-            "evidence_level": "E3" if strong else "E2",
-            "triage_level": "T2",
-            "raw_score": min(1.0, n_inliers / 60.0),
-            "calibrated_score": min(1.0, n_inliers / 60.0),
-            "source_region": _bbox(src_in),
-            "target_region": _bbox(dst_in),
-            "estimated_transform": {
-                "type": "affine_partial",
-                "rotation_deg": round(rotation, 1),
-                "scale": round(scale_est, 3),
-            },
-            "description": (
-                "Deux régions de la même image présentent une correspondance géométrique "
-                f"cohérente ({n_inliers} points appariés, rotation estimée {rotation:.0f}°) : "
-                "région potentiellement dupliquée (copier-déplacer) à examiner."
-            ),
-            "limitations": [
-                "Les textures biologiques répétitives (cellules, bandes) peuvent produire des appariements naturels.",
-                "Résultat à confirmer visuellement (régions source/cible côte à côte).",
-            ],
-        }
-    ]
+        src_in = src[idx_active][inl] / scale
+        dst_in = dst[idx_active][inl] / scale
+        rotation = float(np.degrees(np.arctan2(matrix[1, 0], matrix[0, 0])))
+        scale_est = float(np.hypot(matrix[0, 0], matrix[1, 0]))
+        strong = n_inliers >= 25
+        findings.append(
+            {
+                "detector": "copy_move_keypoint",
+                "anomaly_type": "internal_duplication",
+                "evidence_level": "E3" if strong else "E2",
+                "triage_level": "T2",
+                "raw_score": min(1.0, n_inliers / 60.0),
+                "calibrated_score": min(1.0, n_inliers / 60.0),
+                "source_region": _bbox(src_in),
+                "target_region": _bbox(dst_in),
+                "estimated_transform": {
+                    "type": "affine_partial",
+                    "rotation_deg": round(rotation, 1),
+                    "scale": round(scale_est, 3),
+                },
+                "description": (
+                    "Deux régions de la même image présentent une correspondance géométrique "
+                    f"cohérente ({n_inliers} points appariés, rotation estimée {rotation:.0f}°) : "
+                    "région potentiellement dupliquée (copier-déplacer) à examiner."
+                ),
+                "limitations": [
+                    "Les textures biologiques répétitives (cellules, bandes) peuvent produire des appariements naturels.",
+                    "Résultat à confirmer visuellement (régions source/cible côte à côte).",
+                ],
+            }
+        )
+        active[idx_active[inl]] = False  # retire ces inliers et cherche un autre modèle
+
+    return findings
 
 
 # ---------------------------------------------------------------------------
@@ -197,13 +222,22 @@ def panel_duplication_findings(path: str, threshold: int = 8, max_findings: int 
     gray = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if gray is None:
         return []
+    color = cv2.imread(path, cv2.IMREAD_COLOR)
+    tmask = textmask.text_mask(color if color is not None else gray)
     panels = segment.segment_panels(gray)
     if len(panels) < 2:
         return []
 
     infos: list[dict | None] = []
     for (x, y, w, h) in panels:
-        crop = gray[y : y + h, x : x + w]
+        # Ignore les cellules de LIBELLÉ (majoritairement du texte) : sinon les en-têtes
+        # répétés (« F344 », « HIV-1 TG »…) sont vus comme des panneaux dupliqués (SPECS §11).
+        if textmask.text_fraction(tmask, (x, y, w, h)) > 0.35:
+            infos.append(None)
+            continue
+        crop = gray[y : y + h, x : x + w].copy()
+        # Neutralise le texte résiduel dans le panneau avant hachage.
+        crop[tmask[y : y + h, x : x + w]] = 255
         # Ignore les panneaux quasi-uniformes (fond, aplat) : hachage non discriminant.
         if crop.size == 0 or float(crop.std()) < 8.0:
             infos.append(None)
