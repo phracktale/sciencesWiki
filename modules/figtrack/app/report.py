@@ -95,6 +95,7 @@ def build_report(header: dict, figures: list[dict], source_sha256: str) -> bytes
     pdf.cell(0, 8, "Filtres de rehaussement essayes (parametres)", ln=1)
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(90)
+    pdf.set_x(pdf.l_margin)
     pdf.multi_cell(0, 4.5, _s(
         "L'analyse essaie chaque filtre ci-dessous ; une zone dupliquee peut n'apparaitre "
         "qu'apres rehaussement. Les rectangles du meme numero/couleur relient source et cible."
@@ -104,8 +105,10 @@ def build_report(header: dict, figures: list[dict], source_sha256: str) -> bytes
     for name, params in enhance.PRESETS.items():
         desc = "aucun (image brute)" if not params else ", ".join(f"{k} = {v}" for k, v in params.items())
         pdf.set_font("Helvetica", "B", 9)
+        pdf.set_x(pdf.l_margin)
         pdf.multi_cell(0, 4.5, _s(f"- {name}"))
         pdf.set_font("Courier", "", 8)
+        pdf.set_x(pdf.l_margin)
         pdf.multi_cell(0, 4.5, _s(f"    {desc}"))
     pdf.ln(2)
 
