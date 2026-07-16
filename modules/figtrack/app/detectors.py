@@ -98,6 +98,16 @@ def _bbox(points: np.ndarray) -> dict:
     }
 
 
+def _iou(a: dict, b: dict) -> float:
+    ax2, ay2 = a["x"] + a["width"], a["y"] + a["height"]
+    bx2, by2 = b["x"] + b["width"], b["y"] + b["height"]
+    ix = max(0, min(ax2, bx2) - max(a["x"], b["x"]))
+    iy = max(0, min(ay2, by2) - max(a["y"], b["y"]))
+    inter = ix * iy
+    union = a["width"] * a["height"] + b["width"] * b["height"] - inter
+    return inter / union if union > 0 else 0.0
+
+
 def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
     gray = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
     if gray is None:
@@ -173,6 +183,20 @@ def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
 
         src_in = src[idx_active][inl] / scale
         dst_in = dst[idx_active][inl] / scale
+        active[idx_active[inl]] = False  # retire ces inliers dans TOUS les cas (progresse)
+
+        src_box = _bbox(src_in)
+        tgt_box = _bbox(dst_in)
+        # Rejette les modèles DÉGÉNÉRÉS (régions minuscules) et ceux dont source≈cible
+        # (recouvrement fort = pas une vraie duplication distincte).
+        if min(src_box["width"], src_box["height"], tgt_box["width"], tgt_box["height"]) < 30:
+            continue
+        if _iou(src_box, tgt_box) > 0.4:
+            continue
+        # Déduplication : ignore un modèle recouvrant fortement une duplication déjà retenue.
+        if any(_iou(src_box, f["source_region"]) > 0.5 or _iou(tgt_box, f["target_region"]) > 0.5 for f in findings):
+            continue
+
         rotation = float(np.degrees(np.arctan2(matrix[1, 0], matrix[0, 0])))
         scale_est = float(np.hypot(matrix[0, 0], matrix[1, 0]))
         strong = n_inliers >= 25
@@ -184,8 +208,8 @@ def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
                 "triage_level": "T2",
                 "raw_score": min(1.0, n_inliers / 60.0),
                 "calibrated_score": min(1.0, n_inliers / 60.0),
-                "source_region": _bbox(src_in),
-                "target_region": _bbox(dst_in),
+                "source_region": src_box,
+                "target_region": tgt_box,
                 "estimated_transform": {
                     "type": "affine_partial",
                     "rotation_deg": round(rotation, 1),
@@ -202,7 +226,6 @@ def copy_move_findings(path: str, max_models: int = 5) -> list[dict]:
                 ],
             }
         )
-        active[idx_active[inl]] = False  # retire ces inliers et cherche un autre modèle
 
     return findings
 
