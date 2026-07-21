@@ -60,7 +60,9 @@ final class ContribController extends AbstractController
     {
         // « back » : destination après inscription (ex. revenir à une page de jonction
         // de classe). Local-safe géré par postLoginTarget.
-        $back = (string) $request->get('back', '');
+        // NB : Request::get() a été SUPPRIMÉ en Symfony 7+ → on lit explicitement la
+        // query (GET) puis le corps (POST), comme le faisait l'ancien helper.
+        $back = (string) ($request->query->get('back') ?? $request->request->get('back') ?? '');
         if ($request->isMethod('GET') && $this->user->isLogged()) {
             return $this->redirect($this->postLoginTarget($back));
         }
