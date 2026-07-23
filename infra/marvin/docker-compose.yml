@@ -62,15 +62,18 @@ services:
       # Batch plus large sur GPU (VRAM abondante) : débit de vectorisation nettement
       # supérieur pour la moisson fulltext. Sans GPU, l'app retombe seule sur le CPU.
       EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-128}
-    # GPU (RTX 3090 sur Marvin) : sentence-transformers bascule seul sur CUDA dès que le
-    # device est visible. Requiert le pilote NVIDIA + nvidia-container-toolkit sur l'hôte.
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # GPU DÉSACTIVÉ temporairement : la 3090 (eGPU OCuLink) décroche du bus sous charge
+    # (Xid 79 « GPU has fallen off the bus » → Xid 154 reboot requis). Tant que l'OCuLink
+    # n'est pas fiabilisé (alim du dock / câble / pcie_aspm=off), on NE hard-requiert PAS le
+    # GPU ici, sinon le conteneur casse à chaque décrochage. Le code (ml/app.py) bascule seul
+    # sur CUDA si un GPU est visible — donc réactiver = juste ré-ajouter le bloc deploy ci-dessous.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
     ports:
       # Lié explicitement à l'IP LAN de Marvin (pas 0.0.0.0) → jamais exposé sur une
       # interface WAN/WiFi. Ce service n'a AUCUNE authentification : le bind LAN est
@@ -91,15 +94,15 @@ services:
       context: ../../ml/hhem
       dockerfile: Dockerfile
     image: scienceswiki-hhem:latest
-    # GPU (RTX 3090 sur Marvin) : le modèle est déplacé sur CUDA au démarrage si visible
-    # (cf. ml/hhem/app.py). Requiert le pilote NVIDIA + nvidia-container-toolkit sur l'hôte.
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # GPU DÉSACTIVÉ temporairement (cf. embeddings) : eGPU OCuLink instable (Xid 79).
+    # HHEM repart seul sur CPU (ml/hhem/app.py). Réactiver = ré-ajouter le bloc deploy.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
     ports:
       # Lié explicitement à l'IP LAN de Marvin (pas 0.0.0.0). Service sans authentification :
       # le bind LAN est sa seule protection. Thor le joint par le réseau privé (HHEM_URL).
