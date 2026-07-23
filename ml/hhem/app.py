@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import os
 
+import torch
 from fastapi import FastAPI
 from pydantic import BaseModel
 from transformers import AutoModelForSequenceClassification
@@ -22,6 +23,15 @@ MODEL_NAME = os.getenv("HHEM_MODEL", "vectara/hallucination_evaluation_model")
 
 # trust_remote_code : HHEM-2.1-Open embarque sa propre classe de modèle (cross-encoder).
 model = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, trust_remote_code=True)
+
+# GPU si disponible (RTX 3090 sur Marvin), sinon CPU. Contrairement à sentence-transformers,
+# le modèle custom HHEM ne bascule pas seul : on le déplace explicitement sur CUDA. Sa méthode
+# predict() place ensuite les tenseurs d'entrée sur le device du modèle.
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+if DEVICE == "cuda":
+    model = model.to(DEVICE)
+model.eval()
+print(f"[hhem] device={DEVICE} ({torch.cuda.get_device_name(0) if DEVICE == 'cuda' else 'cpu'})", flush=True)
 
 app = FastAPI(title="SciencesWiki HHEM", version="0.1")
 

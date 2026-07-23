@@ -27,6 +27,8 @@ final class AdminHarvestController
         private readonly string $openalexApiKey = '',
         #[\Symfony\Component\DependencyInjection\Attribute\Autowire(env: 'ML_EMBED_URL')]
         private readonly string $mlEmbedUrl = '',
+        #[\Symfony\Component\DependencyInjection\Attribute\Autowire(env: 'LLM_BASE_URL')]
+        private readonly string $llmBaseUrl = '',
     ) {
     }
 
@@ -324,6 +326,8 @@ final class AdminHarvestController
             ],
             // Charge machines : Thor (cette instance) + Marvin (service ml).
             'system' => $this->systemStats(),
+            // Modèle(s) LLM actuellement chargé(s) dans Ollama (+ part sur GPU).
+            'llm' => $this->llmStats(),
         ]);
     }
 
@@ -335,7 +339,7 @@ final class AdminHarvestController
         return ['thor' => $this->localStats(), 'marvin' => $this->marvinStats()];
     }
 
-    /** Charge CPU (loadavg) + mémoire de l'hôte local (Thor), lues dans /proc. */
+    /** Charge CPU (loadavg) + mémoire + température de l'hôte local (Thor), lues dans /proc et /sys. */
     private function localStats(): array
     {
         $load = \function_exists('sys_getloadavg') ? (sys_getloadavg() ?: [0, 0, 0]) : [0, 0, 0];
@@ -348,10 +352,12 @@ final class AdminHarvestController
             'loadPct' => (int) min(100, round((float) $load[0] / $cpus * 100)),
             'memPct' => $total > 0 ? (int) round(($total - $avail) / $total * 100) : null,
             'memTotalGb' => $total > 0 ? round($total / 1048576, 1) : null,
+            'memUsedGb' => $total > 0 ? round(($total - $avail) / 1048576, 1) : null,
+            'cpuTempC' => $this->cpuTemp(),
         ];
     }
 
-    /** Charge de Marvin via le service ml (/stats). Null si injoignable. */
+    /** Charge de Marvin via le service ml (/stats). Null si injoignable. Inclut GPU + températures. */
     private function marvinStats(): ?array
     {
         $base = preg_replace('#/embed.*$#', '', $this->mlEmbedUrl);
@@ -364,13 +370,78 @@ final class AdminHarvestController
             return null;
         }
 
+        $totalKb = isset($d['memTotalKb']) ? (int) $d['memTotalKb'] : 0;
+        $availKb = isset($d['memAvailKb']) ? (int) $d['memAvailKb'] : 0;
+
         return [
             'load1' => $d['load1'] ?? null,
             'cpus' => $d['cpus'] ?? null,
             'loadPct' => $d['loadPct'] ?? null,
             'memPct' => $d['memPct'] ?? null,
-            'memTotalGb' => isset($d['memTotalKb']) ? round(((int) $d['memTotalKb']) / 1048576, 1) : null,
+            'memTotalGb' => $totalKb > 0 ? round($totalKb / 1048576, 1) : null,
+            'memUsedGb' => $totalKb > 0 ? round(($totalKb - $availKb) / 1048576, 1) : null,
+            'cpuTempC' => $d['cpuTempC'] ?? null,
+            'temps' => $d['temps'] ?? null,
+            'gpu' => \is_array($d['gpu'] ?? null) ? $d['gpu'] : null,
         ];
+    }
+
+    /** Modèle(s) LLM chargé(s) dans Ollama via /api/ps (nom + part chargée sur GPU). Null si injoignable. */
+    private function llmStats(): ?array
+    {
+        $base = preg_replace('#/v1/?$#', '', $this->llmBaseUrl);
+        if (null === $base || '' === $base) {
+            return null;
+        }
+        try {
+            $d = $this->httpClient->request('GET', rtrim($base, '/').'/api/ps', ['timeout' => 3])->toArray(false);
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $models = [];
+        foreach ($d['models'] ?? [] as $m) {
+            $size = (int) ($m['size'] ?? 0);
+            $vram = (int) ($m['size_vram'] ?? 0);
+            $models[] = [
+                'name' => (string) ($m['name'] ?? $m['model'] ?? '?'),
+                'sizeGb' => $size > 0 ? round($size / 1073741824, 1) : null,
+                // 100 % = entièrement sur le GPU ; 0 % = CPU ; entre les deux = offload partiel.
+                'onGpuPct' => $size > 0 ? (int) round($vram / $size * 100) : null,
+                'expiresAt' => $m['expires_at'] ?? null,
+            ];
+        }
+
+        return ['loaded' => $models];
+    }
+
+    /** Température CPU de l'hôte (°C) lue dans /sys/class/hwmon (k10temp/coretemp…), ou null. */
+    private function cpuTemp(): ?float
+    {
+        foreach (glob('/sys/class/hwmon/hwmon*') ?: [] as $chip) {
+            $name = trim((string) @file_get_contents($chip.'/name'));
+            if (!\in_array($name, ['k10temp', 'coretemp', 'zenpower', 'cpu_thermal'], true)) {
+                continue;
+            }
+            $fallback = null;
+            foreach (glob($chip.'/temp*_input') ?: [] as $tin) {
+                $raw = @file_get_contents($tin);
+                if (false === $raw) {
+                    continue;
+                }
+                $celsius = (int) trim($raw) / 1000.0;
+                $label = trim((string) @file_get_contents(str_replace('_input', '_label', $tin)));
+                if (\in_array($label, ['Tctl', 'Tdie', 'Package id 0'], true)) {
+                    return round($celsius, 1);
+                }
+                $fallback ??= $celsius;
+            }
+            if (null !== $fallback) {
+                return round($fallback, 1);
+            }
+        }
+
+        return null;
     }
 
     /** @return array{0:int,1:int} [MemTotal, MemAvailable] en kB (hôte). */

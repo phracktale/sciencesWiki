@@ -1,3 +1,11 @@
 
 # Librairies importées (volumineuses, hors dépôt)
 corpus/
+
+# Secrets — ne JAMAIS commiter. Motifs appliqués à toute profondeur (apps/*, modules/*, infra/…).
+# On garde volontairement .env, .env.dev et .env.test versionnés (convention Symfony : non secrets).
+.env.local
+.env.*.local
+.env.prod
+.env.*.prod
+.env.prod.local

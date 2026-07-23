@@ -465,18 +465,60 @@ class PublicationRepository extends ServiceEntityRepository implements Publicati
     /**
      * Recherche plein-texte simple (titre + résumé).
      *
+     * Chemin INDEXÉ : on réutilise l'expression to_tsvector('simple', title||abstract) couverte
+     * par l'index GIN (comme lexicalCandidates), au lieu d'un LOWER(...) LIKE '%q%'. Le joker en
+     * tête interdisait tout index → seq scan sur ~31 M lignes ; comme l'endpoint /api/search est
+     * public, c'était un vecteur de DoS trivial. Le tsquery OR est sécurisé par construction
+     * (ftsOrQuery ne laisse survivre aucun opérateur). L'hydratation se fait en UNE requête (pas de N+1).
+     *
      * @return list<Publication>
      */
     public function textSearch(string $query, int $limit): array
     {
-        return $this->createQueryBuilder('p')
-            ->andWhere('LOWER(p.title) LIKE :q OR LOWER(p.abstract) LIKE :q')
-            ->andWhere('p.listedInCorpus = true')
-            ->setParameter('q', '%'.mb_strtolower($query).'%')
-            ->orderBy('p.publicationDate', 'DESC')
-            ->setMaxResults(max(1, $limit))
+        $tsq = $this->ftsOrQuery($query);
+        if ('' === $tsq) {
+            return [];
+        }
+
+        $tsv = "to_tsvector('simple', coalesce(p.title,'') || ' ' || coalesce(p.abstract,''))";
+        $ids = $this->getEntityManager()->getConnection()->executeQuery(
+            \sprintf(
+                "SELECT p.id
+                 FROM publication p
+                 WHERE p.listed_in_corpus AND p.retraction_status = 'none'
+                   AND %s @@ to_tsquery('simple', :tsq)
+                 ORDER BY ts_rank(%s, to_tsquery('simple', :tsq)) DESC, p.cited_by_count DESC
+                 LIMIT %d",
+                $tsv,
+                $tsv,
+                max(1, $limit),
+            ),
+            ['tsq' => $tsq],
+        )->fetchFirstColumn();
+
+        if ([] === $ids) {
+            return [];
+        }
+        $intIds = array_map('intval', $ids);
+        $pubs = $this->createQueryBuilder('p')
+            ->andWhere('p.id IN (:ids)')
+            ->setParameter('ids', $intIds)
             ->getQuery()
             ->getResult();
+
+        // Préserve l'ordre de pertinence renvoyé par le tsquery.
+        $byId = [];
+        foreach ($pubs as $p) {
+            $byId[$p->getId()] = $p;
+        }
+        $out = [];
+        foreach ($intIds as $id) {
+            if (isset($byId[$id])) {
+                $out[] = $byId[$id];
+            }
+        }
+
+        return $out;
     }
 
     /**

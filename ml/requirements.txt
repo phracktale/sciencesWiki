@@ -1,3 +1,5 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
 sentence-transformers>=2.7
+# Le wheel PyPI par défaut (linux x86_64) embarque CUDA → GPU utilisé dès qu'il est visible.
+torch>=2.2

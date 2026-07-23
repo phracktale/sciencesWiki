@@ -15,7 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import detectors, enhance, extract, overlay, report, storage
-from .auth import require_analyst
+from .auth import CurrentUser, require_analyst
 from .config import MAX_UPLOAD_BYTES, NEAR_DUP_HAMMING
 from .db import get_db
 from .models import Analysis, Asset, Document, Finding
@@ -27,6 +27,34 @@ _TRIAGE_ORDER = ["T0", "T1", "T2", "T3"]
 
 def _ti(t: str) -> int:
     return _TRIAGE_ORDER.index(t) if t in _TRIAGE_ORDER else 0
+
+
+def _assert_owner(user: CurrentUser, owner: str | None) -> None:
+    """Autorise le propriétaire de la ressource, ou le comité (admin inclus par hiérarchie).
+
+    Renvoie 404 (et non 403) pour ne pas divulguer l'existence d'une ressource d'autrui.
+    Sans ce contrôle, tout analyste peut lire/exporter/réviser les dossiers des autres (IDOR).
+    """
+    if owner == user.username or user.has("ROLE_COMITE"):
+        return
+    raise HTTPException(status_code=404, detail="Ressource introuvable.")
+
+
+def _analysis_owner(db: Session, analysis_id: str) -> str | None:
+    analysis = db.get(Analysis, analysis_id)
+    return analysis.requested_by if analysis else None
+
+
+_SAFE_IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/tiff"}
+
+
+def _safe_image_type(mime: str | None) -> str:
+    """Ne jamais réémettre le Content-Type d'un upload tel quel (contrôlé par l'attaquant) :
+    un `text/html` servi sur l'origine ouvrirait un XSS stocké. On restreint aux types image
+    connus, sinon octet-stream neutre (+ `nosniff` côté réponse)."""
+    if mime in _SAFE_IMAGE_TYPES:
+        return mime
+    return "application/octet-stream"
 
 
 @app.get("/health")
@@ -161,10 +189,11 @@ async def create_document(request: Request, db: Session = Depends(get_db)) -> JS
 
 @app.get("/documents/{document_id}")
 def read_document(document_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
-    require_analyst(request)
+    user = require_analyst(request)
     doc = db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document introuvable.")
+    _assert_owner(user, doc.requested_by)
     return _serialize_document(db, doc)
 
 
@@ -195,15 +224,20 @@ def my_documents(request: Request, db: Session = Depends(get_db)) -> dict:
 # ---------------------------------------------------------------------------
 @app.get("/assets/{asset_id}/image")
 def asset_image(asset_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
-    require_analyst(request)
+    user = require_analyst(request)
     asset = db.get(Asset, asset_id)
     if asset is None:
         raise HTTPException(status_code=404, detail="Asset introuvable.")
+    _assert_owner(user, asset.requested_by)
     path = storage.path_for(asset.sha256)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Fichier absent.")
     with open(path, "rb") as fh:
-        return Response(content=fh.read(), media_type=asset.mime or "application/octet-stream")
+        return Response(
+            content=fh.read(),
+            media_type=_safe_image_type(asset.mime),
+            headers={"X-Content-Type-Options": "nosniff"},
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -238,8 +272,8 @@ async def explore_upload(request: Request, db: Session = Depends(get_db)) -> dic
 @app.get("/assets/{asset_id}/processed.png")
 def processed_image(asset_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
     """Image de travail rehaussée (canal/niveaux/contraste/gamma…) pour l'affichage canvas."""
-    require_analyst(request)
-    path = _asset_path(db, asset_id)
+    user = require_analyst(request)
+    path = _asset_path(db, asset_id, user)
     gray = enhance.process(path, _adjust_params(request.query_params))
     return Response(content=enhance.to_png(gray), media_type="image/png")
 
@@ -247,17 +281,18 @@ def processed_image(asset_id: str, request: Request, db: Session = Depends(get_d
 @app.get("/assets/{asset_id}/copymove")
 def explore_copymove(asset_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
     """Copier-déplacer paramétrable exécuté sur l'image REHAUSSÉE (mêmes réglages que /processed.png)."""
-    require_analyst(request)
-    path = _asset_path(db, asset_id)
+    user = require_analyst(request)
+    path = _asset_path(db, asset_id, user)
     gray = enhance.process(path, _adjust_params(request.query_params))
     findings = detectors.copy_move_findings(path, gray_in=gray, **_algo_params(request.query_params))
     return {"findings": findings, "image": {"width": int(gray.shape[1]), "height": int(gray.shape[0])}}
 
 
-def _asset_path(db: Session, asset_id: str) -> str:
+def _asset_path(db: Session, asset_id: str, user: CurrentUser) -> str:
     asset = db.get(Asset, asset_id)
     if asset is None:
         raise HTTPException(status_code=404, detail="Asset introuvable.")
+    _assert_owner(user, asset.requested_by)
     path = storage.path_for(asset.sha256)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="Fichier absent.")
@@ -312,10 +347,11 @@ def _algo_params(qp) -> dict:
 @app.get("/analyses/{analysis_id}/overlay.png")
 def analysis_overlay(analysis_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
     """Image annotée : zones dupliquées encadrées (1 couleur par duplication distincte)."""
-    require_analyst(request)
+    user = require_analyst(request)
     analysis = db.get(Analysis, analysis_id)
     if analysis is None:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    _assert_owner(user, analysis.requested_by)
     asset = db.get(Asset, analysis.asset_id)
     if asset is None:
         raise HTTPException(status_code=404, detail="Image introuvable.")
@@ -337,10 +373,11 @@ def analysis_overlay(analysis_id: str, request: Request, db: Session = Depends(g
 # ---------------------------------------------------------------------------
 @app.get("/assets/{asset_id}/similar")
 def similar_assets(asset_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
-    require_analyst(request)
+    user = require_analyst(request)
     asset = db.get(Asset, asset_id)
     if asset is None:
         raise HTTPException(status_code=404, detail="Asset introuvable.")
+    _assert_owner(user, asset.requested_by)
     k = _clamp_int(request.query_params.get("k"), default=10, lo=1, hi=50)
     ref = {"phash": asset.phash, "dhash": asset.dhash}
     return {"items": _rank_corpus(db, ref, k, exclude_sha=asset.sha256, exclude_id=asset.id)}
@@ -386,10 +423,11 @@ def _rank_corpus(db: Session, ref: dict, k: int, exclude_sha: str, exclude_id: s
 # ---------------------------------------------------------------------------
 @app.get("/documents/{document_id}/report.pdf")
 def document_report(document_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
-    require_analyst(request)
+    user = require_analyst(request)
     doc = db.get(Document, document_id)
     if doc is None:
         raise HTTPException(status_code=404, detail="Document introuvable.")
+    _assert_owner(user, doc.requested_by)
     data = _serialize_document(db, doc)
     header = {
         "kind": "document (PDF)",
@@ -405,10 +443,11 @@ def document_report(document_id: str, request: Request, db: Session = Depends(ge
 
 @app.get("/analyses/{analysis_id}/report.pdf")
 def analysis_report(analysis_id: str, request: Request, db: Session = Depends(get_db)) -> Response:
-    require_analyst(request)
+    user = require_analyst(request)
     analysis = db.get(Analysis, analysis_id)
     if analysis is None:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    _assert_owner(user, analysis.requested_by)
     asset = db.get(Asset, analysis.asset_id)
     data = _serialize_analysis(db, analysis, asset)
     header = {
@@ -452,10 +491,11 @@ def _clamp_int(value: str | None, default: int, lo: int, hi: int) -> int:
 # ---------------------------------------------------------------------------
 @app.get("/analyses/{analysis_id}")
 def read_analysis(analysis_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
-    require_analyst(request)
+    user = require_analyst(request)
     analysis = db.get(Analysis, analysis_id)
     if analysis is None:
         raise HTTPException(status_code=404, detail="Analyse introuvable.")
+    _assert_owner(user, analysis.requested_by)
     return _serialize_analysis(db, analysis, db.get(Asset, analysis.asset_id))
 
 
@@ -483,10 +523,11 @@ def my_analyses(request: Request, db: Session = Depends(get_db)) -> dict:
 
 @app.get("/findings/{finding_id}")
 def read_finding(finding_id: str, request: Request, db: Session = Depends(get_db)) -> dict:
-    require_analyst(request)
+    user = require_analyst(request)
     finding = db.get(Finding, finding_id)
     if finding is None:
         raise HTTPException(status_code=404, detail="Finding introuvable.")
+    _assert_owner(user, _analysis_owner(db, finding.analysis_id))
     return _serialize_finding(finding)
 
 
@@ -496,6 +537,7 @@ async def review_finding(finding_id: str, request: Request, db: Session = Depend
     finding = db.get(Finding, finding_id)
     if finding is None:
         raise HTTPException(status_code=404, detail="Finding introuvable.")
+    _assert_owner(user, _analysis_owner(db, finding.analysis_id))
     body = await request.json()
     status = str(body.get("status", "")).strip()
     if status not in {"confirmed", "rejected", "acceptable", "indeterminate"}:

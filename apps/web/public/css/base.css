@@ -94,6 +94,7 @@ a:focus { color:#792424; font-weight:bold; }
 .badge { display:inline-block; font-size:.78rem; padding:.1rem .55rem; border-radius:8px; }
 .badge.ok { background:#dcfce7; color:#166534; }
 .badge.warn { background:#fef3c7; color:#92400e; }
+.badge.info { background:#dbeafe; color:#1e40af; }
 .qlist { list-style:none; padding:0; margin:0; }
 .qlist li { border:1px solid var(--line); border-radius:10px; padding:.7rem .9rem; margin:.5rem 0; }
 .qlist a.q-title { font-weight:600; text-decoration:none; color:#111827; font-size:1.05rem; }
@@ -138,6 +139,40 @@ footer a { color:#6b7280; }
 .admin-nav .dd-menu::before { content:''; position:absolute; left:0; right:0; top:-8px; height:8px; }
 .admin-nav .dd:hover .dd-menu, .admin-nav .dd:focus-within .dd-menu { display:block; }
 .admin-nav .dd-menu a { display:block; white-space:nowrap; }
+/* ===== Barre de monitoring admin (fixée en bas, toutes pages front) ===== */
+#admin-bar { position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#0f172a; color:#e2e8f0;
+    font-family:var(--font-base); font-size:12.5px; line-height:1.4; display:flex; align-items:center; gap:.5rem;
+    padding:.4rem .7rem; box-shadow:0 -2px 12px rgba(0,0,0,.28); border-top:1px solid #1e293b; flex-wrap:wrap; }
+#admin-bar .ab-badge { background:var(--accent); color:#fff; padding:.12rem .5rem; border-radius:6px; font-weight:700; letter-spacing:.02em; }
+#admin-bar a { color:#93c5fd; text-decoration:none; font-weight:600; padding:.15rem .4rem; border-radius:6px; }
+#admin-bar a:hover { background:#1e293b; color:#fff; }
+#admin-bar .ab-quit { color:#fca5a5; }
+#admin-bar .ab-spacer { margin-left:auto; }
+/* Puces machines (critique en un coup d'œil) */
+.ab-chip { display:inline-flex; align-items:center; gap:.45rem; background:#111c30; border:1px solid #1e293b; border-radius:8px; padding:.12rem .55rem; }
+.ab-chip .ab-host { color:#e2e8f0; font-weight:700; font-size:11.5px; }
+.ab-chip .ab-m { color:#94a3b8; font-size:11px; white-space:nowrap; }
+.ab-chip .ab-m b { font-weight:700; font-variant-numeric:tabular-nums; }
+.ab-v-ok { color:#86efac; } .ab-v-warn { color:#fbbf24; } .ab-v-crit { color:#f87171; }
+/* Moisson */
+.ab-harvest { display:inline-flex; align-items:center; gap:.5rem; color:#cbd5e1; }
+.ab-harvest .ab-track { width:80px; height:7px; background:#334155; border-radius:4px; overflow:hidden; }
+.ab-harvest .ab-fill { display:block; height:100%; width:0; background:var(--accent); transition:width .4s; }
+/* Bouton détails + volet déroulant */
+.ab-toggle { cursor:pointer; user-select:none; background:#1e293b; border:1px solid #334155; color:#cbd5e1;
+    border-radius:6px; padding:.14rem .55rem; font:inherit; font-weight:600; }
+.ab-toggle:hover { background:#334155; color:#fff; }
+#admin-panel { position:fixed; left:0; right:0; bottom:37px; z-index:9998; background:#0b1322; color:#cbd5e1;
+    border-top:1px solid #1e293b; box-shadow:0 -8px 24px rgba(0,0,0,.4); padding:.9rem 1.1rem;
+    font-family:var(--font-base); font-size:12.5px; max-height:60vh; overflow:auto; display:none; }
+#admin-panel.open { display:block; }
+.ab-panel-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:1rem; max-width:1100px; margin:0 auto; }
+.ab-card { background:#111c30; border:1px solid #1e293b; border-radius:10px; padding:.7rem .85rem; }
+.ab-card h4 { margin:0 0 .5rem; font-size:12.5px; color:#e2e8f0; display:flex; align-items:center; gap:.4rem; }
+.ab-card .row { display:flex; justify-content:space-between; gap:1rem; padding:.18rem 0; border-bottom:1px solid rgba(30,41,59,.6); }
+.ab-card .row:last-child { border-bottom:0; }
+.ab-card .row span:first-child { color:#94a3b8; }
+.ab-card .row span:last-child { font-variant-numeric:tabular-nums; font-weight:600; color:#e2e8f0; }
 /* Rendu Markdown (articles wiki + réponses) */
 .md { line-height:1.7; }
 .md h2 { margin:1.8rem 0 .6rem; font-size:1.5rem; border-bottom:2px solid var(--line); padding-bottom:.25rem; }

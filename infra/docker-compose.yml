@@ -98,9 +98,9 @@ services:
       # Mercure (temps réel) : l'api HÉBERGE le hub (Caddy) ET publie.
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
-      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
-      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
-      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET:-}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
+      MERCURE_PUBLISHER_JWT_KEY: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
+      MERCURE_SUBSCRIBER_JWT_KEY: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
       # CORS du hub Mercure (lu par le Caddyfile). Restreindre au domaine public :
       # défaut « * » trop permissif. En prod : https://scienceswiki.eu.
       MERCURE_CORS_ORIGINS: ${MERCURE_CORS_ORIGINS:-${PUBLIC_URL:-https://scienceswiki.eu}}
@@ -152,7 +152,7 @@ services:
       MAILER_DSN: ${MAILER_DSN:-null://null}
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
-      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
       # RUN_INIT non défini : pas de migration ici, uniquement la consommation.
     # memory_limit PHP relevé (embeddings par lots + gros lots de moisson) ; le
     # --memory-limit Messenger (RSS) redémarre proprement avant tout dépassement.
@@ -197,7 +197,7 @@ services:
       CORE_API_KEY: ${CORE_API_KEY:-}
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
-      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
     command: ["php", "-d", "memory_limit=1024M", "bin/console", "messenger:consume", "fulltext", "failed", "-v", "--time-limit=3600", "--memory-limit=1500M"]
     volumes:
       - secrets_vault:/app/config/secrets:rw
@@ -241,7 +241,7 @@ services:
       LLM_API_TOKEN: ${LLM_API_TOKEN}
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
-      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
     # Un run d'analyse peut durer >1 h sur un gros nœud ; time-limit large pour ne
     # pas recycler le worker entre deux messages trop tôt.
     command: ["php", "-d", "memory_limit=1024M", "bin/console", "messenger:consume", "analysis", "failed", "-v", "--time-limit=21600", "--memory-limit=1500M"]
@@ -282,7 +282,7 @@ services:
       LLM_API_TOKEN: ${LLM_API_TOKEN}
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
-      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
     # Un appraisal dure ~1-10 min : recyclage horaire standard (contrairement à
     # analysis-worker qui doit tenir un run de nœud de plusieurs heures).
     command: ["php", "-d", "memory_limit=1024M", "bin/console", "messenger:consume", "appraisal", "failed", "-v", "--time-limit=3600", "--memory-limit=1500M"]
@@ -322,7 +322,7 @@ services:
       HARVESTER_CONTACT_EMAIL: ${HARVESTER_CONTACT_EMAIL}
       MERCURE_URL: http://api/.well-known/mercure
       MERCURE_PUBLIC_URL: ${PUBLIC_URL:-https://scienceswiki.eu}/.well-known/mercure
-      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:-}
+      MERCURE_JWT_SECRET: ${MERCURE_JWT_SECRET:?requis - un secret vide rend les jetons Mercure forgeables ; definir dans .env.prod}
     command: ["php", "-d", "memory_limit=1024M", "bin/console", "messenger:consume", "article", "failed", "-v", "--time-limit=3600", "--memory-limit=1500M"]
     volumes:
       - secrets_vault:/app/config/secrets:rw

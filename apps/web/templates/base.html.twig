@@ -234,25 +234,12 @@
     <header>
         <a class="brand" href="{{ path('home') }}"><img src="{{ crt ? '/logo-crt.svg' : '/logo.svg' }}" alt="SciencesWiki"></a>
         <span class="muted">— le savoir scientifique, libre et vulgarisé</span>
-        <style>
-            /* Le wrapper .nav-dd porte le style d'item de menu (voir base.css / crt-theme.css :
-               header nav a, header nav .nav-dd). Le lien intérieur hérite couleur+état, sans
-               padding propre, pour un rendu STRICTEMENT identique aux autres entrées. */
-            .nav-dd .nav-dd-btn { color:inherit; padding:0; cursor:pointer; text-decoration:none; font:inherit }
-            .nav-dd .nav-dd-btn::after { content:" ▾"; font-size:.8em }
-            .nav-dd-menu { position:absolute; top:100%; left:0; background:#fff; color:#0f172a;
-                border:1px solid var(--line); border-radius:10px; min-width:180px; padding:.3rem 0;
-                box-shadow:0 10px 28px rgba(15,23,42,.18); display:none; z-index:60 }
-            .nav-dd:hover .nav-dd-menu, .nav-dd:focus-within .nav-dd-menu { display:block }
-            .nav-dd-menu a { display:block; padding:.45rem 1rem; white-space:nowrap; color:#0f172a; text-decoration:none; font-weight:500 }
-            .nav-dd-menu a:hover { background:#eef2ff }
-        </style>
         <nav>
             <a href="{{ path('home') }}"{{ route == 'home' ? ' class="is-active"' : '' }}>Accueil</a>
             <a href="{{ path('explore') }}"{{ route in ['explore','node','all_questions'] ? ' class="is-active"' : '' }}>Explorer</a>
             {% if current_user.canResearch %}<a href="{{ path('lab_hub') }}"{{ route starts with 'lab' ? ' class="is-active"' : '' }}>🔬 Labo</a>{% endif %}
-            <span class="nav-dd{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}">
-                <a tabindex="0" role="button" aria-haspopup="true" class="nav-dd-btn">Le projet</a>
+            <span class="nav-dd dd-left{{ route in ['crt_discover','process','reliability','crt_manifesto','project'] ? ' is-active' : '' }}">
+                <button type="button" aria-haspopup="true" class="nav-dd-top">Le projet</button>
                 <span class="nav-dd-menu" role="menu">
                     <a href="{{ path('crt_discover') }}" role="menuitem">Découvrir</a>
                     <a href="{{ path('process') }}" role="menuitem">Process</a>
@@ -267,7 +254,7 @@
         </nav>
     </header>
     <main>
-        {% for t in ['success', 'error'] %}{% for m in app.flashes(t) %}<p class="badge {{ t == 'success' ? 'ok' : 'warn' }}">{{ m }}</p>{% endfor %}{% endfor %}
+        {% for label, messages in app.flashes %}{% for m in messages %}<p class="badge {{ label == 'success' ? 'ok' : (label in ['error', 'warning'] ? 'warn' : 'info') }}">{{ m }}</p>{% endfor %}{% endfor %}
         {% block body %}{% endblock %}
     </main>
     <footer>
@@ -289,58 +276,118 @@
 
     {% if admin_session.logged %}
         <div style="height:46px"></div>{# espace pour ne pas masquer le footer #}
-        <div id="admin-bar" style="position:fixed; left:0; right:0; bottom:0; z-index:9999; background:#0f172a; color:#e2e8f0; font:13px/1.4 system-ui,sans-serif; display:flex; align-items:center; gap:.5rem; padding:.35rem .7rem; box-shadow:0 -2px 8px rgba(0,0,0,.2)">
-            <strong style="background:var(--accent); color:#fff; padding:.1rem .5rem; border-radius:5px">ADMIN</strong>
-            <a href="{{ path('admin_dashboard') }}" style="color:#93c5fd">Tableau de bord</a>
-            <a href="{{ path('admin_harvest') }}" style="color:#93c5fd">Moisson</a>
-            <a href="{{ path('admin_activity') }}" style="color:#93c5fd">Journal</a>
-            <a href="{{ path('admin_articles') }}" style="color:#93c5fd">Articles</a>
-            <a href="{{ path('admin_settings') }}" style="color:#93c5fd">Paramètres</a>
+        <div id="admin-panel"><div class="ab-panel-grid" id="ab-panel-grid"></div></div>
+        <div id="admin-bar">
+            <span class="ab-badge">ADMIN</span>
+            <a href="{{ path('admin_dashboard') }}">Tableau de bord</a>
+            <a href="{{ path('admin_harvest') }}">Moisson</a>
+            <a href="{{ path('admin_settings') }}">Paramètres</a>
             {% block admin_context %}{% endblock %}
-            <span id="ab-load" style="margin-left:auto; display:flex; align-items:center; gap:.7rem; font-size:12px; color:#94a3b8" title="Charge CPU (loadavg/cœurs) · RAM">—</span>
-            <span id="ab-harvest" style="display:flex; align-items:center; gap:.5rem">
-                <span class="muted" style="color:#94a3b8">moisson :</span>
-                <span id="ab-text" style="color:#cbd5e1">—</span>
-                <span style="width:90px; height:7px; background:#334155; border-radius:4px; overflow:hidden"><span id="ab-bar" style="display:block; height:100%; width:0; background:var(--accent)"></span></span>
-            </span>
-            <a href="{{ path('admin_logout') }}" style="color:#fca5a5; margin-left:.4rem">quitter</a>
+            <span class="ab-spacer"></span>
+            <span id="ab-thor" class="ab-chip" title="Thor — serveur applicatif (web/API/workers)"><span class="ab-host">Thor</span><span class="ab-m">—</span></span>
+            <span id="ab-marvin" class="ab-chip" title="Marvin — nœud IA (DB, GROBID, embeddings, GPU)"><span class="ab-host">Marvin</span><span class="ab-m">—</span></span>
+            <span id="ab-llm" class="ab-chip" title="Modèle LLM chargé dans Ollama" hidden><span class="ab-host">🧠</span><span class="ab-m">—</span></span>
+            <span class="ab-harvest"><span class="muted" style="color:#94a3b8">moisson</span><span id="ab-text" style="color:#cbd5e1">—</span><span class="ab-track"><span id="ab-bar" class="ab-fill"></span></span></span>
+            <button type="button" class="ab-toggle" id="ab-toggle" aria-expanded="false" aria-controls="admin-panel">détails ▾</button>
+            <a href="{{ path('admin_logout') }}" class="ab-quit">quitter</a>
         </div>
         <script nonce="{{ csp_nonce.value }}">
         (function () {
-            var txt = document.getElementById('ab-text'), bar = document.getElementById('ab-bar'), load = document.getElementById('ab-load');
-            if (!txt) return;
-            function host(name, s) {
-                if (!s) return name + ' <span style="color:#64748b">n/d</span>';
-                var lp = s.loadPct == null ? '?' : s.loadPct, mp = s.memPct == null ? '?' : s.memPct;
-                var col = (lp >= 90 || mp >= 90) ? '#f87171' : (lp >= 70 || mp >= 70) ? '#fbbf24' : '#86efac';
-                return name + ' <span style="color:' + col + '">' + lp + '%</span>·<span style="color:' + col + '">' + mp + '%</span>';
+            var bar = document.getElementById('admin-bar');
+            if (!bar) return;
+            var elThor = document.getElementById('ab-thor'), elMarvin = document.getElementById('ab-marvin');
+            var elLlm = document.getElementById('ab-llm');
+            var txt = document.getElementById('ab-text'), fill = document.getElementById('ab-bar');
+            var panel = document.getElementById('admin-panel'), grid = document.getElementById('ab-panel-grid');
+            var toggle = document.getElementById('ab-toggle');
+
+            // Classe couleur selon des seuils (vert / ambre / rouge).
+            function cls(v, warn, crit) { return v == null ? '' : (v >= crit ? 'ab-v-crit' : (v >= warn ? 'ab-v-warn' : 'ab-v-ok')); }
+            function pct(v) { return v == null ? '<b>?</b>' : '<b class="' + cls(v, 70, 90) + '">' + v + '%</b>'; }
+            function temp(v) { return v == null ? '' : '<b class="' + cls(v, 75, 88) + '">' + Math.round(v) + '°</b>'; }
+
+            function chip(name, s) {
+                if (!s) return '<span class="ab-host">' + name + '</span><span class="ab-m" style="color:#64748b">n/d</span>';
+                var h = '<span class="ab-host">' + name + '</span>'
+                    + '<span class="ab-m">CPU ' + pct(s.loadPct) + '</span>'
+                    + '<span class="ab-m">RAM ' + pct(s.memPct) + '</span>';
+                if (s.cpuTempC != null) h += '<span class="ab-m">' + temp(s.cpuTempC) + '</span>';
+                var g = s.gpu;
+                if (g) h += '<span class="ab-m">GPU <b class="' + cls(g.utilPct, 70, 90) + '">' + Math.round(g.utilPct) + '%</b> ' + temp(g.tempC) + '</span>';
+                return h;
             }
+
+            // Modèle LLM chargé (Ollama) : puce compacte + carte détaillée.
+            function llmChip(llm) {
+                var m = llm && llm.loaded && llm.loaded[0];
+                if (!m) { elLlm.hidden = true; return; }
+                elLlm.hidden = false;
+                var gpu = m.onGpuPct == null ? '' : ' <b class="' + (m.onGpuPct >= 100 ? 'ab-v-ok' : (m.onGpuPct > 0 ? 'ab-v-warn' : 'ab-v-crit')) + '">' + m.onGpuPct + '% GPU</b>';
+                elLlm.innerHTML = '<span class="ab-host">🧠</span><span class="ab-m">' + m.name + gpu + '</span>';
+            }
+            function llmCard(llm) {
+                if (!llm || !llm.loaded || !llm.loaded.length) return '<div class="ab-card"><h4>🧠 LLM (Ollama)</h4>' + row('état', 'aucun modèle chargé') + '</div>';
+                var r = '';
+                llm.loaded.forEach(function (m) {
+                    r += row('Modèle', m.name);
+                    if (m.sizeGb != null) r += row('Taille', m.sizeGb + ' Go');
+                    if (m.onGpuPct != null) r += row('Sur GPU', m.onGpuPct + '% ' + (m.onGpuPct >= 100 ? '(entièrement)' : (m.onGpuPct > 0 ? '(offload partiel CPU)' : '(CPU)')));
+                });
+                return '<div class="ab-card"><h4>🧠 LLM (Ollama)</h4>' + r + '</div>';
+            }
+
+            function row(k, v) { return '<div class="row"><span>' + k + '</span><span>' + v + '</span></div>'; }
+            function card(name, s) {
+                if (!s) return '<div class="ab-card"><h4>🖥 ' + name + '</h4>' + row('état', 'injoignable') + '</div>';
+                var r = row('CPU (load / cœurs)', (s.load1 != null ? s.load1 : '?') + ' / ' + (s.cpus || '?') + ' · ' + (s.loadPct != null ? s.loadPct + '%' : '?'));
+                r += row('RAM', (s.memUsedGb != null ? s.memUsedGb : '?') + ' / ' + (s.memTotalGb != null ? s.memTotalGb : '?') + ' Go · ' + (s.memPct != null ? s.memPct + '%' : '?'));
+                if (s.cpuTempC != null) r += row('Température CPU', Math.round(s.cpuTempC) + ' °C');
+                var g = s.gpu;
+                if (g) {
+                    r += row('GPU', g.name || '—');
+                    r += row('GPU util / temp', (g.utilPct != null ? Math.round(g.utilPct) + '%' : '?') + ' / ' + (g.tempC != null ? Math.round(g.tempC) + ' °C' : '?'));
+                    r += row('VRAM', (g.memUsedMiB != null ? (g.memUsedMiB / 1024).toFixed(1) : '?') + ' / ' + (g.memTotalMiB != null ? (g.memTotalMiB / 1024).toFixed(1) : '?') + ' Go');
+                    r += row('Puissance', (g.powerW != null ? Math.round(g.powerW) : '?') + ' / ' + (g.powerLimitW != null ? Math.round(g.powerLimitW) : '?') + ' W');
+                }
+                return '<div class="ab-card"><h4>🖥 ' + name + '</h4>' + r + '</div>';
+            }
+
             function poll() {
                 fetch('/admin/harvest/status.json', { headers: { 'Accept': 'application/json' } })
                     .then(function (r) { return r.ok ? r.json() : null; })
                     .then(function (d) {
                         if (!d) return;
-                        if (load && d.system) {
-                            load.innerHTML = '🖥 ' + host('Thor', d.system.thor) + ' &nbsp; ' + host('Marvin', d.system.marvin);
+                        var sys = d.system || {};
+                        elThor.innerHTML = chip('Thor', sys.thor);
+                        elMarvin.innerHTML = chip('Marvin', sys.marvin);
+                        llmChip(d.llm);
+                        if (panel.classList.contains('open')) {
+                            grid.innerHTML = card('Thor', sys.thor) + card('Marvin', sys.marvin) + llmCard(d.llm);
                         }
-                        var running = (d.running || []).length, queued = d.queued || 0;
+                        var queued = d.queued || 0;
                         var run = (d.jobs || []).filter(function (j) { return j.status === 'running' && !j.stale; })[0];
                         if (run) {
-                            txt.textContent = '⏳ ' + (run.label || run.rubric) + ' — ' + run.processed + ' traité(s)' + (queued ? ' · ' + queued + ' en file' : '');
-                            bar.style.width = Math.min(100, Math.round(run.processed / 500 * 100)) + '%';
+                            txt.textContent = '⏳ ' + (run.label || run.rubric) + ' — ' + run.processed + (queued ? ' · ' + queued + ' en file' : '');
+                            fill.style.width = Math.min(100, Math.round(run.processed / 500 * 100)) + '%';
                         } else if (queued) {
-                            txt.textContent = '⏳ ' + queued + ' moisson(s) en file';
-                            bar.style.width = '5%';
+                            txt.textContent = '⏳ ' + queued + ' en file'; fill.style.width = '5%';
                         } else {
-                            txt.textContent = 'au repos'; bar.style.width = '0';
+                            txt.textContent = 'au repos'; fill.style.width = '0';
                         }
                     }).catch(function () {});
             }
+
+            toggle.addEventListener('click', function () {
+                var open = panel.classList.toggle('open');
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                toggle.textContent = open ? 'détails ▴' : 'détails ▾';
+                if (open) poll();
+            });
+
             poll();
             var t = setInterval(poll, 5000);
-            // (Pas de Mercure ici : le hub est hébergé par l'API, pas sur l'origine
-            // web → un EventSource('/.well-known/mercure') faisait un 404 systématique
-            // — la barre est de toute façon rafraîchie par le polling 5 s ci-dessus.)
+            // (Pas de Mercure ici : le hub est hébergé par l'API, pas sur l'origine web
+            // → un EventSource('/.well-known/mercure') faisait un 404 ; le polling 5 s suffit.)
             document.addEventListener('turbo:before-cache', function () { clearInterval(t); }, { once: true });
         })();
         </script>

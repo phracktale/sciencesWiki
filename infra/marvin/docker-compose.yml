@@ -59,9 +59,23 @@ services:
     environment:
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2}
       EMBEDDING_DIMENSIONS: "384"
+      # Batch plus large sur GPU (VRAM abondante) : débit de vectorisation nettement
+      # supérieur pour la moisson fulltext. Sans GPU, l'app retombe seule sur le CPU.
+      EMBEDDING_BATCH_SIZE: ${EMBEDDING_BATCH_SIZE:-128}
+    # GPU (RTX 3090 sur Marvin) : sentence-transformers bascule seul sur CUDA dès que le
+    # device est visible. Requiert le pilote NVIDIA + nvidia-container-toolkit sur l'hôte.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     ports:
-      # Exposé sur le réseau privé homelab uniquement (ne pas publier sur Internet).
-      - "8001:8001"
+      # Lié explicitement à l'IP LAN de Marvin (pas 0.0.0.0) → jamais exposé sur une
+      # interface WAN/WiFi. Ce service n'a AUCUNE authentification : le bind LAN est
+      # sa seule protection. Thor le joint par le réseau privé (ML_EMBED_URL).
+      - "192.168.1.171:8001:8001"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/health').status==200 else 1)"]
       interval: 30s
@@ -77,9 +91,19 @@ services:
       context: ../../ml/hhem
       dockerfile: Dockerfile
     image: scienceswiki-hhem:latest
+    # GPU (RTX 3090 sur Marvin) : le modèle est déplacé sur CUDA au démarrage si visible
+    # (cf. ml/hhem/app.py). Requiert le pilote NVIDIA + nvidia-container-toolkit sur l'hôte.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
     ports:
-      # Réseau privé homelab uniquement (ne pas publier sur Internet).
-      - "8002:8002"
+      # Lié explicitement à l'IP LAN de Marvin (pas 0.0.0.0). Service sans authentification :
+      # le bind LAN est sa seule protection. Thor le joint par le réseau privé (HHEM_URL).
+      - "192.168.1.171:8002:8002"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8002/health').status==200 else 1)"]
       interval: 30s

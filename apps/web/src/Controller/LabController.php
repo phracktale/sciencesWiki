@@ -123,7 +123,10 @@ final class LabController extends AbstractController
             $response = $this->httpClient->request($request->getMethod(), $url, $options);
             $contentType = $response->getHeaders(false)['content-type'][0] ?? 'application/json';
 
-            return new Response($response->getContent(false), $response->getStatusCode(), ['Content-Type' => $contentType]);
+            return new Response($response->getContent(false), $response->getStatusCode(), [
+                'Content-Type' => $contentType,
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
         } catch (\Throwable) {
             return new JsonResponse(['error' => 'Module analyses momentanément indisponible.'], 502);
         }
@@ -188,11 +191,39 @@ final class LabController extends AbstractController
 
         try {
             $response = $this->httpClient->request($request->getMethod(), $url, $options);
-            $contentType = $response->getHeaders(false)['content-type'][0] ?? 'application/json';
+            // Défense en profondeur : ce proxy sert sur l'origine du site. Le module ne doit
+            // jamais nous faire réémettre un type actif (text/html…) issu d'un upload. On borne
+            // à une liste blanche neutre + nosniff (le contenu image/PDF/JSON reste servi tel quel).
+            $contentType = $this->safeProxyContentType($response->getHeaders(false)['content-type'][0] ?? null);
 
-            return new Response($response->getContent(false), $response->getStatusCode(), ['Content-Type' => $contentType]);
+            return new Response($response->getContent(false), $response->getStatusCode(), [
+                'Content-Type' => $contentType,
+                'X-Content-Type-Options' => 'nosniff',
+            ]);
         } catch (\Throwable) {
             return new JsonResponse(['error' => 'Module figTrack momentanément indisponible.'], 502);
         }
+    }
+
+    /**
+     * Restreint le Content-Type relayé par figTrack à des types passifs connus. Tout type
+     * inattendu (notamment text/html, dérivé d'un Content-Type d'upload) retombe sur
+     * application/octet-stream, qui, combiné à `nosniff`, ne peut pas être interprété comme du HTML.
+     */
+    private function safeProxyContentType(?string $raw): string
+    {
+        $type = strtolower(trim(explode(';', (string) $raw)[0]));
+        $allowed = [
+            'application/json',
+            'application/pdf',
+            'image/png',
+            'image/jpeg',
+            'image/gif',
+            'image/webp',
+            'image/bmp',
+            'image/tiff',
+        ];
+
+        return \in_array($type, $allowed, true) ? $type : 'application/octet-stream';
     }
 }

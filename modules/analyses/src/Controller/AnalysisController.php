@@ -123,6 +123,9 @@ final class AnalysisController extends AbstractController
         if (null === $assessment) {
             return new JsonResponse(['error' => 'Analyse introuvable.'], 404);
         }
+        if ($deny = $this->denyIfNotOwner($assessment)) {
+            return $deny;
+        }
 
         return new JsonResponse($this->serialize($assessment, withDetails: true));
     }
@@ -137,6 +140,9 @@ final class AnalysisController extends AbstractController
         $assessment = $this->assessments->find(Ulid::fromString($id));
         if (null === $assessment) {
             return new JsonResponse(['error' => 'Analyse introuvable.'], 404);
+        }
+        if ($deny = $this->denyIfNotOwner($assessment)) {
+            return $deny;
         }
 
         $binary = $this->pdf->render($assessment, $this->criteria->findForAssessment($assessment->getId()));
@@ -158,6 +164,9 @@ final class AnalysisController extends AbstractController
         if (null === $assessment) {
             return new JsonResponse(['error' => 'Analyse introuvable.'], 404);
         }
+        if ($deny = $this->denyIfNotOwner($assessment)) {
+            return $deny;
+        }
 
         return new JsonResponse($this->projection->project(
             $assessment,
@@ -165,6 +174,24 @@ final class AnalysisController extends AbstractController
             $this->evidence->findForAssessment($assessment->getId()),
             $role,
         ));
+    }
+
+    /**
+     * Cloisonnement des analyses : seul le demandeur voit la sienne ; le comité (ROLE_COMITE,
+     * admin inclus par hiérarchie) garde un accès transverse pour la relecture/validation.
+     * Renvoie une réponse 404 (sans divulguer l'existence) à refuser, ou null si l'accès est permis.
+     */
+    private function denyIfNotOwner(Assessment $a): ?JsonResponse
+    {
+        $me = $this->getUser()?->getUserIdentifier();
+        if (null !== $me && $a->getRequestedBy() === $me) {
+            return null;
+        }
+        if ($this->isGranted('ROLE_COMITE')) {
+            return null;
+        }
+
+        return new JsonResponse(['error' => 'Analyse introuvable.'], 404);
     }
 
     /**
