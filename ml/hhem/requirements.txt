@@ -1,6 +1,9 @@
 fastapi>=0.110
 uvicorn[standard]>=0.29
-transformers>=4.40
+# HHEM-2.1-Open embarque une classe de modèle custom (trust_remote_code) qui référence
+# `_tied_weights_keys` ; les transformers >= 4.46 exigent `all_tied_weights_keys` et cassent
+# le chargement (AttributeError). On borne donc sous cette rupture d'API.
+transformers>=4.40,<4.46
 torch>=2.2
 sentencepiece>=0.2
 protobuf>=4.25
