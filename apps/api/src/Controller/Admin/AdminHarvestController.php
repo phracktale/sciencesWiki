@@ -29,6 +29,7 @@ final class AdminHarvestController
         private readonly string $mlEmbedUrl = '',
         #[\Symfony\Component\DependencyInjection\Attribute\Autowire(env: 'LLM_BASE_URL')]
         private readonly string $llmBaseUrl = '',
+        private readonly ?\App\Ai\Llm\LlmUsageMeter $usageMeter = null,
     ) {
     }
 
@@ -386,33 +387,42 @@ final class AdminHarvestController
         ];
     }
 
-    /** Modèle(s) LLM chargé(s) dans Ollama via /api/ps (nom + part chargée sur GPU). Null si injoignable. */
+    /**
+     * État LLM : modèle(s) chargé(s) dans Ollama (/api/ps, + part GPU) ET consommation de
+     * tokens du jour (DB, indépendante d'Ollama). L'usage reste renvoyé même si Ollama est
+     * injoignable ; on ne renvoie null que si ni Ollama ni l'usage ne sont disponibles.
+     */
     private function llmStats(): ?array
     {
-        $base = preg_replace('#/v1/?$#', '', $this->llmBaseUrl);
-        if (null === $base || '' === $base) {
-            return null;
-        }
-        try {
-            $d = $this->httpClient->request('GET', rtrim($base, '/').'/api/ps', ['timeout' => 3])->toArray(false);
-        } catch (\Throwable) {
-            return null;
-        }
+        // Conso du jour (DB) — best-effort, indépendante de la disponibilité d'Ollama.
+        $usageToday = $this->usageMeter?->today();
 
         $models = [];
-        foreach ($d['models'] ?? [] as $m) {
-            $size = (int) ($m['size'] ?? 0);
-            $vram = (int) ($m['size_vram'] ?? 0);
-            $models[] = [
-                'name' => (string) ($m['name'] ?? $m['model'] ?? '?'),
-                'sizeGb' => $size > 0 ? round($size / 1073741824, 1) : null,
-                // 100 % = entièrement sur le GPU ; 0 % = CPU ; entre les deux = offload partiel.
-                'onGpuPct' => $size > 0 ? (int) round($vram / $size * 100) : null,
-                'expiresAt' => $m['expires_at'] ?? null,
-            ];
+        $base = preg_replace('#/v1/?$#', '', $this->llmBaseUrl);
+        if (null !== $base && '' !== $base) {
+            try {
+                $d = $this->httpClient->request('GET', rtrim($base, '/').'/api/ps', ['timeout' => 3])->toArray(false);
+                foreach ($d['models'] ?? [] as $m) {
+                    $size = (int) ($m['size'] ?? 0);
+                    $vram = (int) ($m['size_vram'] ?? 0);
+                    $models[] = [
+                        'name' => (string) ($m['name'] ?? $m['model'] ?? '?'),
+                        'sizeGb' => $size > 0 ? round($size / 1073741824, 1) : null,
+                        // 100 % = entièrement sur le GPU ; 0 % = CPU ; entre les deux = offload partiel.
+                        'onGpuPct' => $size > 0 ? (int) round($vram / $size * 100) : null,
+                        'expiresAt' => $m['expires_at'] ?? null,
+                    ];
+                }
+            } catch (\Throwable) {
+                // Ollama injoignable : on garde l'usage du jour, sans la liste des modèles chargés.
+            }
         }
 
-        return ['loaded' => $models];
+        if ([] === $models && null === $usageToday) {
+            return null;
+        }
+
+        return ['loaded' => $models, 'usageToday' => $usageToday];
     }
 
     /** Température CPU de l'hôte (°C) lue dans /sys/class/hwmon (k10temp/coretemp…), ou null. */

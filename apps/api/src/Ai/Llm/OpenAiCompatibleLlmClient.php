@@ -18,6 +18,7 @@ final class OpenAiCompatibleLlmClient implements LlmClient
 {
     public function __construct(
         private readonly HttpClientInterface $httpClient,
+        private readonly LlmUsageMeter $usageMeter,
         #[Autowire(env: 'LLM_BASE_URL')]
         private readonly string $baseUrl,
         #[Autowire(env: 'LLM_MODEL')]
@@ -71,12 +72,18 @@ final class OpenAiCompatibleLlmClient implements LlmClient
         }
 
         $usage = \is_array($data['usage'] ?? null) ? $data['usage'] : [];
+        $usedModel = \is_string($data['model'] ?? null) ? $data['model'] : $this->model;
+        $promptTokens = isset($usage['prompt_tokens']) ? (int) $usage['prompt_tokens'] : null;
+        $completionTokens = isset($usage['completion_tokens']) ? (int) $usage['completion_tokens'] : null;
+
+        // Comptabilise la consommation du jour (best-effort, jamais bloquant).
+        $this->usageMeter->record($usedModel, $promptTokens, $completionTokens);
 
         return new LlmCompletion(
             content: $content,
-            model: \is_string($data['model'] ?? null) ? $data['model'] : $this->model,
-            promptTokens: isset($usage['prompt_tokens']) ? (int) $usage['prompt_tokens'] : null,
-            completionTokens: isset($usage['completion_tokens']) ? (int) $usage['completion_tokens'] : null,
+            model: $usedModel,
+            promptTokens: $promptTokens,
+            completionTokens: $completionTokens,
         );
     }
 

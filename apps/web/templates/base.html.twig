@@ -317,22 +317,44 @@
                 return h;
             }
 
-            // Modèle LLM chargé (Ollama) : puce compacte + carte détaillée.
+            // Formatage compact des grands nombres (tokens) : 1234 → 1.2k, 3400000 → 3.4M.
+            function fmtTok(n) {
+                if (n == null) return '?';
+                if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+                if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+                return '' + n;
+            }
+            // Modèle LLM chargé (Ollama) + tokens du jour : puce compacte + carte détaillée.
             function llmChip(llm) {
                 var m = llm && llm.loaded && llm.loaded[0];
-                if (!m) { elLlm.hidden = true; return; }
+                var u = llm && llm.usageToday;
+                if (!m && !(u && u.totalTokens)) { elLlm.hidden = true; return; }
                 elLlm.hidden = false;
-                var gpu = m.onGpuPct == null ? '' : ' <b class="' + (m.onGpuPct >= 100 ? 'ab-v-ok' : (m.onGpuPct > 0 ? 'ab-v-warn' : 'ab-v-crit')) + '">' + m.onGpuPct + '% GPU</b>';
-                elLlm.innerHTML = '<span class="ab-host">🧠</span><span class="ab-m">' + m.name + gpu + '</span>';
+                var parts = '';
+                if (m) {
+                    var gpu = m.onGpuPct == null ? '' : ' <b class="' + (m.onGpuPct >= 100 ? 'ab-v-ok' : (m.onGpuPct > 0 ? 'ab-v-warn' : 'ab-v-crit')) + '">' + m.onGpuPct + '% GPU</b>';
+                    parts += m.name + gpu;
+                }
+                if (u && u.totalTokens) parts += (parts ? ' · ' : '') + '<b>' + fmtTok(u.totalTokens) + '</b> tok/j';
+                elLlm.innerHTML = '<span class="ab-host">🧠</span><span class="ab-m">' + parts + '</span>';
             }
             function llmCard(llm) {
-                if (!llm || !llm.loaded || !llm.loaded.length) return '<div class="ab-card"><h4>🧠 LLM (Ollama)</h4>' + row('état', 'aucun modèle chargé') + '</div>';
+                var loaded = (llm && llm.loaded) || [];
+                var u = llm && llm.usageToday;
+                if (!loaded.length && !(u && u.totalCalls)) return '<div class="ab-card"><h4>🧠 LLM (Ollama)</h4>' + row('état', 'aucun modèle chargé, aucun appel du jour') + '</div>';
                 var r = '';
-                llm.loaded.forEach(function (m) {
-                    r += row('Modèle', m.name);
+                loaded.forEach(function (m) {
+                    r += row('Modèle chargé', m.name);
                     if (m.sizeGb != null) r += row('Taille', m.sizeGb + ' Go');
                     if (m.onGpuPct != null) r += row('Sur GPU', m.onGpuPct + '% ' + (m.onGpuPct >= 100 ? '(entièrement)' : (m.onGpuPct > 0 ? '(offload partiel CPU)' : '(CPU)')));
                 });
+                if (u) {
+                    r += row('Tokens aujourd\'hui', fmtTok(u.totalTokens) + ' (' + fmtTok(u.totalPrompt) + ' in + ' + fmtTok(u.totalCompletion) + ' out)');
+                    r += row('Appels aujourd\'hui', u.totalCalls);
+                    (u.models || []).slice(0, 5).forEach(function (mm) {
+                        r += row('· ' + mm.model, fmtTok(mm.prompt + mm.completion) + ' · ' + mm.calls + ' appels');
+                    });
+                }
                 return '<div class="ab-card"><h4>🧠 LLM (Ollama)</h4>' + r + '</div>';
             }
 
