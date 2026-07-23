@@ -6,7 +6,11 @@ framework:
             # Transport DÉDIÉ au module (table isolée analys_messenger_messages dans la
             # base SW partagée) : n'utilise PAS la file du cœur. auto_setup crée la table.
             analys_analysis:
-                dsn: 'doctrine://default?table_name=analys_messenger_messages&queue_name=analysis'
+                # redeliver_timeout élevé (4 h) : un run LLM long ne doit PAS être considéré
+                # comme abandonné puis re-livré en double pendant qu'il tourne encore (le worker
+                # a --time-limit=3600 et se recycle ; sans cette fenêtre large, le défaut 3600 s
+                # pouvait faire rejouer tout le pipeline). Aligné sur la file `analysis` du cœur.
+                dsn: 'doctrine://default?table_name=analys_messenger_messages&queue_name=analysis&redeliver_timeout=14400'
                 # 1 seul réessai : un référentiel lent est déjà isolé (les résultats obtenus
                 # survivent, revue humaine forcée) ; inutile de rejouer tout le pipeline LLM
                 # (long, worker unique) plus d'une fois en cas d'échec total.
